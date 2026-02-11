@@ -215,13 +215,14 @@ func (am *alertmanager) StopAndWait() {
 }
 
 // ApplyConfig applies the configuration to the Alertmanager.
-func (am *alertmanager) ApplyConfig(ctx context.Context, dbCfg *ngmodels.AlertConfiguration, opts ...ngmodels.ApplyConfigOption) error {
+func (am *alertmanager) ApplyConfig(ctx context.Context, dbCfg *ngmodels.AlertConfiguration, opts ...ngmodels.ApplyConfigOption) (bool, error) {
 	var err error
 	cfg, err := Load([]byte(dbCfg.AlertmanagerConfiguration))
 	if err != nil {
-		return fmt.Errorf("failed to parse Alertmanager config: %w", err)
+		return false, fmt.Errorf("failed to parse Alertmanager config: %w", err)
 	}
 
+	var configChanged bool
 	var outerErr error
 	am.Base.WithLock(func() {
 		// Note: Adding the autogen config here causes alert_configuration_history to update last_applied more often.
@@ -229,26 +230,15 @@ func (am *alertmanager) ApplyConfig(ctx context.Context, dbCfg *ngmodels.AlertCo
 		// To fix this however, the local alertmanager needs to be able to tell the difference between user-created and
 		// autogen config, which may introduce cross-cutting complexity.
 		defaults := ngmodels.ApplyConfigOptions{AutogenInvalidReceiversAction: LogInvalidReceivers}
-		configChanged, err := am.applyConfig(ctx, cfg, defaults.WithOverrides(opts...).AutogenInvalidReceiversAction)
+		changed, err := am.applyConfig(ctx, cfg, defaults.WithOverrides(opts...).AutogenInvalidReceiversAction)
 		if err != nil {
 			outerErr = fmt.Errorf("unable to apply configuration: %w", err)
 			return
 		}
-
-		if !configChanged {
-			return
-		}
-		markConfigCmd := ngmodels.MarkConfigurationAsAppliedCmd{
-			OrgID:             am.Base.TenantID(),
-			ConfigurationHash: dbCfg.ConfigurationHash,
-		}
-		err = am.Store.MarkConfigurationAsApplied(ctx, &markConfigCmd)
-		if err != nil {
-			outerErr = fmt.Errorf("unable to mark configuration as applied: %w", err)
-		}
+		configChanged = changed
 	})
 
-	return outerErr
+	return configChanged, outerErr
 }
 
 type AggregateMatchersUsage struct {

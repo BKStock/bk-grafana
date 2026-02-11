@@ -50,7 +50,7 @@ var (
 //go:generate mockery --name Alertmanager --structname AlertmanagerMock --with-expecter --output alertmanager_mock --outpkg alertmanager_mock
 type Alertmanager interface {
 	// Configuration
-	ApplyConfig(context.Context, *models.AlertConfiguration, ...models.ApplyConfigOption) error
+	ApplyConfig(context.Context, *models.AlertConfiguration, ...models.ApplyConfigOption) (bool, error)
 	GetStatus(context.Context) (apimodels.GettableStatus, error)
 
 	// Silences
@@ -361,19 +361,19 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 		}
 		orgsFound[orgID] = struct{}{}
 
-		alertmanager, found := moa.alertmanagers[orgID]
+		am, found := moa.alertmanagers[orgID]
 
 		if !found {
 			// These metrics are not exported by Grafana and are mostly a placeholder.
 			// To export them, we need to translate the metrics from each individual registry and,
 			// then aggregate them on the main registry.
-			am, err := moa.factory(ctx, orgID)
+			newAm, err := moa.factory(ctx, orgID)
 			if err != nil {
 				moa.logger.Error("Unable to create Alertmanager for org", "org", orgID, "error", err)
 				continue
 			}
-			moa.alertmanagers[orgID] = am
-			alertmanager = am
+			moa.alertmanagers[orgID] = newAm
+			am = newAm
 		}
 
 		dbConfig, cfgFound := dbConfigs[orgID]
@@ -389,22 +389,32 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				OrgID:                     orgID,
 				LastApplied:               time.Now().UTC().Unix(),
 			}, func(alertConfig models.AlertConfiguration) error {
-				return alertmanager.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+				_, err := am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+				return err
 			})
 			if err != nil {
 				moa.logger.Error("Failed to apply the default Alertmanager configuration", "org", orgID)
 				continue
 			}
-			moa.alertmanagers[orgID] = alertmanager
+			moa.alertmanagers[orgID] = am
 			continue
 		}
 
-		err := alertmanager.ApplyConfig(ctx, dbConfig)
+		configChanged, err := am.ApplyConfig(ctx, dbConfig)
 		if err != nil {
 			moa.logger.Error("Failed to apply Alertmanager config for org", "org", orgID, "id", dbConfig.ID, "error", err)
 			continue
 		}
-		moa.alertmanagers[orgID] = alertmanager
+		if configChanged {
+			if err = moa.configStore.MarkConfigurationAsApplied(ctx, &models.MarkConfigurationAsAppliedCmd{
+				OrgID:             orgID,
+				ConfigurationHash: dbConfig.ConfigurationHash,
+			}); err != nil {
+				moa.logger.Error("Failed to mark Alertmanager configuration as applied", "org", orgID, "hash", dbConfig.ConfigurationHash, "error", err)
+			}
+		}
+
+		moa.alertmanagers[orgID] = am
 	}
 
 	amsToStop := map[int64]Alertmanager{}

@@ -331,14 +331,18 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	config := &ngmodels.AlertConfiguration{
 		AlertmanagerConfiguration: string(encryptedConfig),
 	}
-	require.Error(t, am.ApplyConfig(ctx, config))
+	applied, err := am.ApplyConfig(ctx, config)
+	require.False(t, applied)
+	require.Error(t, err)
 	require.False(t, am.Ready())
 	require.Equal(t, 0, stateSyncs)
 	require.Equal(t, 0, configSyncs)
 
 	// A 200 status code response should make the check succeed.
 	server.Config.Handler = okHandler
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.True(t, applied)
+	require.NoError(t, err)
 	require.True(t, am.Ready())
 	require.Equal(t, 1, stateSyncs)
 	require.Equal(t, 1, configSyncs)
@@ -356,7 +360,9 @@ func TestIntegrationApplyConfig(t *testing.T) {
 
 	// If we already got a 200 status code response and the sync interval hasn't elapsed,
 	// we shouldn't send the state/configuration again.
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.False(t, applied) // Not applied.
+	require.NoError(t, err)
 	require.Equal(t, 1, stateSyncs)
 	require.Equal(t, 1, configSyncs)
 
@@ -366,21 +372,27 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	config = &ngmodels.AlertConfiguration{
 		AlertmanagerConfiguration: testGrafanaConfig,
 	}
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.True(t, applied)
+	require.NoError(t, err)
 	require.Equal(t, 2, configSyncs)
 	require.Equal(t, 1, stateSyncs)
 
 	// After a restart, the Alertmanager shouldn't send the configuration if it has not changed.
 	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
 	require.NoError(t, err)
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.False(t, applied) // Not applied.
+	require.NoError(t, err)
 	require.Equal(t, 2, configSyncs)
 
 	// Changing the "from" address should result in the configuration being updated.
 	cfg.SmtpConfig.FromAddress = "new-address@test.com"
 	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
 	require.NoError(t, err)
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.True(t, applied)
+	require.NoError(t, err)
 	require.Equal(t, 3, configSyncs)
 	require.Equal(t, am.smtp.FromAddress, configSent.SmtpConfig.FromAddress)
 
@@ -398,7 +410,9 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	}
 	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
 	require.NoError(t, err)
-	require.NoError(t, am.ApplyConfig(ctx, config))
+	applied, err = am.ApplyConfig(ctx, config)
+	require.True(t, applied)
+	require.NoError(t, err)
 	require.Equal(t, 4, configSyncs)
 	require.Equal(t, am.smtp, configSent.SmtpConfig)
 
@@ -656,9 +670,10 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 			cfg := ngmodels.AlertConfiguration{
 				AlertmanagerConfiguration: test.config,
 			}
-			err = am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
+			applied, err := am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
 			if len(test.expErrContains) == 0 {
 				require.NoError(tt, err)
+				require.True(tt, applied)
 
 				var gotCfg client.UserGrafanaConfig
 				require.NoError(tt, json.Unmarshal([]byte(got), &gotCfg))
@@ -674,13 +689,15 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 
 				got1 := got
 				got = ""
-				err = am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
+				applied, err = am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
 				require.NoError(tt, err)
+				require.True(tt, applied)
 
 				got2 := got
 				require.Equalf(tt, got1, got2, "Configuration is not idempotent")
 				return
 			}
+			require.False(tt, applied)
 			for _, expErr := range test.expErrContains {
 				require.ErrorContains(tt, err, expErr)
 			}
@@ -847,8 +864,9 @@ receivers:
 
 	configJSON, err := json.Marshal(cfg)
 	require.NoError(t, err)
-	err = am.ApplyConfig(ctx, &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
+	applied, err := am.ApplyConfig(ctx, &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
 	require.NoError(t, err)
+	require.True(t, applied)
 
 	require.Equal(t, len(configSent.GrafanaAlertmanagerConfig.AlertmanagerConfig.Receivers), 2)
 
@@ -964,8 +982,9 @@ receivers:
 		AlertmanagerConfiguration: string(configJSON),
 	}
 
-	err = am.CompareAndSendConfiguration(ctx, config, notifier.LogInvalidReceivers)
+	sent, err := am.CompareAndSendConfiguration(ctx, config, notifier.LogInvalidReceivers)
 	require.NoError(t, err)
+	require.True(t, sent)
 
 	require.Equal(t, len(configSent.GrafanaAlertmanagerConfig.AlertmanagerConfig.Receivers), 2)
 	found := slices.ContainsFunc(configSent.GrafanaAlertmanagerConfig.AlertmanagerConfig.Receivers, func(rcv *apimodels.PostableApiReceiver) bool {
@@ -1033,7 +1052,9 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 	// Using `ApplyConfig` as a heuristic of a function that gets called when the Alertmanager starts
 	// We call it as if the Alertmanager were starting.
 	{
-		require.NoError(t, am.ApplyConfig(ctx, testConfig))
+		applied, err := am.ApplyConfig(ctx, testConfig)
+		require.True(t, applied)
+		require.NoError(t, err)
 
 		// First, we need to verify that the readiness check passes.
 		require.True(t, am.Ready())
@@ -1058,7 +1079,9 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 		require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", "silences", testSilence2))
 		require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", "notifications", testNflog2))
 		testConfig.CreatedAt = time.Now().Unix()
-		require.NoError(t, am.ApplyConfig(ctx, testConfig))
+		applied, err := am.ApplyConfig(ctx, testConfig)
+		require.True(t, applied)
+		require.NoError(t, err)
 
 		// The remote Alertmanager continues to be ready.
 		require.True(t, am.Ready())

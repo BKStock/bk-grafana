@@ -82,7 +82,8 @@ func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, 
 	}
 
 	err = moa.configStore.SaveAlertmanagerConfigurationWithCallback(ctx, cmd, func(alertConfig models.AlertConfiguration) error {
-		return am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers))
+		_, err := am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers))
+		return err
 	})
 	if err != nil {
 		return err
@@ -121,9 +122,17 @@ func (moa *MultiOrgAlertmanager) ApplyConfig(ctx context.Context, orgId int64, d
 		}
 	}
 
-	err = am.ApplyConfig(ctx, dbConfig)
+	configChanged, err := am.ApplyConfig(ctx, dbConfig)
 	if err != nil {
 		return fmt.Errorf("failed to apply configuration: %w", err)
+	}
+	if configChanged {
+		if err = moa.configStore.MarkConfigurationAsApplied(ctx, &models.MarkConfigurationAsAppliedCmd{
+			OrgID:             orgId,
+			ConfigurationHash: dbConfig.ConfigurationHash,
+		}); err != nil {
+			moa.logger.Error("Failed to mark Alertmanager configuration as applied", "org", orgId, "hash", dbConfig.ConfigurationHash, "error", err)
+		}
 	}
 	return nil
 }
@@ -543,6 +552,7 @@ func (moa *MultiOrgAlertmanager) saveAndApplyConfig(ctx context.Context, org int
 	}
 
 	return moa.configStore.SaveAlertmanagerConfigurationWithCallback(ctx, cmd, func(alertConfig models.AlertConfiguration) error {
-		return am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+		_, err := am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+		return err
 	})
 }

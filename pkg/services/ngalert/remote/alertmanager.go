@@ -256,34 +256,35 @@ func NewAlertmanager(
 // 1. Execute a readiness check to make sure the remote Alertmanager we're about to communicate with is up and ready.
 // 2. Upload the configuration and state we currently hold.
 // On each subsequent call to ApplyConfig we compare and upload only the configuration.
-func (am *Alertmanager) ApplyConfig(ctx context.Context, config *models.AlertConfiguration, opts ...models.ApplyConfigOption) error {
+func (am *Alertmanager) ApplyConfig(ctx context.Context, config *models.AlertConfiguration, opts ...models.ApplyConfigOption) (bool, error) {
 	if am.ready {
 		am.log.Debug("Alertmanager previously marked as ready, skipping readiness check and state sync")
 	} else {
 		am.log.Debug("Start readiness check for remote Alertmanager", "url", am.url)
 		if err := am.checkReadiness(ctx); err != nil {
-			return fmt.Errorf("unable to pass the readiness check: %w", err)
+			return false, fmt.Errorf("unable to pass the readiness check: %w", err)
 		}
 		am.log.Debug("Completed readiness check for remote Alertmanager, starting state upload", "url", am.url)
 
 		if err := am.SendState(ctx); err != nil {
-			return fmt.Errorf("unable to upload the state to the remote Alertmanager: %w", err)
+			return false, fmt.Errorf("unable to upload the state to the remote Alertmanager: %w", err)
 		}
 		am.log.Debug("Completed state upload to remote Alertmanager", "url", am.url)
 	}
 
 	if time.Since(am.lastConfigSync) < am.syncInterval {
 		am.log.Debug("Not syncing configuration to remote Alertmanager, last sync was too recent")
-		return nil
+		return false, nil
 	}
 
 	am.log.Debug("Start configuration upload to remote Alertmanager", "url", am.url)
 	defaults := models.ApplyConfigOptions{AutogenInvalidReceiversAction: models.LogInvalidReceivers}
-	if err := am.CompareAndSendConfiguration(ctx, config, defaults.WithOverrides(opts...).AutogenInvalidReceiversAction); err != nil {
-		return fmt.Errorf("unable to upload the configuration to the remote Alertmanager: %w", err)
+	sent, err := am.CompareAndSendConfiguration(ctx, config, defaults.WithOverrides(opts...).AutogenInvalidReceiversAction)
+	if err != nil {
+		return false, fmt.Errorf("unable to upload the configuration to the remote Alertmanager: %w", err)
 	}
-	am.log.Debug("Completed configuration upload to remote Alertmanager", "url", am.url)
-	return nil
+	am.log.Debug("Completed configuration upload to remote Alertmanager", "url", am.url, "uploaded", sent)
+	return sent, nil
 }
 
 func (am *Alertmanager) checkReadiness(ctx context.Context) error {
@@ -300,17 +301,17 @@ func (am *Alertmanager) checkReadiness(ctx context.Context) error {
 
 // CompareAndSendConfiguration checks whether a given configuration is being used by the remote Alertmanager.
 // If not, it sends the configuration to the remote Alertmanager.
-func (am *Alertmanager) CompareAndSendConfiguration(ctx context.Context, config *models.AlertConfiguration, autogenInvalidReceiverAction models.InvalidReceiversAction) error {
+func (am *Alertmanager) CompareAndSendConfiguration(ctx context.Context, config *models.AlertConfiguration, autogenInvalidReceiverAction models.InvalidReceiversAction) (bool, error) {
 	payload, err := am.buildConfiguration(ctx, config, config.CreatedAt, autogenInvalidReceiverAction)
 	if err != nil {
-		return fmt.Errorf("unable to build configuration: %w", err)
+		return false, fmt.Errorf("unable to build configuration: %w", err)
 	}
 	// Send the configuration only if we need to.
 	if !am.shouldSendConfig(ctx, payload) {
-		return nil
+		return false, nil
 	}
 
-	return am.sendConfiguration(ctx, payload)
+	return true, am.sendConfiguration(ctx, payload)
 }
 
 func (am *Alertmanager) isDefaultConfiguration(configHash string) bool {

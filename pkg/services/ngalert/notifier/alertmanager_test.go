@@ -168,14 +168,15 @@ receivers:
 
 			configJSON, err := json.Marshal(tc.config)
 			require.NoError(t, err)
-			err = am.ApplyConfig(context.Background(), &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
+			changed, err := am.ApplyConfig(context.Background(), &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
 
 			if tc.expectedError != "" {
+				require.False(t, changed)
 				require.Error(t, err)
 				require.ErrorContains(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
-
+				require.True(t, changed)
 				appliedCfg, err := Load(am.Base.GetStatus())
 				require.NoError(t, err)
 
