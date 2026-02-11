@@ -66,14 +66,24 @@ func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, 
 	moa.alertmanagersMtx.RLock()
 	defer moa.alertmanagersMtx.RUnlock()
 
-	orgAM, err := moa.alertmanagerForOrg(orgId)
+	am, err := moa.alertmanagerForOrg(orgId)
 	if err != nil {
 		return err
 	}
 
 	previousConfig, cleanPermissionsErr := moa.configStore.GetLatestAlertmanagerConfiguration(ctx, orgId)
 
-	err = orgAM.SaveAndApplyDefaultConfig(ctx)
+	cmd := &models.SaveAlertmanagerConfigurationCmd{
+		AlertmanagerConfiguration: moa.settings.UnifiedAlerting.DefaultConfiguration,
+		Default:                   true,
+		ConfigurationVersion:      fmt.Sprintf("v%d", models.AlertConfigurationVersion),
+		OrgID:                     orgId,
+		LastApplied:               time.Now().UTC().Unix(),
+	}
+
+	err = moa.configStore.SaveAlertmanagerConfigurationWithCallback(ctx, cmd, func(alertConfig models.AlertConfiguration) error {
+		return am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers))
+	})
 	if err != nil {
 		return err
 	}

@@ -51,7 +51,6 @@ var (
 type Alertmanager interface {
 	// Configuration
 	ApplyConfig(context.Context, *models.AlertConfiguration, ...models.ApplyConfigOption) error
-	SaveAndApplyDefaultConfig(ctx context.Context) error
 	GetStatus(context.Context) (apimodels.GettableStatus, error)
 
 	// Silences
@@ -383,7 +382,15 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				// This means that the configuration is gone but the organization, as well as the Alertmanager, exists.
 				moa.logger.Warn("Alertmanager exists for org but the configuration is gone. Applying the default configuration", "org", orgID)
 			}
-			err := alertmanager.SaveAndApplyDefaultConfig(ctx)
+			err := moa.configStore.SaveAlertmanagerConfigurationWithCallback(ctx, &models.SaveAlertmanagerConfigurationCmd{
+				AlertmanagerConfiguration: moa.settings.UnifiedAlerting.DefaultConfiguration,
+				Default:                   true,
+				ConfigurationVersion:      fmt.Sprintf("v%d", models.AlertConfigurationVersion),
+				OrgID:                     orgID,
+				LastApplied:               time.Now().UTC().Unix(),
+			}, func(alertConfig models.AlertConfiguration) error {
+				return alertmanager.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+			})
 			if err != nil {
 				moa.logger.Error("Failed to apply the default Alertmanager configuration", "org", orgID)
 				continue

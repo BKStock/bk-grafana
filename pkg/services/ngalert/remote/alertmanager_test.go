@@ -1079,32 +1079,6 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 		require.Equal(t, encodedFullState, state.State)
 	}
 
-	// `SaveAndApplyDefaultConfig` should send the default Alertmanager configuration to the remote Alertmanager.
-	{
-		require.NoError(t, am.SaveAndApplyDefaultConfig(ctx))
-
-		// Check that the default configuration was uploaded.
-		config, err := am.mimirClient.GetGrafanaAlertmanagerConfig(ctx)
-		require.NoError(t, err)
-
-		pCfg, err := notifier.Load([]byte(defaultGrafanaConfig))
-		require.NoError(t, err)
-
-		want, err := json.Marshal(pCfg)
-		require.NoError(t, err)
-
-		got, err := json.Marshal(config.GrafanaAlertmanagerConfig)
-		require.NoError(t, err)
-
-		require.JSONEq(t, string(want), string(got))
-		require.True(t, config.Default)
-
-		// An error while adding auto-generated rutes should be returned.
-		am.autogenFn = errAutogenFn
-		require.ErrorIs(t, am.SaveAndApplyDefaultConfig(ctx), errTest)
-		am.autogenFn = NoopAutogenFn
-	}
-
 	// TODO: Now, shutdown the Alertmanager and we expect the latest configuration to be uploaded.
 	{
 	}
