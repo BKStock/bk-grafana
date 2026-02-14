@@ -23,6 +23,7 @@ import { ShareExportDashboardButton } from './DashboardExportButton';
 import { DashboardOutline } from './DashboardOutline';
 import { ElementEditPane } from './ElementEditPane';
 import { AddNewEditPane } from './add-new/AddNewEditPane';
+import { applyJsonToDashboard, getDashboardJsonText } from './codePaneUtils';
 
 export interface Props {
   editPane: DashboardEditPane;
@@ -120,7 +121,11 @@ export function DashboardEditPaneRenderer({ editPane, dashboard }: Props) {
       )}
       {openPane === 'code' && (
         <Sidebar.OpenPane>
-          <DashboardCodePane dashboard={dashboard} />
+          <DashboardCodePane
+            key={dashboard.state.key}
+            initialValue={getDashboardJsonText(dashboard)}
+            onApply={(jsonText) => applyJsonToDashboard(dashboard, jsonText)}
+          />
         </Sidebar.OpenPane>
       )}
       <Sidebar.Toolbar>
