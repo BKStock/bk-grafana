@@ -32,7 +32,6 @@ export const getColumnIdx = async (loc: Page | Locator, columnName: string) => {
   return result;
 };
 
-// helper utils
 export const waitForTableLoad = async (loc: Page | Locator) => {
-  await expect(loc.locator('.rdg')).toBeVisible();
+  await expect(loc.locator('.rdg').first()).toBeVisible();
 };
