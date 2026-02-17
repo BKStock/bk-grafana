@@ -865,4 +865,8 @@ const (
 	// FlagAnalyticsFramework
 	// Enables new analytics framework
 	FlagAnalyticsFramework = "analyticsFramework"
+
+	// FlagAlertingNotificationHistoryContactPoints
+	// Enables the notification history contact points page drawer
+	FlagAlertingNotificationHistoryContactPoints = "alertingNotificationHistoryContactPoints"
 )

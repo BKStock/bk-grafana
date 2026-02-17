@@ -2514,6 +2514,14 @@ var (
 			HideFromDocs: true,
 			Expression:   "false",
 		},
+		{
+			Name:         "alertingNotificationHistoryContactPoints",
+			Description:  "Enables the notification history contact points page drawer",
+			Stage:        FeatureStageExperimental,
+			Owner:        grafanaAlertingSquad,
+			HideFromDocs: true,
+			Expression:   "false",
+		},
 	}
 )
 
