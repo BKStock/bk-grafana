@@ -215,13 +215,7 @@ func (am *alertmanager) StopAndWait() {
 }
 
 // ApplyConfig applies the configuration to the Alertmanager.
-func (am *alertmanager) ApplyConfig(ctx context.Context, dbCfg *ngmodels.AlertConfiguration, opts ...ngmodels.ApplyConfigOption) (bool, error) {
-	var err error
-	cfg, err := Load([]byte(dbCfg.AlertmanagerConfiguration))
-	if err != nil {
-		return false, fmt.Errorf("failed to parse Alertmanager config: %w", err)
-	}
-
+func (am *alertmanager) ApplyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig, opts ...ngmodels.ApplyConfigOption) (bool, error) {
 	var configChanged bool
 	var outerErr error
 	am.Base.WithLock(func() {
@@ -291,6 +285,7 @@ func (am *alertmanager) aggregateInhibitMatchers(rules []apimodels.InhibitRule, 
 // It returns a boolean indicating whether the user config was changed and an error.
 // It is not safe to call concurrently.
 func (am *alertmanager) applyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig, onInvalid InvalidReceiversAction) (bool, error) {
+	// TODO: How much of this can I extract out of here and into moa?
 	err := am.crypto.DecryptExtraConfigs(ctx, cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to decrypt external configurations: %w", err)

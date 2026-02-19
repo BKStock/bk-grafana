@@ -50,7 +50,7 @@ var (
 //go:generate mockery --name Alertmanager --structname AlertmanagerMock --with-expecter --output alertmanager_mock --outpkg alertmanager_mock
 type Alertmanager interface {
 	// Configuration
-	ApplyConfig(context.Context, *models.AlertConfiguration, ...models.ApplyConfigOption) (bool, error)
+	ApplyConfig(context.Context, *apimodels.PostableUserConfig, ...models.ApplyConfigOption) (bool, error)
 	GetStatus(context.Context) (apimodels.GettableStatus, error)
 
 	// Silences
@@ -389,7 +389,12 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				OrgID:                     orgID,
 				LastApplied:               time.Now().UTC().Unix(),
 			}, func(alertConfig models.AlertConfiguration) error {
-				_, err := am.ApplyConfig(ctx, &alertConfig, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+				cfg, err := Load([]byte(alertConfig.AlertmanagerConfiguration))
+				if err != nil {
+					return fmt.Errorf("failed to parse Alertmanager config: %w", err)
+				}
+
+				_, err = am.ApplyConfig(ctx, cfg, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
 				return err
 			})
 			if err != nil {
@@ -400,7 +405,13 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 			continue
 		}
 
-		configChanged, err := am.ApplyConfig(ctx, dbConfig)
+		cfg, err := Load([]byte(dbConfig.AlertmanagerConfiguration))
+		if err != nil {
+			moa.logger.Error("Failed to parse Alertmanager config", "org", orgID, "id", dbConfig.ID, "error", err)
+			continue
+		}
+
+		configChanged, err := am.ApplyConfig(ctx, cfg)
 		if err != nil {
 			moa.logger.Error("Failed to apply Alertmanager config for org", "org", orgID, "id", dbConfig.ID, "error", err)
 			continue
