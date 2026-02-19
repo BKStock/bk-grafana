@@ -393,8 +393,15 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				if err != nil {
 					return fmt.Errorf("failed to parse Alertmanager config: %w", err)
 				}
-
-				_, err = am.ApplyConfig(ctx, cfg, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+				preparedCfg, err := moa.prepareApplyConfig(ctx, orgID, cfg, ErrorOnInvalidReceivers)
+				if err != nil {
+					return err
+				}
+				_, err = am.ApplyConfig(
+					ctx,
+					preparedCfg,
+					models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers), // Rollback save if apply fails.
+				)
 				return err
 			})
 			if err != nil {
@@ -411,7 +418,12 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 			continue
 		}
 
-		configChanged, err := am.ApplyConfig(ctx, cfg)
+		preparedCfg, err := moa.prepareApplyConfig(ctx, orgID, cfg, LogInvalidReceivers)
+		if err != nil {
+			moa.logger.Error("Failed to prepare Alertmanager config", "org", orgID, "id", dbConfig.ID, "error", err)
+			continue
+		}
+		configChanged, err := am.ApplyConfig(ctx, preparedCfg)
 		if err != nil {
 			moa.logger.Error("Failed to apply Alertmanager config for org", "org", orgID, "id", dbConfig.ID, "error", err)
 			continue

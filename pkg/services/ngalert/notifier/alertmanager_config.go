@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/go-openapi/strfmt"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/grafana/grafana/pkg/apimachinery/errutil"
+	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/ngalert/notifier/legacy_storage"
@@ -62,6 +64,56 @@ type configurationStore interface {
 	GetLatestAlertmanagerConfiguration(ctx context.Context, orgID int64) (*models.AlertConfiguration, error)
 }
 
+func (moa *MultiOrgAlertmanager) prepareApplyConfig(ctx context.Context, orgID int64, cfg *definitions.PostableUserConfig, onInvalid InvalidReceiversAction) (*definitions.PostableUserConfig, error) {
+	// Clone (is this needed?)
+	serialized, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize Alertmanager config: %w", err)
+	}
+
+	var prepared definitions.PostableUserConfig
+	if err := json.Unmarshal(serialized, &prepared); err != nil {
+		return nil, fmt.Errorf("failed to clone Alertmanager config: %w", err)
+	}
+
+	if err := moa.Crypto.DecryptExtraConfigs(ctx, &prepared); err != nil {
+		return nil, fmt.Errorf("failed to decrypt external configurations: %w", err)
+	}
+
+	mergeResult, err := prepared.GetMergedAlertmanagerConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full alertmanager configuration: %w", err)
+	}
+	if logInfo := mergeResult.LogContext(); len(logInfo) > 0 {
+		moa.logger.Info("Configurations merged successfully but some resources were renamed", logInfo...)
+	}
+	preparedConfig := mergeResult.Config
+
+	// Add extra route as managed route to the configuration.
+	//nolint:staticcheck // not yet migrated to OpenFeature
+	if moa.featureManager.IsEnabledGlobally(featuremgmt.FlagAlertingMultiplePolicies) {
+		managed := maps.Clone(prepared.ManagedRoutes)
+		if managed == nil {
+			managed = make(map[string]*definitions.Route)
+		}
+		if mergeResult.ExtraRoute != nil {
+			if _, ok := managed[mergeResult.Identifier]; ok {
+				moa.logger.Warn("Imported configuration name conflicts with existing managed routes, skipping adding imported config.", "identifier", mergeResult.Identifier)
+			} else {
+				managed[mergeResult.Identifier] = mergeResult.ExtraRoute
+			}
+		}
+		preparedConfig.Route = legacy_storage.WithManagedRoutes(preparedConfig.Route, managed)
+	}
+
+	if err := AddAutogenConfig(ctx, moa.logger, moa.configStore, orgID, &preparedConfig, onInvalid, moa.featureManager); err != nil {
+		return nil, err
+	}
+
+	prepared.AlertmanagerConfig = preparedConfig
+	return &prepared, nil
+}
+
 func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, orgId int64) error {
 	moa.alertmanagersMtx.RLock()
 	defer moa.alertmanagersMtx.RUnlock()
@@ -86,7 +138,15 @@ func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, 
 		if err != nil {
 			return fmt.Errorf("failed to parse Alertmanager config: %w", err)
 		}
-		_, err = am.ApplyConfig(ctx, cfg, models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers))
+		preparedCfg, err := moa.prepareApplyConfig(ctx, orgId, cfg, LogInvalidReceivers)
+		if err != nil {
+			return err
+		}
+		_, err = am.ApplyConfig(
+			ctx,
+			preparedCfg,
+			models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers),
+		)
 		return err
 	})
 	if err != nil {
@@ -131,7 +191,14 @@ func (moa *MultiOrgAlertmanager) ApplyConfig(ctx context.Context, orgId int64, d
 		}
 	}
 
-	configChanged, err := am.ApplyConfig(ctx, cfg)
+	preparedCfg, err := moa.prepareApplyConfig(ctx, orgId, cfg, LogInvalidReceivers)
+	if err != nil {
+		return fmt.Errorf("failed to prepare configuration: %w", err)
+	}
+	configChanged, err := am.ApplyConfig(
+		ctx,
+		preparedCfg,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to apply configuration: %w", err)
 	}
@@ -565,8 +632,15 @@ func (moa *MultiOrgAlertmanager) saveAndApplyConfig(ctx context.Context, org int
 		if err != nil {
 			return fmt.Errorf("failed to parse Alertmanager config: %w", err)
 		}
-
-		_, err = am.ApplyConfig(ctx, cfg, models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers)) // Rollback save if apply fails.
+		preparedCfg, err := moa.prepareApplyConfig(ctx, org, cfg, ErrorOnInvalidReceivers)
+		if err != nil {
+			return err
+		}
+		_, err = am.ApplyConfig(
+			ctx,
+			preparedCfg,
+			models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers), // Rollback save if apply fails.
+		)
 		return err
 	})
 }
