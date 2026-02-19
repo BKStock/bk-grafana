@@ -227,7 +227,7 @@ func TestGetRemoteState(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(tt *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewServer(test.handler)
 			cfg := AlertmanagerConfig{
 				OrgID:         1,
@@ -328,9 +328,8 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	am, err := newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
 	require.NoError(t, err)
 
-	config := &ngmodels.AlertConfiguration{
-		AlertmanagerConfiguration: string(encryptedConfig),
-	}
+	config, err := notifier.Load(encryptedConfig)
+	require.NoError(t, err)
 	applied, err := am.ApplyConfig(ctx, config)
 	require.False(t, applied)
 	require.Error(t, err)
@@ -369,9 +368,8 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	// Changing the sync interval and calling ApplyConfig again with a new config
 	// should result in us sending the configuration but not the state.
 	am.syncInterval = 0
-	config = &ngmodels.AlertConfiguration{
-		AlertmanagerConfiguration: testGrafanaConfig,
-	}
+	config, err = notifier.Load([]byte(testGrafanaConfig))
+	require.NoError(t, err)
 	applied, err = am.ApplyConfig(ctx, config)
 	require.True(t, applied)
 	require.NoError(t, err)
@@ -459,24 +457,29 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		return nil
 	}
 
+	cloneConfig := func(c apimodels.PostableUserConfig) apimodels.PostableUserConfig {
+		clone, err := json.Marshal(c)
+		require.NoError(t, err)
+		var cloneCfg apimodels.PostableUserConfig
+		require.NoError(t, json.Unmarshal(clone, &cloneCfg))
+		return cloneCfg
+	}
+
 	// Create a config with correctly encrypted and encoded secrets.
 	var inputCfg apimodels.PostableUserConfig
 	require.NoError(t, json.Unmarshal([]byte(testGrafanaConfigWithSecret), &inputCfg))
 	encryptedReceivers, err := notifier.EncryptedReceivers(inputCfg.AlertmanagerConfig.Receivers, notifier.EncryptIntegrationSettings(context.Background(), secretsService))
 	inputCfg.AlertmanagerConfig.Receivers = encryptedReceivers
 	require.NoError(t, err)
-	testGrafanaConfigWithEncryptedSecret, err := json.Marshal(inputCfg)
-	require.NoError(t, err)
+	testGrafanaConfigWithEncryptedSecret := cloneConfig(inputCfg)
 
 	// Created a config with invalid base64 encoding in the secret.
 	inputCfg.AlertmanagerConfig.Receivers[0].PostableGrafanaReceivers.GrafanaManagedReceivers[0].SecureSettings["password"] = "!"
-	testGrafanaConfigWithBadEncoding, err := json.Marshal(inputCfg)
-	require.NoError(t, err)
+	testGrafanaConfigWithBadEncoding := cloneConfig(inputCfg)
 
 	// Create a config with a valid base64 encoding but an invalid encryption.
 	inputCfg.AlertmanagerConfig.Receivers[0].PostableGrafanaReceivers.GrafanaManagedReceivers[0].SecureSettings["password"] = base64.StdEncoding.EncodeToString([]byte("test"))
-	testGrafanaConfigWithBadEncryption, err := json.Marshal(inputCfg)
-	require.NoError(t, err)
+	testGrafanaConfigWithBadEncryption := cloneConfig(inputCfg)
 
 	test, err := notifier.Load([]byte(testGrafanaConfigWithSecret))
 	require.NoError(t, err)
@@ -505,16 +508,9 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		Templates:          definition.TemplatesMapToPostableAPITemplates(cfgWithExtraUnmerged.ExtraConfigs[0].TemplateFiles, definition.MimirTemplateKind),
 	}
 
-	mustMarshal := func(v any) []byte {
-		t.Helper()
-		b, err := json.Marshal(v)
-		require.NoError(t, err)
-		return b
-	}
-
 	tests := []struct {
 		name                  string
-		config                string
+		config                apimodels.PostableUserConfig
 		autogenFn             AutogenFn
 		enabledMultipleRoutes bool
 		expCfg                *client.UserGrafanaConfig
@@ -522,31 +518,31 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 	}{
 		{
 			name:           "invalid config",
-			config:         "{}",
+			config:         apimodels.PostableUserConfig{},
 			autogenFn:      NoopAutogenFn,
 			expErrContains: []string{"no route provided in config"},
 		},
 		{
 			name:           "invalid base-64 in key",
-			config:         string(testGrafanaConfigWithBadEncoding),
+			config:         testGrafanaConfigWithBadEncoding,
 			autogenFn:      NoopAutogenFn,
 			expErrContains: []string{`"grafana-default-email"`, "dde6ntuob69dtf", "password", "illegal base64 data at input byte 0"},
 		},
 		{
 			name:           "decrypt error",
-			config:         string(testGrafanaConfigWithBadEncryption),
+			config:         testGrafanaConfigWithBadEncryption,
 			autogenFn:      NoopAutogenFn,
 			expErrContains: []string{`"grafana-default-email"`, "dde6ntuob69dtf", "password", "unable to compute salt"},
 		},
 		{
 			name:           "error from autogen function",
-			config:         string(testGrafanaConfigWithEncryptedSecret),
+			config:         testGrafanaConfigWithEncryptedSecret,
 			autogenFn:      errAutogenFn,
 			expErrContains: []string{errTest.Error()},
 		},
 		{
 			name:      "no error",
-			config:    string(testGrafanaConfigWithEncryptedSecret),
+			config:    testGrafanaConfigWithEncryptedSecret,
 			autogenFn: NoopAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
 				GrafanaAlertmanagerConfig: cfgWithDecryptedSecret,
@@ -554,7 +550,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name:      "no error, with auto-generated routes",
-			config:    string(testGrafanaConfigWithEncryptedSecret),
+			config:    testGrafanaConfigWithEncryptedSecret,
 			autogenFn: testAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
 				GrafanaAlertmanagerConfig: cfgWithAutogenRoutes,
@@ -562,7 +558,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name:      "no error, with extra configurations",
-			config:    string(cfgWithExtraUnmergedBytes),
+			config:    *cfgWithExtraUnmerged,
 			autogenFn: NoopAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
 				GrafanaAlertmanagerConfig: cfgWithExtraMerged,
@@ -570,7 +566,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name:                  "no error, with extra configurations and managed routes enabled",
-			config:                string(cfgWithExtraUnmergedBytes),
+			config:                *cfgWithExtraUnmerged,
 			enabledMultipleRoutes: true,
 			autogenFn:             NoopAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
@@ -596,7 +592,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name:                  "no error, with managed routes",
-			config:                string(mustMarshal(policy_exports.Config())),
+			config:                *policy_exports.Config(),
 			enabledMultipleRoutes: true,
 			autogenFn:             NoopAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
@@ -611,7 +607,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name:                  "no error, with managed routes but flag disabled",
-			config:                string(mustMarshal(policy_exports.Config())),
+			config:                *policy_exports.Config(),
 			enabledMultipleRoutes: false,
 			autogenFn:             NoopAutogenFn,
 			expCfg: &client.UserGrafanaConfig{
@@ -622,14 +618,14 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		},
 		{
 			name: "do not add managed route from extra config if name conflict",
-			config: func() string {
-				cfgWithExtraUnmerged, err := notifier.Load(cfgWithExtraUnmergedBytes)
+			config: func() apimodels.PostableUserConfig {
+				c, err := notifier.Load(cfgWithExtraUnmergedBytes)
 				require.NoError(t, err)
 
-				cfgWithExtraUnmerged.ManagedRoutes = map[string]*definition.Route{
+				c.ManagedRoutes = map[string]*definition.Route{
 					"imported": {Receiver: "grafana-default-email"},
 				}
-				return string(mustMarshal(cfgWithExtraUnmerged))
+				return *c
 			}(),
 			enabledMultipleRoutes: true,
 			autogenFn:             NoopAutogenFn,
@@ -657,7 +653,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 		t.Run(test.name, func(tt *testing.T) {
 			ctx := context.Background()
 			am, err := newAlertmanagerSut(cfg, fstore, testCrypto, NoopAutogenFn)
-			require.NoError(t, err)
+			require.NoError(tt, err)
 
 			if test.enabledMultipleRoutes {
 				am.features = featuremgmt.WithFeatures(featuremgmt.FlagAlertingMultiplePolicies)
@@ -667,10 +663,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 			// to simulate errors when comparing the configuration.
 			am.autogenFn = test.autogenFn
 
-			cfg := ngmodels.AlertConfiguration{
-				AlertmanagerConfiguration: test.config,
-			}
-			applied, err := am.CompareAndSendConfiguration(ctx, &cfg)
+			applied, err := am.CompareAndSendConfiguration(ctx, &test.config)
 			if len(test.expErrContains) == 0 {
 				require.NoError(tt, err)
 				require.True(tt, applied)
@@ -679,8 +672,10 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 				require.NoError(tt, json.Unmarshal([]byte(got), &gotCfg))
 
 				require.NotEmpty(tt, gotCfg.Hash)
+				require.NotEmpty(tt, gotCfg.CreatedAt)
 				require.Empty(tt, cmp.Diff(test.expCfg, &gotCfg,
-					cmpopts.IgnoreFields(client.UserGrafanaConfig{}, "Hash"), // do not compare hashes because the config is processed slightly different: empty maps are nils.
+					// do not compare hashes because the config is processed slightly different: empty maps are nils.
+					cmpopts.IgnoreFields(client.UserGrafanaConfig{}, "Hash", "CreatedAt"),
 					cmpopts.EquateEmpty(),
 					cmpopts.IgnoreUnexported(
 						time.Location{},
@@ -689,7 +684,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 
 				got1 := got
 				got = ""
-				applied, err = am.CompareAndSendConfiguration(ctx, &cfg)
+				applied, err = am.CompareAndSendConfiguration(ctx, &test.config)
 				require.NoError(tt, err)
 				require.True(tt, applied)
 
@@ -862,9 +857,7 @@ receivers:
 	am, err := newAlertmanagerSut(c, fstore, tc, NoopAutogenFn)
 	require.NoError(t, err)
 
-	configJSON, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	applied, err := am.ApplyConfig(ctx, &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
+	applied, err := am.ApplyConfig(ctx, &cfg)
 	require.NoError(t, err)
 	require.True(t, applied)
 
@@ -976,13 +969,7 @@ receivers:
 	am, err := newAlertmanagerSut(c, fstore, tc, NoopAutogenFn)
 	require.NoError(t, err)
 
-	configJSON, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	config := &ngmodels.AlertConfiguration{
-		AlertmanagerConfiguration: string(configJSON),
-	}
-
-	sent, err := am.CompareAndSendConfiguration(ctx, config)
+	sent, err := am.CompareAndSendConfiguration(ctx, &cfg)
 	require.NoError(t, err)
 	require.True(t, sent)
 
@@ -1016,13 +1003,8 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 	}
 
 	testConfigCreatedAt := time.Now().Unix()
-	testConfig := &ngmodels.AlertConfiguration{
-		AlertmanagerConfiguration: testGrafanaConfig,
-		ConfigurationHash:         "",
-		ConfigurationVersion:      "v2",
-		CreatedAt:                 testConfigCreatedAt,
-		OrgID:                     1,
-	}
+	testConfig, err := notifier.Load([]byte(testGrafanaConfig))
+	require.NoError(t, err)
 
 	store := ngfakes.NewFakeKVStore(t)
 	fstore := notifier.NewFileStore(cfg.OrgID, store)
@@ -1067,7 +1049,7 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		require.JSONEq(t, testGrafanaConfig, string(rawCfg))
 		require.Equal(t, testConfigCreatedAt, config.CreatedAt)
-		require.Equal(t, testConfig.Default, config.Default)
+		require.False(t, config.Default)
 
 		state, err := am.mimirClient.GetGrafanaAlertmanagerState(ctx)
 		require.NoError(t, err)
@@ -1078,7 +1060,6 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 	{
 		require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", "silences", testSilence2))
 		require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", "notifications", testNflog2))
-		testConfig.CreatedAt = time.Now().Unix()
 		applied, err := am.ApplyConfig(ctx, testConfig)
 		require.True(t, applied)
 		require.NoError(t, err)

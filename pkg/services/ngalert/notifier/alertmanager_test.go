@@ -2,7 +2,6 @@ package notifier
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
-	ngmodels "github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/ngalert/store"
 	"github.com/grafana/grafana/pkg/services/ngalert/tests/fakes"
 	"github.com/grafana/grafana/pkg/services/secrets/database"
@@ -166,9 +164,7 @@ receivers:
 		t.Run(tc.name, func(t *testing.T) {
 			am := setupAMTest(t)
 
-			configJSON, err := json.Marshal(tc.config)
-			require.NoError(t, err)
-			changed, err := am.ApplyConfig(context.Background(), &ngmodels.AlertConfiguration{AlertmanagerConfiguration: string(configJSON)})
+			changed, err := am.ApplyConfig(context.Background(), tc.config)
 
 			if tc.expectedError != "" {
 				require.False(t, changed)
