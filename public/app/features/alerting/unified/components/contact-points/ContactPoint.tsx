@@ -232,7 +232,15 @@ const ContactPointReceiverMetadataRow = ({
   const [isDrawerOpen, toggleDrawer] = useToggle(false);
   const notificationHistoryEnabled = config.featureToggles.alertingNotificationHistoryContactPoints;
 
-  const failedToSend = Boolean(diagnostics.lastNotifyAttemptError);
+  const totalAttempts = diagnostics.totalAttempts || 0;
+  const failedAttempts = diagnostics.failedAttempts || 0;
+  const successAttempts = diagnostics.successAttempts || 0;
+
+  const noAttempts = totalAttempts === 0;
+  const allFailed = totalAttempts > 0 && failedAttempts === totalAttempts;
+  const allSuccess = totalAttempts > 0 && successAttempts === totalAttempts;
+  const hasMixedState = totalAttempts > 0 && failedAttempts > 0 && successAttempts > 0;
+
   const lastDeliveryAttempt = dateTime(diagnostics.lastNotifyAttempt);
   const lastDeliveryAttemptDuration = diagnostics.lastNotifyAttemptDuration;
   const hasDeliveryAttempt = lastDeliveryAttempt.isValid();
@@ -249,68 +257,95 @@ const ContactPointReceiverMetadataRow = ({
     <>
       <div className={styles.metadataRow}>
         <Stack direction="row" gap={1}>
-          {/* this is shown when the last delivery failed – we don't show any additional metadata */}
-          {failedToSend ? (
+          {/* All failed state */}
+          {allFailed ? (
             <MetaText color="error" icon="exclamation-circle">
               <Tooltip content={diagnostics.lastNotifyAttemptError!}>
                 {notificationHistoryEnabled ? (
                   <span className={styles.clickableStatus} onClick={handleClick}>
-                    <Trans i18nKey="alerting.contact-points.last-delivery-failed">Last delivery attempt failed</Trans>
+                    <Trans i18nKey="alerting.contact-points.all-delivery-failed">
+                      All {totalAttempts} attempts failed in last 1h
+                    </Trans>
                   </span>
                 ) : (
                   <span>
-                    <Trans i18nKey="alerting.contact-points.last-delivery-failed">Last delivery attempt failed</Trans>
+                    <Trans i18nKey="alerting.contact-points.all-delivery-failed">
+                      All {totalAttempts} attempts failed in last 1h
+                    </Trans>
                   </span>
                 )}
               </Tooltip>
             </MetaText>
           ) : (
             <>
-              {/* this is shown when we have a last delivery attempt */}
-              {hasDeliveryAttempt && (
-                <>
-                  <MetaText icon="clock-nine">
-                    {notificationHistoryEnabled ? (
-                      <span className={styles.clickableStatus} onClick={handleClick}>
-                        <Trans i18nKey="alerting.contact-points.last-delivery-attempt">Last delivery attempt</Trans>
-                      </span>
-                    ) : (
-                      <Trans i18nKey="alerting.contact-points.last-delivery-attempt">Last delivery attempt</Trans>
-                    )}
-                    <Tooltip content={lastDeliveryAttempt.toLocaleString()}>
-                      <span>
-                        <Text color="primary">{lastDeliveryAttempt.locale('en').fromNow()}</Text>
-                      </span>
-                    </Tooltip>
-                  </MetaText>
-                  <MetaText icon="stopwatch">
-                    <Trans i18nKey="alerting.contact-points.delivery-duration">
-                      Last delivery took <PrimaryText content={lastDeliveryAttemptDuration} />
-                    </Trans>
-                  </MetaText>
-                </>
-              )}
-              {/* when we have no last delivery attempt */}
-              {!hasDeliveryAttempt && (
-                <MetaText icon="clock-nine">
+              {/* Mixed state - some failures, some success */}
+              {hasMixedState ? (
+                <MetaText color="warning" icon="exclamation-triangle">
                   {notificationHistoryEnabled ? (
                     <span className={styles.clickableStatus} onClick={handleClick}>
-                      <Trans i18nKey="alerting.contact-points.no-delivery-attempts">No delivery attempts</Trans>
+                      <Trans i18nKey="alerting.contact-points.mixed-delivery-attempts">
+                        {failedAttempts} of {totalAttempts} attempts failed in the last 1h
+                      </Trans>
                     </span>
                   ) : (
-                    <Trans i18nKey="alerting.contact-points.no-delivery-attempts">No delivery attempts</Trans>
+                    <Trans i18nKey="alerting.contact-points.mixed-delivery-attempts">
+                      {failedAttempts} of {totalAttempts} attempts failed in the last 1h
+                    </Trans>
                   )}
                 </MetaText>
-              )}
-              {/* this is only shown for contact points that only want "firing" updates */}
-              {!sendingResolved && (
-                <MetaText icon="info-circle">
-                  <Trans i18nKey="alerting.contact-points.only-firing">
-                    Delivering <Text color="primary">only firing</Text> notifications
-                  </Trans>
-                </MetaText>
+              ) : (
+                <>
+                  {/* All success state */}
+                  {allSuccess && hasDeliveryAttempt && (
+                    <>
+                      <MetaText icon="clock-nine">
+                        {notificationHistoryEnabled ? (
+                          <span className={styles.clickableStatus} onClick={handleClick}>
+                            <Trans i18nKey="alerting.contact-points.last-delivery">Last delivery</Trans>
+                          </span>
+                        ) : (
+                          <Trans i18nKey="alerting.contact-points.last-delivery">Last delivery</Trans>
+                        )}
+                        <Tooltip content={lastDeliveryAttempt.toLocaleString()}>
+                          <span>
+                            <Text color="primary">{lastDeliveryAttempt.locale('en').fromNow()}</Text>
+                          </span>
+                        </Tooltip>
+                      </MetaText>
+                      <MetaText icon="stopwatch">
+                        <Trans i18nKey="alerting.contact-points.delivery-duration">
+                          Last delivery took <PrimaryText content={lastDeliveryAttemptDuration} />
+                        </Trans>
+                      </MetaText>
+                    </>
+                  )}
+                  {/* No attempts state */}
+                  {noAttempts && (
+                    <MetaText icon="clock-nine">
+                      {notificationHistoryEnabled ? (
+                        <span className={styles.clickableStatus} onClick={handleClick}>
+                          <Trans i18nKey="alerting.contact-points.no-delivery-attempts-time">
+                            No delivery attempts in the last 1h
+                          </Trans>
+                        </span>
+                      ) : (
+                        <Trans i18nKey="alerting.contact-points.no-delivery-attempts-time">
+                          No delivery attempts in the last 1h
+                        </Trans>
+                      )}
+                    </MetaText>
+                  )}
+                </>
               )}
             </>
+          )}
+          {/* this is only shown for contact points that only want "firing" updates */}
+          {!sendingResolved && !allFailed && !hasMixedState && (
+            <MetaText icon="info-circle">
+              <Trans i18nKey="alerting.contact-points.only-firing">
+                Delivering <Text color="primary">only firing</Text> notifications
+              </Trans>
+            </MetaText>
           )}
         </Stack>
       </div>
