@@ -68,13 +68,13 @@ func newRemotePrimaryForkedAlertmanager(log log.Logger, internal notifier.Alertm
 }
 
 // ApplyConfig will send the configuration to the remote Alertmanager on startup.
-func (fam *RemotePrimaryForkedAlertmanager) ApplyConfig(ctx context.Context, config *apimodels.PostableUserConfig, opts ...models.ApplyConfigOption) (bool, error) {
-	applied, err := fam.remote.ApplyConfig(ctx, config, opts...)
+func (fam *RemotePrimaryForkedAlertmanager) ApplyConfig(ctx context.Context, config *apimodels.PostableUserConfig) (bool, error) {
+	applied, err := fam.remote.ApplyConfig(ctx, config)
 	if err != nil {
 		return false, fmt.Errorf("failed to call ApplyConfig on the remote Alertmanager: %w", err)
 	}
 
-	if _, err := fam.internal.ApplyConfig(ctx, config, opts...); err != nil {
+	if _, err := fam.internal.ApplyConfig(ctx, config); err != nil {
 		// An error in the internal Alertmanager shouldn't make the whole operation fail.
 		// We're replicating writes in the internal Alertmanager just for comparing and in case we need to roll back.
 		fam.log.Error("Error applying config to the internal Alertmanager", "err", err)

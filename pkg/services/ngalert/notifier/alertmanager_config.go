@@ -142,11 +142,7 @@ func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		_, err = am.ApplyConfig(
-			ctx,
-			preparedCfg,
-			models.WithAutogenInvalidReceiversAction(models.LogInvalidReceivers),
-		)
+		_, err = am.ApplyConfig(ctx, preparedCfg)
 		return err
 	})
 	if err != nil {
@@ -632,15 +628,11 @@ func (moa *MultiOrgAlertmanager) saveAndApplyConfig(ctx context.Context, org int
 		if err != nil {
 			return fmt.Errorf("failed to parse Alertmanager config: %w", err)
 		}
-		preparedCfg, err := moa.prepareApplyConfig(ctx, org, cfg, ErrorOnInvalidReceivers)
+		preparedCfg, err := moa.prepareApplyConfig(ctx, org, cfg, ErrorOnInvalidReceivers) // Rollback save if apply fails.
 		if err != nil {
 			return err
 		}
-		_, err = am.ApplyConfig(
-			ctx,
-			preparedCfg,
-			models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers), // Rollback save if apply fails.
-		)
+		_, err = am.ApplyConfig(ctx, preparedCfg)
 		return err
 	})
 }

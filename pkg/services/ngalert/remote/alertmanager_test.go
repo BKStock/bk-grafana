@@ -670,7 +670,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 			cfg := ngmodels.AlertConfiguration{
 				AlertmanagerConfiguration: test.config,
 			}
-			applied, err := am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
+			applied, err := am.CompareAndSendConfiguration(ctx, &cfg)
 			if len(test.expErrContains) == 0 {
 				require.NoError(tt, err)
 				require.True(tt, applied)
@@ -689,7 +689,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 
 				got1 := got
 				got = ""
-				applied, err = am.CompareAndSendConfiguration(ctx, &cfg, notifier.LogInvalidReceivers)
+				applied, err = am.CompareAndSendConfiguration(ctx, &cfg)
 				require.NoError(tt, err)
 				require.True(tt, applied)
 
@@ -982,7 +982,7 @@ receivers:
 		AlertmanagerConfiguration: string(configJSON),
 	}
 
-	sent, err := am.CompareAndSendConfiguration(ctx, config, notifier.LogInvalidReceivers)
+	sent, err := am.CompareAndSendConfiguration(ctx, config)
 	require.NoError(t, err)
 	require.True(t, sent)
 

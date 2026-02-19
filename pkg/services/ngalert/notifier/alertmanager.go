@@ -19,7 +19,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	apimodels "github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
-	ngmodels "github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/ngalert/store"
 	"github.com/grafana/grafana/pkg/services/notifications"
 	"github.com/grafana/grafana/pkg/setting"
@@ -212,7 +211,7 @@ func (am *alertmanager) StopAndWait() {
 }
 
 // ApplyConfig applies the configuration to the Alertmanager.
-func (am *alertmanager) ApplyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig, opts ...ngmodels.ApplyConfigOption) (bool, error) {
+func (am *alertmanager) ApplyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig) (bool, error) {
 	var configChanged bool
 	var outerErr error
 	am.Base.WithLock(func() {

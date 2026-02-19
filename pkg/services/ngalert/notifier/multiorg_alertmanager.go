@@ -50,7 +50,7 @@ var (
 //go:generate mockery --name Alertmanager --structname AlertmanagerMock --with-expecter --output alertmanager_mock --outpkg alertmanager_mock
 type Alertmanager interface {
 	// Configuration
-	ApplyConfig(context.Context, *apimodels.PostableUserConfig, ...models.ApplyConfigOption) (bool, error)
+	ApplyConfig(context.Context, *apimodels.PostableUserConfig) (bool, error)
 	GetStatus(context.Context) (apimodels.GettableStatus, error)
 
 	// Silences
@@ -397,11 +397,7 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				if err != nil {
 					return err
 				}
-				_, err = am.ApplyConfig(
-					ctx,
-					preparedCfg,
-					models.WithAutogenInvalidReceiversAction(models.ErrorOnInvalidReceivers), // Rollback save if apply fails.
-				)
+				_, err = am.ApplyConfig(ctx, preparedCfg)
 				return err
 			})
 			if err != nil {

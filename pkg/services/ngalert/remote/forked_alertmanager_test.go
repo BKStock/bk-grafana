@@ -56,7 +56,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Twice()
 			remote.EXPECT().Ready().Return(true).Twice()
-			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything, models.LogInvalidReceivers).Return(true, nil).Twice()
+			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Twice()
 			applied, err := forked.ApplyConfig(ctx, &models.AlertConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
@@ -84,7 +84,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal, remote, forked = genTestAlertmanagers(tt, modeRemoteSecondary, withSyncInterval(10*time.Minute))
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Twice()
 			remote.EXPECT().Ready().Return(true).Twice()
-			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything, models.LogInvalidReceivers).Return(false, expErr).Twice()
+			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(false, expErr).Twice()
 			applied, err = forked.ApplyConfig(ctx, &models.AlertConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
@@ -126,7 +126,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.mergeStateCalled = false
 			remote.EXPECT().Ready().Return(true).Once()
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
-			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything, models.LogInvalidReceivers).Return(true, nil).Once()
+			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Once()
 			applied, err = forked.ApplyConfig(ctx, &models.AlertConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
@@ -147,7 +147,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			// Calling ApplyConfig again should result in the forked Alertmanager calling ApplyConfig on both
 			// Alertmanagers and merging the remote state, even if the sync interval has not elapsed.
 			remote.EXPECT().Ready().Return(true).Twice()
-			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything, models.LogInvalidReceivers).Return(true, nil).Once()
+			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Once()
 			remoteStateCall := remote.EXPECT().GetRemoteState(mock.Anything).Return(notifier.ExternalState{}, nil).Once()
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(remoteStateCall)
 			applied, err = forked.ApplyConfig(ctx, &models.AlertConfiguration{})
@@ -389,7 +389,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
 			internal.EXPECT().StopAndWait().Once()
 			remote.EXPECT().StopAndWait().Once()
-			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything, models.LogInvalidReceivers).Return(true, nil).Once()
+			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything).Return(true, nil).Once()
 			remote.EXPECT().SendState(mock.Anything).Return(nil).Once()
 			forked.StopAndWait()
 		}
@@ -400,7 +400,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
 			internal.EXPECT().StopAndWait().Once()
 			remote.EXPECT().StopAndWait().Once()
-			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything, models.LogInvalidReceivers).Return(false, expErr).Once()
+			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything).Return(false, expErr).Once()
 			remote.EXPECT().SendState(mock.Anything).Return(expErr).Once()
 			forked.StopAndWait()
 		}
