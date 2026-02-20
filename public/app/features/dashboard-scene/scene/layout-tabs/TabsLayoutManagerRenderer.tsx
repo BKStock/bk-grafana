@@ -33,8 +33,6 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const isNestedInTab = useMemo(() => model.parent instanceof TabItem, [model.parent]);
   const soloPanelContext = useSoloPanelContext();
 
-  useEffect(() => console.log('placeholderIndex', placeholderIndex), [placeholderIndex]);
-
   useEffect(() => {
     if (currentTab && currentTab.getSlug() !== model.state.currentTabSlug) {
       model.setState({ currentTabSlug: currentTab.getSlug() });
