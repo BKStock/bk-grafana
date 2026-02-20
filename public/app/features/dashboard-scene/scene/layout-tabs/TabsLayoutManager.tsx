@@ -39,8 +39,7 @@ interface TabsLayoutManagerState extends SceneObjectState {
   // Dimensions of the dragged tab header for placeholder sizing
   draggedTabWidth?: number;
   draggedTabHeight?: number;
-  // Index of the tab currently hovered during drag (used for placeholder position)
-  hoveredTabIndex?: number;
+  placeholderIndex?: number | null;
 }
 
 export class TabsLayoutManager
@@ -51,12 +50,6 @@ export class TabsLayoutManager
 
   public readonly isDashboardLayoutManager = true;
   public readonly isDashboardDropTarget = true as const;
-
-  // CODE: implement setIsDropTarget
-  // CODE: implements setDraggedTabDimensions to store width and height of dragged element for placeholder
-  // CODE: implement setHoveredTabIndex to know which tab is being hovered during drag and show placeholder in the right place
-
-  // CODE: isDropTarget and dimensions are in state and can be used by TabsLayoutManagerRenderer
 
   public static readonly descriptor: LayoutRegistryItem = {
     get name() {
@@ -157,12 +150,13 @@ export class TabsLayoutManager
   public setIsDropTarget(isDropTarget: boolean) {
     this.setState({
       isDropTarget,
+      placeholderIndex: isDropTarget ? null : this.getTabsIncludingRepeats().length,
     });
   }
 
-  public setHoveredTabIndex(index?: number | null) {
+  public setPlaceHolderIndex(index: number | null | undefined) {
     this.setState({
-      hoveredTabIndex: index ?? undefined,
+      placeholderIndex: index,
     });
   }
 

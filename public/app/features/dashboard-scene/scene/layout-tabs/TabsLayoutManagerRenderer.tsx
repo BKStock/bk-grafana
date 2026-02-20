@@ -24,7 +24,7 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const styles = useStyles2(getStyles);
   const layoutControlsStyles = useStyles2(getLayoutControlsStyles);
 
-  const { tabs, key, hoveredTabIndex, draggedTabHeight, draggedTabWidth, isDropTarget } = model.useState();
+  const { tabs, key, placeholderIndex, draggedTabHeight, draggedTabWidth, isDropTarget } = model.useState();
   const currentTab = model.getCurrentTab();
   const dashboard = getDashboardSceneFor(model);
   const orchestrator = getLayoutOrchestratorFor(model);
@@ -33,10 +33,7 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const isNestedInTab = useMemo(() => model.parent instanceof TabItem, [model.parent]);
   const soloPanelContext = useSoloPanelContext();
 
-  useEffect(() => console.log('hoveredTabIndex', hoveredTabIndex), [hoveredTabIndex]);
-  useEffect(() => console.log('draggedTabHeight', draggedTabHeight), [draggedTabHeight]);
-  useEffect(() => console.log('draggedTabWidth', draggedTabWidth), [draggedTabWidth]);
-  useEffect(() => console.log('isDropTarget', isDropTarget), [isDropTarget]);
+  useEffect(() => console.log('placeholderIndex', placeholderIndex), [placeholderIndex]);
 
   useEffect(() => {
     if (currentTab && currentTab.getSlug() !== model.state.currentTabSlug) {
@@ -61,8 +58,20 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
     orchestrator?.stopTabDrag(targetIndex);
   };
 
-  // CODE: create a placeholder tab if this is a drop target and we have the dimensions of the dragged tab and the index of the placehodler
-  //       the index of the placeholder should be based of non-repeated tabs so we should be able to render it in the tabs loop below
+  const customDropTab = isDropTarget ? (
+    <div key="placeholder" style={{ width: draggedTabWidth, height: draggedTabHeight }}></div>
+  ) : null;
+
+  const children: React.ReactNode[] = [];
+  tabs.forEach((tab) => {
+    if (customDropTab && placeholderIndex === children.length) {
+      children.push(customDropTab);
+    }
+    children.push(<TabWrapper tab={tab} manager={model} key={tab.state.key!} />);
+  });
+  if (customDropTab && placeholderIndex === children.length) {
+    children.push(customDropTab);
+  }
 
   return (
     <div className={cx(styles.tabLayoutContainer, { [styles.nestedTabsMargin]: isNestedInTab })}>
@@ -72,9 +81,7 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
             <Droppable droppableId={key!} direction="horizontal">
               {(dropProvided) => (
                 <div className={styles.tabsContainer} ref={dropProvided.innerRef} {...dropProvided.droppableProps}>
-                  {tabs.map((tab) => (
-                    <TabWrapper tab={tab} manager={model} key={tab.state.key!} />
-                  ))}
+                  {children}
 
                   {dropProvided.placeholder}
                 </div>

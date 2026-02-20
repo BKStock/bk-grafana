@@ -220,6 +220,6 @@ function getDraggableStyle(style: React.CSSProperties | undefined, snapshot: Dra
 
   return {
     ...style,
-    transitionDuration: '0.01s',
+    transition: 'all 0.01s',
   };
 }

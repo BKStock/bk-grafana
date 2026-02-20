@@ -94,6 +94,8 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   /** Height of the dragged tab header in pixels (for cross-manager placeholder sizing) */
   private _draggedTabHeight: number | null = null;
   private _targetTabIndex: number | undefined;
+  private _currentlyHoveredTabIndex: null | number | undefined;
+  private _placeHoverTabIndex: number | undefined;
 
   public constructor() {
     super({});
@@ -296,19 +298,32 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
 
     // Tabs can be dropped only to TabsLayoutManager
     if (dropTarget instanceof TabsLayoutManager) {
+      if (dropTarget === this._sourceDropTarget) {
+        return;
+      }
+
       if (dropTarget !== this._lastDropTarget) {
         this.cleanUpTabDrag();
+        this._lastDropTarget = dropTarget;
+        dropTarget.setDraggedTabDimensions?.(this._draggedTabWidth, this._draggedTabHeight);
+        dropTarget.setIsDropTarget?.(true);
       }
-      this._lastDropTarget = dropTarget;
-      dropTarget.setDraggedTabDimensions?.(this._draggedTabWidth, this._draggedTabHeight);
-      dropTarget.setIsDropTarget?.(true);
-      const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY);
+
+      const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY, this._draggedTab!.state.key);
       if (this._lastDropTarget && this._lastDropTarget instanceof TabsLayoutManager) {
         this._targetTabIndex = this._lastDropTarget
           ?.getTabsIncludingRepeats()
           .findIndex((t) => t.state.key === tabUnderMouse);
       }
-      dropTarget.setHoveredTabIndex(this._targetTabIndex);
+      this._currentlyHoveredTabIndex =
+        this._targetTabIndex === -1 || this._targetTabIndex === undefined ? null : this._targetTabIndex;
+      if (this._currentlyHoveredTabIndex !== null) {
+        this._placeHoverTabIndex =
+          this._currentlyHoveredTabIndex === this._placeHoverTabIndex
+            ? this._currentlyHoveredTabIndex + 1
+            : this._currentlyHoveredTabIndex;
+      }
+      dropTarget.setPlaceHolderIndex(this._placeHoverTabIndex);
     } else {
       this.cleanUpTabDrag();
       this._lastDropTarget = null;
@@ -318,7 +333,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   private cleanUpTabDrag() {
     if (this._lastDropTarget && this._lastDropTarget instanceof TabsLayoutManager) {
       this._lastDropTarget.setIsDropTarget?.(false);
-      this._lastDropTarget.setHoveredTabIndex?.(undefined);
+      this._lastDropTarget.setPlaceHolderIndex?.(undefined);
       this._lastDropTarget.setDraggedTabDimensions?.(undefined, undefined);
     }
     this._lastDropTarget = null;
@@ -342,21 +357,18 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
       return;
     }
 
-    if (this._lastDropTarget === null || !(this._lastDropTarget instanceof TabsLayoutManager)) {
-      return;
-    }
-
     const sourceManager = this._sourceDropTarget;
     const destinationManager = this._lastDropTarget;
-    targetIndex = targetIndex ?? this._targetTabIndex ?? destinationManager.getTabsIncludingRepeats().length;
+
+    if (!targetIndex && destinationManager && destinationManager instanceof TabsLayoutManager) {
+      targetIndex = this._placeHoverTabIndex ?? destinationManager.getTabsIncludingRepeats().length;
+    }
 
     const tab = this._draggedTab;
 
     if (!tab) {
       return;
     }
-
-    this.cleanUpTabDrag();
 
     const sourceIndex = sourceManager.getTabsIncludingRepeats().findIndex((t) => t === tab);
     this._draggedTab = undefined;
@@ -366,15 +378,17 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
       if (sourceIndex === targetIndex) {
         return;
       }
-      sourceManager.moveTab(sourceIndex, targetIndex);
+      sourceManager.moveTab(sourceIndex, targetIndex!);
       return;
     }
     // moving to a different TabsLayoutManager
-    else {
-      const realDestinationIndex = destinationManager.mapTabInsertIndex(targetIndex);
+    else if (destinationManager && destinationManager instanceof TabsLayoutManager) {
+      const realDestinationIndex = destinationManager.mapTabInsertIndex(targetIndex!);
       // When moving a tab into a new tab group, make it the active tab.
       this._moveTabBetweenManagers(tab, sourceManager, destinationManager, realDestinationIndex);
     }
+
+    this.cleanUpTabDrag();
   }
 
   private _moveTabBetweenManagers(
@@ -788,11 +802,15 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     return 'Panel';
   }
 
-  private _getTabUnderMouse(clientX: number, clientY: number): string | null {
+  private _getTabUnderMouse(clientX: number, clientY: number, excludeKey?: string): string | null {
     const elementsUnderPoint = document.elementsFromPoint(clientX, clientY);
 
     const tabKey = elementsUnderPoint
-      ?.find((element) => element.getAttribute('data-tab-activation-key'))
+      ?.find(
+        (element) =>
+          element.getAttribute('data-tab-activation-key') &&
+          (!excludeKey || element.getAttribute('data-tab-activation-key') !== excludeKey)
+      )
       ?.getAttribute('data-tab-activation-key');
 
     return tabKey || null;
