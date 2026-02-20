@@ -64,15 +64,10 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
     );
   }
 
-  const children: React.ReactNode[] = [];
-  tabs.forEach((tab) => {
-    if (placeholder && placeholder.index === children.length) {
-      children.push(placeholderComponent);
-    }
-    children.push(<TabWrapper tab={tab} manager={model} key={tab.state.key!} />);
-  });
-  if (placeholder && placeholder.index === children.length) {
-    children.push(placeholderComponent);
+  const children: React.ReactNode[] = tabs.map((tab) => <TabWrapper tab={tab} manager={model} key={tab.state.key!} />);
+
+  if (isDropTarget && placeholder && placeholderComponent) {
+    children.splice(placeholder.index, 0, placeholderComponent);
   }
 
   return (
