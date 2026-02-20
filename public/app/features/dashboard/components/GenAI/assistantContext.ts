@@ -1,7 +1,26 @@
-import { getPanelDataSummary, PanelData } from '@grafana/data';
+import { DataQuery, DataSourceRef, getPanelDataSummary, PanelData } from '@grafana/data';
 import { Dashboard, Panel } from '@grafana/schema';
 
 import { getFilteredPanelString } from './utils';
+
+/**
+ * Stable fingerprint of the panel properties that affect title/description semantics.
+ * Changes only when pluginId, datasource, or query expressions change.
+ */
+export function getPanelFingerprint(
+  pluginId: string,
+  datasource?: DataSourceRef,
+  queries?: DataQuery[]
+): string {
+  const ds = datasource?.uid ?? '';
+  const qs = (queries ?? [])
+    .map((q) => {
+      const target = q as unknown as Record<string, unknown>;
+      return q.refId + '|' + ((target.expr ?? target.rawSql ?? target.query ?? '') as string);
+    })
+    .join(';');
+  return `${pluginId}::${ds}::${qs}`;
+}
 
 const TITLE_SOFT_LIMIT = 80;
 const DESCRIPTION_CHAR_LIMIT = 200;
@@ -121,18 +140,45 @@ export function buildAssistantTitlePrompt(
  * Build a combined system prompt for AITextInput (title field).
  * Merges instructions and panel/dashboard context into a single system prompt
  * so the user's typed text becomes the user prompt.
+ *
+ * When previousValue is provided the LLM is told to keep it if it still fits
+ * the new context, avoiding unnecessary churn on minor changes.
  */
-export function buildTitleInputSystemPrompt(panel: Panel, dashboard: Dashboard, data?: PanelData): string {
+export function buildTitleInputSystemPrompt(
+  panel: Panel,
+  dashboard: Dashboard,
+  data?: PanelData,
+  previousValue?: string
+): string {
   const { systemPrompt, prompt } = buildAssistantTitlePrompt(panel, dashboard, data);
-  return [systemPrompt, 'Panel context:', prompt].join('\n\n');
+  const parts = [systemPrompt];
+  if (previousValue) {
+    parts.push(
+      `The previous title was: "${previousValue}". If it still accurately describes the panel given the new context, return it unchanged. Only generate a new title if the meaning of the panel has changed.`
+    );
+  }
+  parts.push('Panel context:', prompt);
+  return parts.join('\n\n');
 }
 
 /**
  * Build a combined system prompt for AITextArea (description field).
  */
-export function buildDescriptionInputSystemPrompt(panel: Panel, dashboard: Dashboard, data?: PanelData): string {
+export function buildDescriptionInputSystemPrompt(
+  panel: Panel,
+  dashboard: Dashboard,
+  data?: PanelData,
+  previousValue?: string
+): string {
   const { systemPrompt, prompt } = buildAssistantDescriptionPrompt(panel, dashboard, data);
-  return [systemPrompt, 'Panel context:', prompt].join('\n\n');
+  const parts = [systemPrompt];
+  if (previousValue) {
+    parts.push(
+      `The previous description was: "${previousValue}". If it still accurately describes the panel given the new context, return it unchanged. Only generate a new description if the meaning of the panel has changed.`
+    );
+  }
+  parts.push('Panel context:', prompt);
+  return parts.join('\n\n');
 }
 
 /**

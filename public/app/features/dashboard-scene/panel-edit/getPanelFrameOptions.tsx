@@ -22,7 +22,7 @@ import { PanelTimeRange } from '../scene/panel-timerange/PanelTimeRange';
 import { isDashboardLayoutItem } from '../scene/types/DashboardLayoutItem';
 import { vizPanelToPanel, transformSceneToSaveModel } from '../serialization/transformSceneToSaveModel';
 import { dashboardSceneGraph } from '../utils/dashboardSceneGraph';
-import { getDashboardSceneFor } from '../utils/utils';
+import { getDashboardSceneFor, getQueryRunnerFor } from '../utils/utils';
 
 export function getPanelFrameOptions(panel: VizPanel): OptionsPaneCategoryDescriptor {
   const descriptor = new OptionsPaneCategoryDescriptor({
@@ -132,7 +132,7 @@ export function PanelFrameTitleInput({
   isNewElement?: boolean;
   id?: string;
 }) {
-  const { title } = panel.useState();
+  const { title, pluginId } = panel.useState();
   const notInPanelEdit = panel.getPanelContext().app !== CoreApp.PanelEditor;
   const [prevTitle, setPrevTitle] = React.useState(panel.state.title);
 
@@ -145,6 +145,9 @@ export function PanelFrameTitleInput({
   const dashboardModel = transformSceneToSaveModel(dashboard);
   const isDefaultTitle = !title || title === t('dashboard.new-panel-title', 'New panel');
 
+  const queryRunner = getQueryRunnerFor(panel);
+  const queryRunnerState = queryRunner?.useState();
+
   return (
     <GenAITextInput
       data-testid={selectors.components.PanelEditor.OptionsPane.fieldInput('Title')}
@@ -155,20 +158,27 @@ export function PanelFrameTitleInput({
       onBlur={() => editPanelTitleAction(panel, title, prevTitle)}
       panel={panelModel}
       dashboard={dashboardModel}
+      data={queryRunnerState?.data}
       autoGenerate={isDefaultTitle}
       id={id}
       inputRef={ref}
+      pluginId={pluginId}
+      datasource={queryRunnerState?.datasource}
+      queries={queryRunnerState?.queries}
     />
   );
 }
 
 export function PanelDescriptionTextArea({ panel, id }: { panel: VizPanel; id?: string }) {
-  const { description } = panel.useState();
+  const { description, pluginId } = panel.useState();
   const [prevDescription, setPrevDescription] = React.useState(panel.state.description);
 
   const dashboard = getDashboardSceneFor(panel);
   const panelModel = vizPanelToPanel(panel);
   const dashboardModel = transformSceneToSaveModel(dashboard);
+
+  const queryRunner = getQueryRunnerFor(panel);
+  const queryRunnerState = queryRunner?.useState();
 
   return (
     <GenAITextArea
@@ -193,8 +203,12 @@ export function PanelDescriptionTextArea({ panel, id }: { panel: VizPanel; id?: 
       }}
       panel={panelModel}
       dashboard={dashboardModel}
+      data={queryRunnerState?.data}
       autoGenerate={!description}
       id={id}
+      pluginId={pluginId}
+      datasource={queryRunnerState?.datasource}
+      queries={queryRunnerState?.queries}
     />
   );
 }
