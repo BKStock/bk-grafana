@@ -89,6 +89,10 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   /** Last hovered AutoGrid item key (to prevent flickering) */
   private _lastHoveredAutoGridItemKey: string | null = null;
   private _draggedTab: TabItem | undefined;
+  /** Width of the dragged tab header in pixels (for cross-manager placeholder sizing) */
+  private _draggedTabWidth: number | null = null;
+  /** Height of the dragged tab header in pixels (for cross-manager placeholder sizing) */
+  private _draggedTabHeight: number | null = null;
   private _targetTabIndex: number | undefined;
 
   public constructor() {
@@ -272,6 +276,17 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
 
     this._draggedTab = sceneGraph.findByKeyAndType(this._getDashboard(), draggedTabId, TabItem);
 
+    // Calculate dimensions of the dragged tab header and cache for cross-manager placeholder sizing
+    this._draggedTabWidth = null;
+    this._draggedTabHeight = null;
+    const draggedHeaderEl = this._draggedTab?.containerRef?.current ?? undefined;
+    if (draggedHeaderEl) {
+      const rect = draggedHeaderEl.getBoundingClientRect();
+      // Use at least 1px to ensure placeholder is visible even if width/height are extremely small
+      this._draggedTabWidth = Math.max(1, Math.round(rect.width));
+      this._draggedTabHeight = Math.max(1, Math.round(rect.height));
+    }
+
     document.body.addEventListener('pointerup', this._onTabDragPointerUp, true);
     document.body.addEventListener('pointermove', this._onTabDragPointerMove);
   }
@@ -280,9 +295,25 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     const dropTarget = this._getDropTargetUnderMouse(evt) ?? this._sourceDropTarget;
 
     // Tabs can be dropped only to TabsLayoutManager
+    // CODE: check if dropTarget is different from lastDropTarget to prevent flickering when hovering over non-drop targets (e.g. tab content)
     if (dropTarget instanceof TabsLayoutManager) {
+      // CODE: if there is last drop target -> remove placeholder
       this._lastDropTarget = dropTarget;
+      // CODE: set placeholder on new drop target but only if source and target are different (otherwise pangea handles placeholder)
+      // CODE: this._lastDropTarget.setIsDropTarget?.(true);
+      // CODE: pass dragged tab dimensions to the target manager for placeholder sizing (e.g. target.setDraggedTabDimensions(this._draggedTabWidth, this._draggedTabHeight))
+      // CODE: calculate target index of the dragged (move the logic from pointerup):
+      //       - find hovered tab index _getTabUnderMouse
+      //       - set the hovered tab index in this._lastDropTarget.setHoveredTabIndex(...)
+      //       - the his._lastDropTarget.setHoveredTabIndex(...) will set it only if not set yet! important to avoid moving placeholder back to the end
     } else {
+      // CODE: if there is last drop target -> remove placeholder and clean up everything (reuse in drop end hanlder)
+      //       cleanupTabHover() {
+      //          this._lastDropTarget.setIsDropTarget?.(false);
+      //          this._lastDropTarget.setHoveredTabIndex?.(undefined);
+      //          this._lastDropTarget.setDraggedTabDimensions?.(undefined, undefined);
+      //       }
+
       this._lastDropTarget = null;
     }
   }
@@ -324,6 +355,8 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     if (!tab) {
       return;
     }
+
+    // CODE: if source is different from destination manager -> remove placeholder from the target
 
     const sourceIndex = sourceManager.getTabsIncludingRepeats().findIndex((t) => t === tab);
     this._draggedTab = undefined;

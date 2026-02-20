@@ -23,6 +23,8 @@ import { TabsLayoutManager } from './TabsLayoutManager';
 export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLayoutManager>) {
   const styles = useStyles2(getStyles);
   const layoutControlsStyles = useStyles2(getLayoutControlsStyles);
+
+  // CODE: get isDropTarget and dragged tab dimensions to create a placeholder
   const { tabs, key } = model.useState();
   const currentTab = model.getCurrentTab();
   const dashboard = getDashboardSceneFor(model);
@@ -54,6 +56,9 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
     const targetIndex = result.destination?.index;
     orchestrator?.stopTabDrag(targetIndex);
   };
+
+  // CODE: create a placeholder tab if this is a drop target and we have the dimensions of the dragged tab and the index of the placehodler
+  //       the index of the placeholder should be based of non-repeated tabs so we should be able to render it in the tabs loop below
 
   return (
     <div className={cx(styles.tabLayoutContainer, { [styles.nestedTabsMargin]: isNestedInTab })}>

@@ -34,6 +34,7 @@ import { TabsLayoutManagerRenderer } from './TabsLayoutManagerRenderer';
 interface TabsLayoutManagerState extends SceneObjectState {
   tabs: TabItem[];
   currentTabSlug?: string;
+  // CODE: add isDropTarget property to highlitght the drop area
 }
 
 export class TabsLayoutManager
@@ -44,6 +45,12 @@ export class TabsLayoutManager
 
   public readonly isDashboardLayoutManager = true;
   public readonly isDashboardDropTarget = true as const;
+
+  // CODE: implement setIsDropTarget
+  // CODE: implements setDraggedTabDimensions to store width and height of dragged element for placeholder
+  // CODE: implement setHoveredTabIndex to know which tab is being hovered during drag and show placeholder in the right place
+
+  // CODE: isDropTarget and dimensions are in state and can be used by TabsLayoutManagerRenderer
 
   public static readonly descriptor: LayoutRegistryItem = {
     get name() {
