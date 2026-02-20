@@ -295,37 +295,37 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     const dropTarget = this._getDropTargetUnderMouse(evt) ?? this._sourceDropTarget;
 
     // Tabs can be dropped only to TabsLayoutManager
-    // CODE: check if dropTarget is different from lastDropTarget to prevent flickering when hovering over non-drop targets (e.g. tab content)
     if (dropTarget instanceof TabsLayoutManager) {
-      // CODE: if there is last drop target -> remove placeholder
+      if (dropTarget !== this._lastDropTarget) {
+        this.cleanUpTabDrag();
+      }
       this._lastDropTarget = dropTarget;
-      // CODE: set placeholder on new drop target but only if source and target are different (otherwise pangea handles placeholder)
-      // CODE: this._lastDropTarget.setIsDropTarget?.(true);
-      // CODE: pass dragged tab dimensions to the target manager for placeholder sizing (e.g. target.setDraggedTabDimensions(this._draggedTabWidth, this._draggedTabHeight))
-      // CODE: calculate target index of the dragged (move the logic from pointerup):
-      //       - find hovered tab index _getTabUnderMouse
-      //       - set the hovered tab index in this._lastDropTarget.setHoveredTabIndex(...)
-      //       - the his._lastDropTarget.setHoveredTabIndex(...) will set it only if not set yet! important to avoid moving placeholder back to the end
+      dropTarget.setDraggedTabDimensions?.(this._draggedTabWidth, this._draggedTabHeight);
+      dropTarget.setIsDropTarget?.(true);
+      const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY);
+      if (this._lastDropTarget && this._lastDropTarget instanceof TabsLayoutManager) {
+        this._targetTabIndex = this._lastDropTarget
+          ?.getTabsIncludingRepeats()
+          .findIndex((t) => t.state.key === tabUnderMouse);
+      }
+      dropTarget.setHoveredTabIndex(this._targetTabIndex);
     } else {
-      // CODE: if there is last drop target -> remove placeholder and clean up everything (reuse in drop end hanlder)
-      //       cleanupTabHover() {
-      //          this._lastDropTarget.setIsDropTarget?.(false);
-      //          this._lastDropTarget.setHoveredTabIndex?.(undefined);
-      //          this._lastDropTarget.setDraggedTabDimensions?.(undefined, undefined);
-      //       }
-
+      this.cleanUpTabDrag();
       this._lastDropTarget = null;
     }
   }
 
-  private _onTabDragPointerUp(evt: PointerEvent) {
-    const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY);
+  private cleanUpTabDrag() {
     if (this._lastDropTarget && this._lastDropTarget instanceof TabsLayoutManager) {
-      this._targetTabIndex = this._lastDropTarget
-        ?.getTabsIncludingRepeats()
-        .findIndex((t) => t.state.key === tabUnderMouse);
+      this._lastDropTarget.setIsDropTarget?.(false);
+      this._lastDropTarget.setHoveredTabIndex?.(undefined);
+      this._lastDropTarget.setDraggedTabDimensions?.(undefined, undefined);
     }
+    this._lastDropTarget = null;
+    this._targetTabIndex = undefined;
+  }
 
+  private _onTabDragPointerUp(evt: PointerEvent) {
     document.body.removeEventListener('pointermove', this._onTabDragPointerMove);
     document.body.removeEventListener('pointerup', this._onTabDragPointerUp, true);
     // Note: do not handle dropping yet as pangea is still waiting for events to be fired from the dragged tab.
@@ -356,7 +356,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
       return;
     }
 
-    // CODE: if source is different from destination manager -> remove placeholder from the target
+    this.cleanUpTabDrag();
 
     const sourceIndex = sourceManager.getTabsIncludingRepeats().findIndex((t) => t === tab);
     this._draggedTab = undefined;

@@ -24,8 +24,7 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const styles = useStyles2(getStyles);
   const layoutControlsStyles = useStyles2(getLayoutControlsStyles);
 
-  // CODE: get isDropTarget and dragged tab dimensions to create a placeholder
-  const { tabs, key } = model.useState();
+  const { tabs, key, hoveredTabIndex, draggedTabHeight, draggedTabWidth, isDropTarget } = model.useState();
   const currentTab = model.getCurrentTab();
   const dashboard = getDashboardSceneFor(model);
   const orchestrator = getLayoutOrchestratorFor(model);
@@ -33,6 +32,11 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const { hasCopiedTab } = useClipboardState();
   const isNestedInTab = useMemo(() => model.parent instanceof TabItem, [model.parent]);
   const soloPanelContext = useSoloPanelContext();
+
+  useEffect(() => console.log('hoveredTabIndex', hoveredTabIndex), [hoveredTabIndex]);
+  useEffect(() => console.log('draggedTabHeight', draggedTabHeight), [draggedTabHeight]);
+  useEffect(() => console.log('draggedTabWidth', draggedTabWidth), [draggedTabWidth]);
+  useEffect(() => console.log('isDropTarget', isDropTarget), [isDropTarget]);
 
   useEffect(() => {
     if (currentTab && currentTab.getSlug() !== model.state.currentTabSlug) {

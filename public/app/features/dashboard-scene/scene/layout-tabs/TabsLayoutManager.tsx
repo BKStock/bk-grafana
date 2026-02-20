@@ -34,7 +34,13 @@ import { TabsLayoutManagerRenderer } from './TabsLayoutManagerRenderer';
 interface TabsLayoutManagerState extends SceneObjectState {
   tabs: TabItem[];
   currentTabSlug?: string;
-  // CODE: add isDropTarget property to highlitght the drop area
+  // Whether this manager is an active drop target (used for highlighting the drop area)
+  isDropTarget?: boolean;
+  // Dimensions of the dragged tab header for placeholder sizing
+  draggedTabWidth?: number;
+  draggedTabHeight?: number;
+  // Index of the tab currently hovered during drag (used for placeholder position)
+  hoveredTabIndex?: number;
 }
 
 export class TabsLayoutManager
@@ -139,6 +145,25 @@ export class TabsLayoutManager
 
       return acc;
     }, []);
+  }
+
+  public setDraggedTabDimensions(width?: number | null, height?: number | null) {
+    this.setState({
+      draggedTabWidth: width ?? undefined,
+      draggedTabHeight: height ?? undefined,
+    });
+  }
+
+  public setIsDropTarget(isDropTarget: boolean) {
+    this.setState({
+      isDropTarget,
+    });
+  }
+
+  public setHoveredTabIndex(index?: number | null) {
+    this.setState({
+      hoveredTabIndex: index ?? undefined,
+    });
   }
 
   public addPanel(vizPanel: VizPanel) {
