@@ -24,7 +24,7 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
   const styles = useStyles2(getStyles);
   const layoutControlsStyles = useStyles2(getLayoutControlsStyles);
 
-  const { tabs, key, placeholderIndex, draggedTabHeight, draggedTabWidth, isDropTarget } = model.useState();
+  const { tabs, key, placeholder, isDropTarget } = model.useState();
   const currentTab = model.getCurrentTab();
   const dashboard = getDashboardSceneFor(model);
   const orchestrator = getLayoutOrchestratorFor(model);
@@ -56,19 +56,23 @@ export function TabsLayoutManagerRenderer({ model }: SceneComponentProps<TabsLay
     orchestrator?.stopTabDrag(targetIndex);
   };
 
-  const customDropTab = isDropTarget ? (
-    <div key="placeholder" style={{ width: draggedTabWidth, height: draggedTabHeight }}></div>
-  ) : null;
+  let placeholderComponent: React.ReactNode | null = null;
+
+  if (isDropTarget && placeholder) {
+    placeholderComponent = (
+      <div key="placeholder" style={{ width: placeholder.width, height: placeholder.height }}></div>
+    );
+  }
 
   const children: React.ReactNode[] = [];
   tabs.forEach((tab) => {
-    if (customDropTab && placeholderIndex === children.length) {
-      children.push(customDropTab);
+    if (placeholder && placeholder.index === children.length) {
+      children.push(placeholderComponent);
     }
     children.push(<TabWrapper tab={tab} manager={model} key={tab.state.key!} />);
   });
-  if (customDropTab && placeholderIndex === children.length) {
-    children.push(customDropTab);
+  if (placeholder && placeholder.index === children.length) {
+    children.push(placeholderComponent);
   }
 
   return (

@@ -31,15 +31,17 @@ import { LayoutRegistryItem } from '../types/LayoutRegistryItem';
 import { TabItem } from './TabItem';
 import { TabsLayoutManagerRenderer } from './TabsLayoutManagerRenderer';
 
+type TabsPlaceholder = {
+  width: number;
+  height: number;
+  index: number;
+};
+
 interface TabsLayoutManagerState extends SceneObjectState {
   tabs: TabItem[];
   currentTabSlug?: string;
-  // Whether this manager is an active drop target (used for highlighting the drop area)
   isDropTarget?: boolean;
-  // Dimensions of the dragged tab header for placeholder sizing
-  draggedTabWidth?: number;
-  draggedTabHeight?: number;
-  placeholderIndex?: number | null;
+  placeholder?: TabsPlaceholder;
 }
 
 export class TabsLayoutManager
@@ -140,23 +142,13 @@ export class TabsLayoutManager
     }, []);
   }
 
-  public setDraggedTabDimensions(width?: number | null, height?: number | null) {
-    this.setState({
-      draggedTabWidth: width ?? undefined,
-      draggedTabHeight: height ?? undefined,
-    });
+  public setPlaceholder(placeholder: TabsPlaceholder) {
+    this.setState({ placeholder });
   }
 
   public setIsDropTarget(isDropTarget: boolean) {
     this.setState({
       isDropTarget,
-      placeholderIndex: isDropTarget ? null : this.getTabsIncludingRepeats().length,
-    });
-  }
-
-  public setPlaceHolderIndex(index: number | null | undefined) {
-    this.setState({
-      placeholderIndex: index,
     });
   }
 
