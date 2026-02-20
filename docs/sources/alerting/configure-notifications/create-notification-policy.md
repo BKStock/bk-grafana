@@ -152,49 +152,11 @@ Mute timings are not inherited from a parent notification policy, and they have 
 Multiple notification policies require the `alertingMultiplePolicies` feature flag, which is in public preview. When the flag is disabled, the system uses a single notification policy tree as described above.
 {{< /admonition >}}
 
-Each named routing tree is a self-contained policy tree with its own name, root policy, and child policies which function similar to the default policy.
+By default, Grafana uses a single notification policy tree for all alert routing. As organizations grow in size and complexity, managing a single global tree can become difficult. Multiple notification policies allow you to split routing logic into separate, independently managed routing trees.
+
+Each named routing tree is a self-contained policy tree with its own name, root policy, and child policies which function similar to the default policy. You can create additional named routing trees to organize routing logic by team, service, or domain.
 
 The Default Policy can't be deleted.
-
-### Create a notification policy
-
-1. In the left-side menu, click **Alerts & IRM** and then **Alerting**.
-1. Click **Notification policies**.
-1. Click **Create policy**.
-1. Enter a unique **Name** for the routing tree.
-1. In **Default contact point**, select the [contact point](ref:configure-contact-points) for this routing tree's root policy.
-1. In **Group by**, choose labels to group alerts.
-1. (Optional) Expand **Timing options** to configure group wait, group interval, and repeat interval.
-1. Click **Add routing tree** to save.
-
-After creation, the new routing tree appears in the list. Click **Edit** to open it and add child policies, just as you would with the default policy tree.
-
-### Edit a notification policy
-
-1. In the **Notification policies** list, find the routing tree you want to edit.
-1. Click **Edit** (or **View** if the policy is provisioned).
-1. Make your changes and click **Save**.
-
-### Delete a notification policy
-
-1. In the **Notification policies** list, find the routing tree you want to delete.
-1. Click the **More actions** menu (three dots) and select **Delete**.
-1. Confirm the deletion.
-
-{{< admonition type="note" >}}
-The **Default Policy** can't be deleted. Select **Reset** from its **More actions** menu to restore it to its default configuration. Provisioned routing trees can't be deleted from the UI.
-{{< /admonition >}}
-
-### Export a notification policy
-
-1. In the **Notification policies** list, find the routing tree you want to export.
-1. Click the **More actions** menu (three dots) and select **Export**.
-1. Choose the export format (YAML, JSON, or Terraform).
-1. Click **Copy Code** or **Download**.
-
-### Search notification policies
-
-Use the search field at the top of the **Notification policies** list to filter routing trees by name.
 
 ## Example
 
