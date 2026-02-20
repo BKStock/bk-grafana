@@ -299,15 +299,15 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
       return;
     }
 
-    // Handled by hello-pangea/dnd - skip calculations
-    if (dropTarget === this._sourceDropTarget) {
-      return;
-    }
-
     // moving to a new manager
     if (dropTarget !== this._lastDropTarget) {
       this.cleanUpTabDrag();
       this._lastDropTarget = dropTarget;
+
+      // Handled by hello-pangea/dnd - skip calculations
+      if (dropTarget === this._sourceDropTarget) {
+        return;
+      }
       dropTarget.setIsDropTarget(true);
     }
 
