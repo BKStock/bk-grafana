@@ -9,14 +9,12 @@ import (
 
 	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/grafana/grafana/pkg/apiserver/rest"
+	"github.com/grafana/grafana/pkg/cmd/grafana-cli/logger"
 	"github.com/grafana/grafana/pkg/infra/kvstore"
-	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/setting"
 	unifiedmigrations "github.com/grafana/grafana/pkg/storage/unified/migrations/contract"
 )
-
-var logger = log.New("dualwrite.service")
 
 // fakeMigrator is a no-op implementation of UnifiedStorageMigrationService
 type fakeMigrator struct{}
@@ -92,7 +90,7 @@ func ProvideService(
 
 	if cfg != nil {
 		if !enabled {
-			return &staticService{cfg: cfg, statusReader: statusReader, metrics: metrics}, nil
+			return &staticService{cfg: cfg, statusReader: statusReader}, nil
 		}
 
 		if cfg != nil {
@@ -101,7 +99,7 @@ func ProvideService(
 
 			// If both are fully on unified (Mode5), the dynamic service is not needed.
 			if foldersMode == rest.Mode5 && dashboardsMode == rest.Mode5 {
-				return &staticService{cfg: cfg, statusReader: statusReader, metrics: metrics}, nil
+				return &staticService{cfg: cfg, statusReader: statusReader}, nil
 			}
 
 			if (foldersMode >= rest.Mode4 || dashboardsMode >= rest.Mode4) && foldersMode != dashboardsMode {
@@ -117,7 +115,6 @@ func ProvideService(
 		},
 		enabled:      enabled,
 		statusReader: statusReader,
-		metrics:      metrics,
 	}, nil
 }
 
@@ -125,7 +122,6 @@ type service struct {
 	db           *keyvalueDB
 	enabled      bool
 	statusReader unifiedmigrations.MigrationStatusReader
-	metrics      *Metrics
 }
 
 func (m *service) NewStorage(gr schema.GroupResource, legacy rest.Storage, unified rest.Storage) (rest.Storage, error) {
@@ -133,8 +129,6 @@ func (m *service) NewStorage(gr schema.GroupResource, legacy rest.Storage, unifi
 	if err != nil {
 		return nil, err
 	}
-
-	logModeComparison(m.statusReader, m.metrics, gr, storageModeFromStatus(status))
 
 	if m.enabled && status.Runtime {
 		// Dynamic storage behavior
@@ -147,18 +141,20 @@ func (m *service) NewStorage(gr schema.GroupResource, legacy rest.Storage, unifi
 		}, nil
 	}
 
-	if status.ReadUnified {
-		if status.WriteLegacy {
-			// Write both, read unified
-			return &dualWriter{legacy: legacy, unified: unified, readUnified: true}, nil
-		}
+	// Use MigrationStatusReader for non-runtime mode selection.
+	mode, modeErr := m.statusReader.GetStorageMode(context.Background(), gr)
+	if modeErr != nil {
+		return nil, modeErr
+	}
+
+	switch mode {
+	case unifiedmigrations.StorageModeUnified:
 		return unified, nil
+	case unifiedmigrations.StorageModeDualWrite:
+		return &dualWriter{legacy: legacy, unified: unified, errorIsOK: true}, nil
+	default:
+		return legacy, nil
 	}
-	if status.WriteUnified {
-		// Write both, read legacy
-		return &dualWriter{legacy: legacy, unified: unified}, nil
-	}
-	return legacy, nil
 }
 
 // Hardcoded list of resources that should be controlled by the database (eventually everything?)
@@ -271,11 +267,6 @@ func (m *service) Update(ctx context.Context, status StorageStatus) (StorageStat
 	return status, m.db.set(ctx, status)
 }
 
-// LogStorageModeComparison implements Service.
-func (m *service) LogStorageModeComparison(gr schema.GroupResource, configMode rest.DualWriterMode) {
-	logModeComparison(m.statusReader, m.metrics, gr, storageModeFromConfigMode(configMode))
-}
-
 // logModeComparison compares currentMode with the mode from MigrationStatusReader
 // and emits metrics/logs for observability.
 func logModeComparison(statusReader unifiedmigrations.MigrationStatusReader, metrics *Metrics, gr schema.GroupResource, currentMode unifiedmigrations.StorageMode) {
@@ -287,10 +278,6 @@ func logModeComparison(statusReader unifiedmigrations.MigrationStatusReader, met
 		logger.Warn("Failed to get storage mode from MigrationStatusReader",
 			"resource", gr.String(), "error", err)
 		return
-	}
-
-	if currentMode != newMode && metrics != nil {
-		metrics.ModeMismatchCounter.WithLabelValues(gr.String(), currentMode.String(), newMode.String()).Inc()
 	}
 
 	logger.Info("Storage mode comparison",
