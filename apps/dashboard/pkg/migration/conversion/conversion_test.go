@@ -415,15 +415,7 @@ func TestMigratedDashboardsConversion(t *testing.T) {
 	}
 }
 
-// shouldOverrideOutput checks if OUTPUT_OVERRIDE environment variable is set to "true"
-func shouldOverrideOutput() bool {
-	return os.Getenv("OUTPUT_OVERRIDE") == "true"
-}
 
-func isCI() bool {
-	_, ok := os.LookupEnv("CI")
-	return ok
-}
 
 // setupTestConversionScheme initializes the migration system and sets up the conversion scheme
 // with test data source and library element providers. Returns the configured scheme.
@@ -439,56 +431,27 @@ func setupTestConversionScheme(t *testing.T) *runtime.Scheme {
 	return scheme
 }
 
-// writeOrCompareOutputFile writes or compares an output file based on OUTPUT_OVERRIDE environment variable.
-// If OUTPUT_OVERRIDE is true, it writes/overrides the file. Otherwise, it compares with existing file.
-// In CI, missing golden files cause a test failure.
-// obj should be JSON-marshalable (typically a Dashboard or similar struct).
-func writeOrCompareOutputFile(t *testing.T, obj interface{}, outputPath string, filename string) {
+// writeOrCompareOutputFile writes the golden file to disk (always, so the
+// frontend parity test can consume it) and validates or updates its SHA-256
+// checksum in golden_checksums.json.
+func writeOrCompareOutputFile(t *testing.T, obj interface{}, outputPath string, _ string) {
 	t.Helper()
 
 	outputData, err := json.MarshalIndent(obj, "", "  ")
 	require.NoError(t, err, "Failed to marshal output data")
 
-	outputOverride := shouldOverrideOutput()
-
-	if outputOverride {
-		outputDir := filepath.Dir(outputPath)
-		// ignore gosec G301 as this function is only used in the test process
-		//nolint:gosec
-		err = os.MkdirAll(outputDir, 0755)
-		require.NoError(t, err, "Failed to create output directory")
-		err = os.WriteFile(outputPath, outputData, 0644)
-		require.NoError(t, err, "Failed to write output file")
-		t.Logf("Overrode output file: %s", filename)
-		return
-	}
-
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		if isCI() {
-			t.Fatalf("Golden file missing: %s\n"+
-				"Golden files must be committed to the repository.\n"+
-				"Run the tests locally to generate them, then commit the result:\n\n"+
-				"  go test -count=1 ./apps/dashboard/pkg/migration/conversion/\n", outputPath)
-		}
-		outputDir := filepath.Dir(outputPath)
-		// ignore gosec G301 as this function is only used in the test process
-		//nolint:gosec
-		err = os.MkdirAll(outputDir, 0755)
-		require.NoError(t, err, "Failed to create output directory")
-		err = os.WriteFile(outputPath, outputData, 0644)
-		require.NoError(t, err, "Failed to write output file")
-		t.Logf("Created golden file: %s (commit this file to the repository)", filename)
-		return
-	}
-
-	// ignore gosec G304 as this function is only used in the test process
+	outputDir := filepath.Dir(outputPath)
 	//nolint:gosec
-	existingData, err := os.ReadFile(outputPath)
-	require.NoError(t, err, "Failed to read existing output file")
-	require.JSONEq(t, string(existingData), string(outputData),
-		"%s did not match.\nIf the diff is expected, regenerate with:\n\n  OUTPUT_OVERRIDE=true go test -count=1 ./apps/dashboard/pkg/migration/conversion/\n",
-		outputPath)
-	t.Logf("Conversion to %s matches existing file", filename)
+	err = os.MkdirAll(outputDir, 0755)
+	require.NoError(t, err, "Failed to create output directory")
+
+	err = os.WriteFile(outputPath, outputData, 0644)
+	require.NoError(t, err, "Failed to write output file")
+
+	key, err := checksumKey(outputPath)
+	require.NoError(t, err)
+
+	goldenChecksums.validateOrUpdate(t, key, outputData)
 }
 
 // readInputFile reads and unmarshals a JSON input file into the provided target.
@@ -504,6 +467,9 @@ func readInputFile(t *testing.T, inputPath string, target interface{}) {
 	require.NoError(t, err, "Failed to unmarshal input file %s", inputPath)
 }
 
+// testConversion writes the golden file to disk (always, so the frontend
+// parity test can consume it) and validates or updates its SHA-256 checksum
+// in golden_checksums.json.
 func testConversion(t *testing.T, convertedDash metav1.Object, filename, outputDir string) {
 	t.Helper()
 
@@ -511,44 +477,17 @@ func testConversion(t *testing.T, convertedDash metav1.Object, filename, outputD
 	outBytes, err := json.MarshalIndent(convertedDash, "", "  ")
 	require.NoError(t, err, "failed to marshal converted dashboard")
 
-	outputOverride := shouldOverrideOutput()
-
-	if outputOverride {
-		// ignore gosec G301 as this function is only used in the test process
-		//nolint:gosec
-		err = os.MkdirAll(outputDir, 0755)
-		require.NoError(t, err, "failed to create output directory %s", outputDir)
-		err = os.WriteFile(outPath, outBytes, 0644)
-		require.NoError(t, err, "failed to write output file %s", outPath)
-		t.Logf("Overrode output file: %s", filename)
-		return
-	}
-
-	if _, err := os.Stat(outPath); os.IsNotExist(err) {
-		if isCI() {
-			t.Fatalf("Golden file missing: %s\n"+
-				"Golden files must be committed to the repository.\n"+
-				"Run the tests locally to generate them, then commit the result:\n\n"+
-				"  go test -count=1 ./apps/dashboard/pkg/migration/conversion/\n", outPath)
-		}
-		// ignore gosec G301 as this function is only used in the test process
-		//nolint:gosec
-		err = os.MkdirAll(outputDir, 0755)
-		require.NoError(t, err, "failed to create output directory %s", outputDir)
-		err = os.WriteFile(outPath, outBytes, 0644)
-		require.NoError(t, err, "failed to write output file %s", outPath)
-		t.Logf("Created golden file: %s (commit this file to the repository)", filename)
-		return
-	}
-
-	// ignore gosec G304 as this function is only used in the test process
 	//nolint:gosec
-	existingBytes, err := os.ReadFile(outPath)
-	require.NoError(t, err, "failed to read existing output file")
-	require.JSONEq(t, string(existingBytes), string(outBytes),
-		"%s did not match.\nIf the diff is expected, regenerate with:\n\n  OUTPUT_OVERRIDE=true go test -count=1 ./apps/dashboard/pkg/migration/conversion/\n",
-		outPath)
-	t.Logf("Conversion to %s matches existing file", filename)
+	err = os.MkdirAll(outputDir, 0755)
+	require.NoError(t, err, "failed to create output directory %s", outputDir)
+
+	err = os.WriteFile(outPath, outBytes, 0644)
+	require.NoError(t, err, "failed to write output file %s", outPath)
+
+	key, err := checksumKey(outPath)
+	require.NoError(t, err)
+
+	goldenChecksums.validateOrUpdate(t, key, outBytes)
 }
 
 // TestConversionMetrics tests that conversion-level metrics are recorded correctly

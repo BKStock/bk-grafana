@@ -206,28 +206,13 @@ func TestV2alpha1ToV1beta1FromInputFiles(t *testing.T) {
 			require.NoError(t, err, "Failed to convert v2alpha1 to v1beta1")
 
 			expectedOutputPath := filepath.Join(outputDir, expectedOutputFile)
-
-			// If OUTPUT_OVERRIDE is set, write the file instead of comparing
-			if shouldOverrideOutput() {
-				writeOrCompareOutputFile(t, convertedV1beta1, expectedOutputPath, expectedOutputFile)
-				return
-			}
+			writeOrCompareOutputFile(t, convertedV1beta1, expectedOutputPath, expectedOutputFile)
 
 			// ignore gosec G304 as this function is only used in the test process
 			//nolint:gosec
 			expectedOutputData, err := os.ReadFile(expectedOutputPath)
-			if err != nil {
-				if isCI() {
-					t.Fatalf("Golden file missing: %s\n"+
-						"Golden files must be committed to the repository.\n"+
-						"Run the tests locally to generate them, then commit the result:\n\n"+
-						"  go test -count=1 ./apps/dashboard/pkg/migration/conversion/\n", expectedOutputPath)
-				}
-				writeOrCompareOutputFile(t, convertedV1beta1, expectedOutputPath, expectedOutputFile)
-				return
-			}
+			require.NoError(t, err, "Failed to read output file %s", expectedOutputPath)
 
-			// Parse expected v1beta1 dashboard
 			var expectedV1beta1 dashv1.Dashboard
 			err = json.Unmarshal(expectedOutputData, &expectedV1beta1)
 			require.NoError(t, err, "Failed to unmarshal expected v1beta1 dashboard")
