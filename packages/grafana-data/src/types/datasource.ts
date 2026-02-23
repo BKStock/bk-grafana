@@ -345,12 +345,12 @@ abstract class DataSourceApi<
   /**
    * Get default variables that will be added to the dashboard
    */
-  getDefaultVariables?(): VariableKind[];
+  getDefaultVariables?(): Promise<VariableKind[]>;
 
   /**
    * Get default dashboard links that should be added when this datasource is used.
    */
-  getDefaultLinks?(): DashboardLink[];
+  getDefaultLinks?(): Promise<DashboardLink[]>;
 
   /**
    * Set after constructor call, as the data source instance is the most common thing to pass around

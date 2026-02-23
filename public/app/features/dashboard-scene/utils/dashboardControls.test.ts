@@ -283,7 +283,7 @@ describe('dashboardControls', () => {
       const mockDs1 = createMockDatasource({
         uid: 'ds-1',
         type: 'prometheus',
-        getDefaultVariables: () => [mockVariable1],
+        getDefaultVariables: () => Promise.resolve([mockVariable1]),
         getDefaultLinks: undefined,
         getRef: jest.fn(() => ({ uid: 'ds-1', type: 'prometheus' })),
       });
@@ -291,7 +291,7 @@ describe('dashboardControls', () => {
       const mockDs2 = createMockDatasource({
         uid: 'ds-2',
         type: 'loki',
-        getDefaultVariables: () => [mockVariable2],
+        getDefaultVariables: () => Promise.resolve([mockVariable2]),
         getDefaultLinks: undefined,
         getRef: jest.fn(() => ({ uid: 'ds-2', type: 'loki' })),
       });
@@ -345,7 +345,7 @@ describe('dashboardControls', () => {
         uid: 'ds-1',
         type: 'prometheus',
         getDefaultVariables: undefined,
-        getDefaultLinks: () => [mockLink1, mockLink2],
+        getDefaultLinks: () => Promise.resolve([mockLink1, mockLink2]),
         getRef: jest.fn(() => ({ uid: 'ds-1', type: 'prometheus' })),
       });
 
@@ -383,8 +383,8 @@ describe('dashboardControls', () => {
       const mockDs = createMockDatasource({
         uid: 'ds-1',
         type: 'prometheus',
-        getDefaultVariables: () => [mockVariable1],
-        getDefaultLinks: () => [mockLink1],
+        getDefaultVariables: () => Promise.resolve([mockVariable1]),
+        getDefaultLinks: () => Promise.resolve([mockLink1]),
         getRef: jest.fn(() => ({ uid: 'ds-1', type: 'prometheus' })),
       });
 

@@ -34,7 +34,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
   for (const ds of datasources) {
     if (ds.getDefaultVariables) {
       const ref = ds.getRef();
-      const dsVariables = ds.getDefaultVariables();
+      const dsVariables = await ds.getDefaultVariables();
 
       if (dsVariables && dsVariables.length) {
         defaultVariables.push(
@@ -54,7 +54,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
     // Default links
     if (ds.getDefaultLinks) {
       const ref = ds.getRef();
-      const dsLinks = ds.getDefaultLinks();
+      const dsLinks = await ds.getDefaultLinks();
 
       if (dsLinks && dsLinks.length) {
         defaultLinks.push(
