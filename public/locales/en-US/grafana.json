@@ -13350,13 +13350,11 @@
       "transformation": "Transformation"
     },
     "sidebar": {
-      "add-below": "Add below {{id}}",
       "add-expression": "Add expression",
       "add-query": "Add query",
       "add-query-or-expression": "Add query or expression",
       "add-saved-query": "Add saved query",
       "add-transformation": "Add transformation",
-      "add-transformation-below": "Add transformation below {{id}}",
       "alert-indicator": {
         "button-label": "View alert rules",
         "button-label-hide": "Hide alert rules",
