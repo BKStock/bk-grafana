@@ -30,6 +30,9 @@ func WithAutoEnableMode5(cfg *setting.Cfg) MigrationRunnerOption {
 // MigrationRunner executes migrations without implementing the SQL migration interface.
 type MigrationRunner struct {
 	unifiedMigrator UnifiedMigrator
+	tableLocker     MigrationTableLocker
+	tableRenamer    MigrationTableRenamer
+	definition      MigrationDefinition
 	cfg             *setting.Cfg
 	autoEnableMode5 bool
 	log             log.Logger
@@ -38,11 +41,14 @@ type MigrationRunner struct {
 }
 
 // NewMigrationRunner creates a new migration runner.
-func NewMigrationRunner(unifiedMigrator UnifiedMigrator, migrationID string, resources []schema.GroupResource, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
+func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, tableRenamer MigrationTableRenamer, definition MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
 	r := &MigrationRunner{
 		unifiedMigrator: unifiedMigrator,
-		log:             log.New("storage.unified.migration_runner." + migrationID),
-		resources:       resources,
+		tableLocker:     tableLocker,
+		tableRenamer:    tableRenamer,
+		definition:      definition,
+		log:             log.New("storage.unified.migration_runner." + definition.ID),
+		resources:       definition.GetGroupResources(),
 		validators:      validators,
 	}
 	for _, opt := range opts {
@@ -58,7 +64,7 @@ type RunOptions struct {
 }
 
 // Run executes the migration logic for all organizations.
-func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunOptions) error {
+func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migrator.Migrator, opts RunOptions) error {
 	orgs, err := r.getAllOrgs(sess)
 	if err != nil {
 		r.log.Error("failed to get organizations", "error", err)
@@ -72,6 +78,13 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunO
 
 	r.log.Info("Starting migration for all organizations", "org_count", len(orgs), "resources", r.resources)
 
+	// Handle run failure after renaming some tables but before writing the log,
+	if len(r.definition.RenameTables) > 0 && opts.DriverName == migrator.MySQL {
+		if err := r.recoverPartialRename(mg); err != nil {
+			return fmt.Errorf("failed to recover partial rename: %w", err)
+		}
+	}
+
 	if opts.DriverName == migrator.SQLite {
 		// reuse transaction in SQLite to avoid "database is locked" errors
 		tx, err := sess.Tx()
@@ -83,13 +96,38 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunO
 		r.log.Info("Stored migrator transaction in context for bulk operations (SQLite compatibility)")
 	}
 
+	lockTables := lockTablesForResources(r.definition)
+	hasRename := len(r.definition.RenameTables) > 0
+	unlocked := false
+
+	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, mg, lockTables)
+	if err != nil {
+		return fmt.Errorf("failed to lock tables for migration: %w", err)
+	}
+	doUnlock := func() {
+		if unlocked {
+			return
+		}
+		unlocked = true
+		if err := unlockTables(ctx); err != nil {
+			r.log.Error("error unlocking legacy tables", "error", err)
+		}
+	}
+	defer doUnlock()
+
 	for _, org := range orgs {
 		info, err := types.ParseNamespace(types.OrgNamespaceFormatter(org.ID))
 		if err != nil {
 			r.log.Error("Failed to parse organization namespace", "org_id", org.ID, "error", err)
 			return fmt.Errorf("failed to parse namespace for org %d: %w", org.ID, err)
 		}
-		if err = r.MigrateOrg(ctx, sess, info, opts); err != nil {
+		if err = r.MigrateOrg(ctx, sess, mg.DBEngine, info, opts); err != nil {
+			return err
+		}
+	}
+
+	if hasRename {
+		if err := r.tableRenamer.RenameTables(ctx, sess, mg, r.definition.RenameTables, doUnlock); err != nil {
 			return err
 		}
 	}
@@ -107,8 +145,43 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunO
 	return nil
 }
 
+// recoverPartialRename restores partially renamed tables after a crash so the migration can re-run.
+func (r *MigrationRunner) recoverPartialRename(mg *migrator.Migrator) error {
+	pairs, err := buildRenamePairs(r.log, mg, r.definition.RenameTables)
+	if err != nil {
+		return err
+	}
+
+	// Normal first run
+	if len(pairs) == len(r.definition.RenameTables) {
+		return nil
+	}
+
+	// Rename _legacy tables back to original names so the migration can re-run.
+	alreadyRenamed := len(r.definition.RenameTables) - len(pairs)
+	r.log.Warn("Detected partial rename from previous crash, restoring tables for re-migration",
+		"already_renamed", alreadyRenamed, "total", len(r.definition.RenameTables))
+	for _, table := range r.definition.RenameTables {
+		legacyName := table + legacySuffix
+		legacyExists, err := mg.DBEngine.IsTableExist(legacyName)
+		if err != nil {
+			return fmt.Errorf("failed to check if table %q exists: %w", legacyName, err)
+		}
+		if !legacyExists {
+			continue
+		}
+		restoreSQL := fmt.Sprintf("RENAME TABLE %s TO %s", mg.Dialect.Quote(legacyName), mg.Dialect.Quote(table))
+		r.log.Info("Restoring renamed table", "from", legacyName, "to", table)
+		if _, err := mg.DBEngine.Exec(restoreSQL); err != nil {
+			return fmt.Errorf("failed to restore table %q to %q: %w", legacyName, table, err)
+		}
+	}
+
+	return nil
+}
+
 // MigrateOrg handles migration for a single organization.
-func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, info types.NamespaceInfo, opts RunOptions) error {
+func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, engine *xorm.Engine, info types.NamespaceInfo, opts RunOptions) error {
 	r.log.Info("Migrating organization", "org_id", info.OrgID, "namespace", info.Value)
 
 	// Create a service identity context for this namespace to authenticate with unified storage
@@ -149,8 +222,14 @@ func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, in
 		return fmt.Errorf("rebuilding indexes failed for org %d (%s): %w", info.OrgID, info.Value, err)
 	}
 
-	// Validate the migration results
-	if err := r.validateMigration(ctx, sess, response, r.validators); err != nil {
+	// On MySQL with rename, use a separate session so validator SELECTs don't hold
+	// shared MDL on sess's transaction (would deadlock with RENAME's exclusive MDL).
+	validationSess := sess
+	if opts.DriverName == migrator.MySQL && len(r.definition.RenameTables) > 0 {
+		validationSess = engine.NewSession()
+		defer validationSess.Close()
+	}
+	if err := r.validateMigration(ctx, validationSess, response, r.validators); err != nil {
 		r.log.Error("Migration validation failed", "org_id", info.OrgID, "error", err, "duration", time.Since(startTime))
 		return fmt.Errorf("migration validation failed for org %d (%s): %w", info.OrgID, info.Value, err)
 	}
@@ -220,16 +299,17 @@ func WithAutoMigrate(cfg *setting.Cfg) ResourceMigrationOption {
 // It internally creates a MigrationRunner to handle the actual migration logic.
 func NewResourceMigration(
 	unifiedMigrator UnifiedMigrator,
-	resources []schema.GroupResource,
-	migrationID string,
+	tableLocker MigrationTableLocker,
+	tableRenamer MigrationTableRenamer,
+	def MigrationDefinition,
 	validators []Validator,
 	opts ...ResourceMigrationOption,
 ) *ResourceMigration {
-	runner := NewMigrationRunner(unifiedMigrator, migrationID, resources, validators)
+	runner := NewMigrationRunner(unifiedMigrator, tableLocker, tableRenamer, def, validators)
 	m := &ResourceMigration{
 		runner:      runner,
-		resources:   resources,
-		migrationID: migrationID,
+		resources:   def.GetGroupResources(),
+		migrationID: def.ID,
 	}
 	for _, opt := range opts {
 		opt(m, runner)
@@ -270,7 +350,7 @@ Please investigate the failure and report it to the Grafana team so it can be ad
 
 	ctx := context.Background()
 
-	return m.runner.Run(ctx, sess, RunOptions{
+	return m.runner.Run(ctx, sess, mg, RunOptions{
 		DriverName: mg.Dialect.DriverName(),
 	})
 }
