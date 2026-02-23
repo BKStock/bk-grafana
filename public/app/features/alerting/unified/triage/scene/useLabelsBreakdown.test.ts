@@ -17,7 +17,7 @@ describe('computeTopLabels', () => {
     expect(result[0].key).toBe('team');
   });
 
-  it('should return top 5 labels sorted by frequency', () => {
+  it('should sort labels by frequency', () => {
     const series: Array<Record<string, string>> = [
       { team: 'a', env: 'prod', region: 'us', service: 'api', severity: 'critical', rare: 'x' },
       { team: 'b', env: 'prod', region: 'eu', service: 'web', severity: 'warn' },
@@ -28,7 +28,7 @@ describe('computeTopLabels', () => {
 
     const result = computeTopLabels(series);
 
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(6);
     // team appears in all 5
     expect(result[0].key).toBe('team');
     expect(result[0].count).toBe(5);
@@ -76,18 +76,17 @@ describe('computeTopLabels', () => {
     expect(computeTopLabels(series)).toEqual([]);
   });
 
-  it('should limit value distributions to top 10', () => {
-    // Create series where one label has more than 10 unique values
+  it('should sort values by frequency', () => {
     const series = Array.from({ length: 15 }, (_, i) => ({ host: `host-${i}` }));
 
     const result = computeTopLabels(series);
 
     expect(result[0].key).toBe('host');
     expect(result[0].count).toBe(15);
-    expect(result[0].values).toHaveLength(10);
+    expect(result[0].values).toHaveLength(15);
   });
 
-  it('should return all labels when maxKeys is Infinity', () => {
+  it('should return all labels sorted by frequency', () => {
     const series: Array<Record<string, string>> = [
       { team: 'a', env: 'prod', region: 'us', service: 'api', severity: 'critical', rare: 'x' },
       { team: 'b', env: 'prod', region: 'eu', service: 'web', severity: 'warn' },
@@ -96,34 +95,20 @@ describe('computeTopLabels', () => {
       { team: 'e' },
     ];
 
-    const result = computeTopLabels(series, Infinity, Infinity);
+    const result = computeTopLabels(series);
 
-    // Should include all 6 label keys, not just top 5
     expect(result).toHaveLength(6);
     expect(result.map((r) => r.key)).toEqual(['team', 'env', 'region', 'service', 'severity', 'rare']);
   });
 
-  it('should return all values when maxValues is Infinity', () => {
+  it('should return all values sorted by frequency', () => {
     const series = Array.from({ length: 15 }, (_, i) => ({ host: `host-${i}` }));
 
-    const result = computeTopLabels(series, Infinity, Infinity);
+    const result = computeTopLabels(series);
 
     expect(result[0].key).toBe('host');
     expect(result[0].count).toBe(15);
     expect(result[0].values).toHaveLength(15);
-  });
-
-  it('should respect custom maxKeys and maxValues limits', () => {
-    const series: Array<Record<string, string>> = [
-      { a: '1', b: '1', c: '1' },
-      { a: '2', b: '2', c: '2' },
-      { a: '3', b: '3' },
-    ];
-
-    const result = computeTopLabels(series, 2, 2);
-
-    expect(result).toHaveLength(2);
-    expect(result[0].values).toHaveLength(2);
   });
 
   it('should count firing and pending instances per label key', () => {
@@ -252,26 +237,5 @@ describe('computeTopLabels', () => {
     expect(team.values).toHaveLength(2);
     expect(team.values[0]).toEqual({ value: '', count: 2, firing: 0, pending: 0 });
     expect(team.values[1]).toEqual({ value: 'infra', count: 1, firing: 0, pending: 0 });
-  });
-
-  it('should preserve correct firing/pending counts when limited by maxKeys', () => {
-    const series: Array<Record<string, string>> = [
-      { alertstate: 'firing', a: '1', b: '1', c: '1' },
-      { alertstate: 'pending', a: '2', b: '2', c: '2' },
-      { alertstate: 'firing', a: '3', b: '3' },
-    ];
-
-    const result = computeTopLabels(series, 2, 2);
-
-    expect(result).toHaveLength(2);
-    // a and b both appear 3 times
-    const a = result.find((r) => r.key === 'a')!;
-    expect(a.firing).toBe(2);
-    expect(a.pending).toBe(1);
-    expect(a.values).toHaveLength(2);
-
-    const b = result.find((r) => r.key === 'b')!;
-    expect(b.firing).toBe(2);
-    expect(b.pending).toBe(1);
   });
 });

@@ -10,8 +10,10 @@ import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { AllLabelsDrawer, LabelBadgeCounts, addOrReplaceFilter } from './AllLabelsDrawer';
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
-import { TOP_LABEL_COUNT, type TopLabel, useLabelsBreakdown } from './useLabelsBreakdown';
+import { type TopLabel, useLabelsBreakdown } from './useLabelsBreakdown';
 import { useQueryFilter } from './utils';
+
+const PREVIEW_LABEL_COUNT = 5;
 
 type AlertState = PromAlertingRuleState.Firing | PromAlertingRuleState.Pending;
 
@@ -82,7 +84,7 @@ interface CompactStatRowProps {
   icon: 'exclamation-circle' | 'circle';
   instanceCount: number;
   ruleCount: number;
-  stateLabel: string;
+  stateLabel: AlertState;
 }
 
 function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: CompactStatRowProps) {
@@ -138,7 +140,7 @@ function TopLabelsSection() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const sceneContext = useSceneContext();
 
-  const topLabels = labels.slice(0, TOP_LABEL_COUNT);
+  const topLabels = labels.slice(0, PREVIEW_LABEL_COUNT);
 
   if (isLoading || topLabels.length === 0) {
     return null;
@@ -235,7 +237,7 @@ function SummaryStatsContent() {
               icon="exclamation-circle"
               instanceCount={instances.firing}
               ruleCount={rules.firing}
-              stateLabel="firing"
+              stateLabel={PromAlertingRuleState.Firing}
             />
           )}
           {alertstateFilter.includes(PromAlertingRuleState.Pending) && (
@@ -244,7 +246,7 @@ function SummaryStatsContent() {
               icon="circle"
               instanceCount={instances.pending}
               ruleCount={rules.pending}
-              stateLabel="pending"
+              stateLabel={PromAlertingRuleState.Pending}
             />
           )}
         </div>

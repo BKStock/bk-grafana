@@ -1,8 +1,24 @@
 import { SceneDataQuery } from '@grafana/scenes';
+import { DataSourceRef } from '@grafana/schema';
 
-import { METRIC_NAME } from '../constants';
+import { DATASOURCE_UID, METRIC_NAME } from '../constants';
 
-import { getDataQuery } from './utils';
+function getDataQuery(expression: string, options?: Partial<SceneDataQuery>): SceneDataQuery {
+  const datasourceRef: DataSourceRef = {
+    type: 'prometheus',
+    uid: DATASOURCE_UID,
+  };
+
+  const query: SceneDataQuery = {
+    refId: 'query',
+    expr: expression,
+    instant: false,
+    datasource: datasourceRef,
+    ...options,
+  };
+
+  return query;
+}
 
 /** Time series for the summary bar chart: count by alertstate */
 export function summaryChartQuery(filter: string): SceneDataQuery {

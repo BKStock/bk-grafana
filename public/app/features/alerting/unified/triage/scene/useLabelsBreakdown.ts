@@ -10,9 +10,6 @@ import { DATASOURCE_UID, METRIC_NAME } from '../constants';
 import { INTERNAL_LABELS } from './tagKeysProviders';
 import { useQueryFilter } from './utils';
 
-export const TOP_LABEL_COUNT = 5;
-const TOP_VALUES_COUNT = 10;
-
 export interface LabelValueCount {
   value: string;
   count: number;
@@ -38,7 +35,7 @@ export function useLabelsBreakdown(): {
 
   const { loading, error, value } = useAsync(async () => {
     const series = await fetchSeries(timeRange, filter);
-    return computeTopLabels(series, Infinity, Infinity);
+    return computeTopLabels(series);
   }, [timeRange, filter]);
 
   if (error) {
@@ -49,17 +46,10 @@ export function useLabelsBreakdown(): {
 }
 
 /**
- * Given an array of series (label maps), compute the top N label keys
- * by frequency, along with value distributions for each key.
- *
- * @param maxKeys – number of label keys to return (default 5, pass Infinity for all)
- * @param maxValues – number of values per key to return (default 10, pass Infinity for all)
+ * Given an array of series (label maps), compute label keys sorted by frequency,
+ * along with value distributions for each key.
  */
-export function computeTopLabels(
-  series: Array<Record<string, string>>,
-  maxKeys = TOP_LABEL_COUNT,
-  maxValues = TOP_VALUES_COUNT
-): TopLabel[] {
+export function computeTopLabels(series: Array<Record<string, string>>): TopLabel[] {
   const keyStats = new Map<string, LabelKeyStats>();
 
   for (const s of series) {
@@ -98,7 +88,6 @@ export function computeTopLabels(
 
   return [...keyStats.entries()]
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, maxKeys)
     .map(([key, stats]) => ({
       key,
       count: stats.count,
@@ -106,7 +95,6 @@ export function computeTopLabels(
       pending: stats.pending,
       values: [...stats.values.entries()]
         .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, maxValues)
         .map(([value, vs]) => ({
           value,
           count: vs.count,

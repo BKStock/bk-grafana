@@ -8,7 +8,7 @@ import { DATASOURCE_UID, METRIC_NAME } from '../constants';
 const COMMON_GROUP = 'Common';
 const FREQUENT_GROUP = 'Frequent';
 const ALL_GROUP = 'All';
-const TOP_LABEL_COUNT = 5;
+const MAX_FREQUENT_LABELS = 5;
 const collator = new Intl.Collator();
 
 /** Labels promoted to the top of the GroupBy dropdown */
@@ -103,7 +103,7 @@ async function fetchTopLabelKeys(timeRange: TimeRange): Promise<string[]> {
 
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_LABEL_COUNT)
+    .slice(0, MAX_FREQUENT_LABELS)
     .map(([key]) => key);
 }
 

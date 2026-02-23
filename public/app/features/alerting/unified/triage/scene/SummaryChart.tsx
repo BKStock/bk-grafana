@@ -11,7 +11,7 @@ import { useQueryFilter } from './utils';
 /**
  * Viz config for the summary chart - used by the React component
  */
-export const summaryChartVizConfig = VizConfigBuilders.timeseries()
+const summaryChartVizConfig = VizConfigBuilders.timeseries()
   .setCustomFieldConfig('drawStyle', GraphDrawStyle.Bars)
   .setCustomFieldConfig('barWidthFactor', 1)
   .setCustomFieldConfig('barAlignment', BarAlignment.Center)
