@@ -950,7 +950,8 @@ func Initialize(ctx context.Context, cfg *setting.Cfg, opts Options, apiOpts api
 	if err != nil {
 		return nil, err
 	}
-	provisioningAPIBuilder, err := provisioning2.RegisterAPIService(cfg, featureToggles, apiserverService, registerer, resourceClient, eventualRestConfigProvider, accessClient, dualwriteService, usageStats, tracingService, v3, v4, repositoryFactory, connectionFactory)
+	quotaGetter := extras.ProvideQuotaGetter(cfg)
+	provisioningAPIBuilder, err := provisioning2.RegisterAPIService(cfg, featureToggles, apiserverService, registerer, resourceClient, eventualRestConfigProvider, accessClient, dualwriteService, usageStats, tracingService, v3, v4, repositoryFactory, connectionFactory, quotaGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -1643,7 +1644,8 @@ func InitializeForTest(ctx context.Context, t sqlutil.ITestDB, testingT interfac
 	if err != nil {
 		return nil, err
 	}
-	provisioningAPIBuilder, err := provisioning2.RegisterAPIService(cfg, featureToggles, apiserverService, registerer, resourceClient, eventualRestConfigProvider, accessClient, dualwriteService, usageStats, tracingService, v3, v4, repositoryFactory, connectionFactory)
+	quotaGetter := extras.ProvideQuotaGetter(cfg)
+	provisioningAPIBuilder, err := provisioning2.RegisterAPIService(cfg, featureToggles, apiserverService, registerer, resourceClient, eventualRestConfigProvider, accessClient, dualwriteService, usageStats, tracingService, v3, v4, repositoryFactory, connectionFactory, quotaGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -1677,7 +1679,7 @@ func InitializeForTest(ctx context.Context, t sqlutil.ITestDB, testingT interfac
 	if err != nil {
 		return nil, err
 	}
-	testEnv, err := ProvideTestEnv(testingT, serverServer, sqlStore, cfg, notificationServiceMock, grpcserverProvider, inMemory, httpclientProvider, oauthtokentestService, featureToggles, resourceClient, idimplService, factory, githubFactory, decryptService)
+	testEnv, err := ProvideTestEnv(testingT, serverServer, sqlStore, cfg, notificationServiceMock, grpcserverProvider, inMemory, httpclientProvider, oauthtokentestService, featureToggles, resourceClient, idimplService, factory, githubFactory, decryptService, quotaGetter)
 	if err != nil {
 		return nil, err
 	}

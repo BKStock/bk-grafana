@@ -219,6 +219,12 @@ func NewAPIBuilder(
 // The limits are stored here and then passed to validators and workers via quotaLimits.
 func (b *APIBuilder) SetQuotas(limits quotas.QuotaLimits) {
 	b.quotaLimits = limits
+	if fq, ok := b.quotaGetter.(*quotas.FixedQuotaGetter); ok {
+		fq.SetQuotaStatus(provisioning.QuotaStatus{
+			MaxResourcesPerRepository: limits.MaxResources,
+			MaxRepositories:           limits.MaxRepositories,
+		})
+	}
 }
 
 // createJobHistoryConfigFromSettings creates JobHistoryConfig from Grafana settings
@@ -271,6 +277,7 @@ func RegisterAPIService(
 	extraWorkers []jobs.Worker,
 	repoFactory repository.Factory,
 	connectionFactory connection.Factory,
+	quotaGetter quotas.QuotaGetter,
 ) (*APIBuilder, error) {
 	//nolint:staticcheck // not yet migrated to OpenFeature
 	if !features.IsEnabledGlobally(featuremgmt.FlagProvisioning) {
@@ -285,11 +292,6 @@ func RegisterAPIService(
 	for _, target := range cfg.ProvisioningAllowedTargets {
 		allowedTargets = append(allowedTargets, provisioning.SyncTargetType(target))
 	}
-
-	quotaGetter := quotas.NewFixedQuotaGetter(provisioning.QuotaStatus{
-		MaxResourcesPerRepository: cfg.ProvisioningMaxResourcesPerRepository,
-		MaxRepositories:           cfg.ProvisioningMaxRepositories,
-	})
 
 	builder := NewAPIBuilder(
 		cfg.DisableControllers,
@@ -890,10 +892,6 @@ func (b *APIBuilder) GetPostStartHooks() (map[string]genericapiserver.PostStartH
 				}
 			}()
 
-			quotaGetter := quotas.NewFixedQuotaGetter(provisioning.QuotaStatus{
-				MaxResourcesPerRepository: b.quotaLimits.MaxResources,
-				MaxRepositories:           b.quotaLimits.MaxRepositories,
-			})
 			repoController, err := controller.NewRepositoryController(
 				b.GetClient(),
 				repoInformer,
@@ -909,7 +907,7 @@ func (b *APIBuilder) GetPostStartHooks() (map[string]genericapiserver.PostStartH
 				10,
 				informerFactoryResyncInterval,
 				b.minSyncInterval,
-				quotaGetter,
+				b.quotaGetter,
 			)
 			if err != nil {
 				return err

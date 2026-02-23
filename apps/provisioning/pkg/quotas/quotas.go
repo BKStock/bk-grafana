@@ -134,6 +134,11 @@ func (f *FixedQuotaGetter) GetQuotaStatus(ctx context.Context, namespace string)
 	return f.quotaStatus, nil
 }
 
+// SetQuotaStatus updates the quota status, allowing runtime changes (primarily for testing).
+func (f *FixedQuotaGetter) SetQuotaStatus(status provisioning.QuotaStatus) {
+	f.quotaStatus = status
+}
+
 // Ensure FixedQuotaGetter implements QuotaGetter interface.
 var _ QuotaGetter = (*FixedQuotaGetter)(nil)
 
