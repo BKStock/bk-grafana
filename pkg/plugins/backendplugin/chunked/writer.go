@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	jsoniter "github.com/json-iterator/go"
-
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/genproto/pluginv2"
@@ -22,13 +20,11 @@ var (
 )
 
 type rawChunkWriter struct {
-	stream *jsoniter.Stream
+	w http.ResponseWriter
 }
 
 func NewHTTPWriter(w http.ResponseWriter) *rawChunkWriter {
-	return &rawChunkWriter{
-		stream: jsoniter.NewStream(jsoniter.ConfigCompatibleWithStandardLibrary, w, 1024*10),
-	}
+	return &rawChunkWriter{w}
 }
 
 // ReceivedChunk implements [backendplugin.RawChunkReceiver].
@@ -37,38 +33,43 @@ func (r *rawChunkWriter) OnChunk(chunk *pluginv2.QueryChunkedDataResponse) error
 		return fmt.Errorf("expected json format")
 	}
 
-	r.stream.WriteRaw("data: ")
-	r.stream.WriteObjectStart()
-	r.stream.WriteObjectField("refId")
-	r.stream.WriteString(chunk.RefId)
+	// Write directly to the response -- avoiding any additional buffering
+	_, _ = r.w.Write([]byte(`data: {"refId":"`))
+	_, _ = r.w.Write([]byte(chunk.RefId))
+	_, _ = r.w.Write([]byte(`"`))
 
 	if chunk.FrameId != "" {
-		r.stream.WriteMore()
-		r.stream.WriteObjectField("frameId")
-		r.stream.WriteString(chunk.FrameId)
+		r.writeField("frameId", chunk.FrameId)
 	}
 
 	if chunk.Frame != nil {
-		r.stream.WriteMore()
-		r.stream.WriteObjectField("frame")
-		r.stream.WriteRaw(string(chunk.Frame)) // must not contain newlines!
+		_, _ = r.w.Write([]byte(`,"frame":`))
+		_, _ = r.w.Write(chunk.Frame)
+		_, _ = r.w.Write([]byte(`"`))
 	}
 
 	if chunk.Error != "" {
-		r.stream.WriteMore()
-		r.stream.WriteObjectField("error")
-		r.stream.WriteString(chunk.Error)
+		r.writeField("error", chunk.Error)
 
 		if chunk.ErrorSource != "" {
-			r.stream.WriteMore()
-			r.stream.WriteObjectField("errorSource")
-			r.stream.WriteString(chunk.ErrorSource)
+			r.writeField("errorSource", chunk.ErrorSource)
 		}
 	}
 
-	r.stream.WriteObjectEnd()
-	r.stream.WriteRaw("\n\n") // marks the end of a message in SSE
-	return r.stream.Flush()
+	if _, err := r.w.Write([]byte(`}\n\n`)); err != nil {
+		return err
+	}
+	flusher, ok := r.w.(http.Flusher)
+	if ok {
+		flusher.Flush()
+	}
+	return nil
+}
+
+func (r *rawChunkWriter) writeField(f string, v string) {
+	_, _ = r.w.Write([]byte(`,"` + f + `":"`))
+	_, _ = r.w.Write([]byte(v))
+	_, _ = r.w.Write([]byte(`"`))
 }
 
 // WriteError implements [backend.ChunkedDataWriter].
