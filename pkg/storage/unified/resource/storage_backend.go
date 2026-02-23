@@ -875,13 +875,15 @@ func (k *kvStorageBackend) ListModifiedSince(ctx context.Context, key Namespaced
 	sinceTime := time.Unix(0, sinceRvTimestamp*int64(time.Millisecond))
 	sinceRvAge := time.Since(sinceTime)
 
+	earliestRV := listModifiedSinceRV(sinceRv)
+
 	if sinceRvAge > time.Hour {
 		k.log.Debug("ListModifiedSince using data store", "sinceRv", sinceRv, "sinceRvAge", sinceRvAge)
-		return latestEvent.ResourceVersion, k.listModifiedSinceDataStore(ctx, key, sinceRv)
+		return latestEvent.ResourceVersion, k.listModifiedSinceDataStore(ctx, key, earliestRV, latestEvent.ResourceVersion)
 	}
 
 	k.log.Debug("ListModifiedSince using event store", "sinceRv", sinceRv, "sinceRvAge", sinceRvAge)
-	return latestEvent.ResourceVersion, k.listModifiedSinceEventStore(ctx, key, sinceRv)
+	return latestEvent.ResourceVersion, k.listModifiedSinceEventStore(ctx, key, earliestRV, latestEvent.ResourceVersion)
 }
 
 func convertEventType(action kv.DataAction) resourcepb.WatchEvent_Type {
@@ -911,7 +913,16 @@ func (k *kvStorageBackend) getValueFromDataStore(ctx context.Context, dataKey Da
 	return value, nil
 }
 
-func (k *kvStorageBackend) listModifiedSinceDataStore(ctx context.Context, key NamespacedResource, sinceRv int64) iter.Seq2[*ModifiedResource, error] {
+func listModifiedSinceRV(sinceRV int64) int64 {
+	// Apply a lookback in the search for events. This could lead to some re-indexing
+	// of resources, but it also reduces the chances of missed events: in the current
+	// implementation, the storage backend can persist higher-RV events before lower-RV
+	// events when there is concurrent writes for the same namespace/group/resource.
+	const lookback = 500 * time.Millisecond
+	return subtractDurationFromSnowflake(sinceRV, lookback)
+}
+
+func (k *kvStorageBackend) listModifiedSinceDataStore(ctx context.Context, key NamespacedResource, sinceRV, latestRV int64) iter.Seq2[*ModifiedResource, error] {
 	return func(yield func(*ModifiedResource, error) bool) {
 		var lastSeenResource *ModifiedResource
 		var lastSeenDataKey DataKey
@@ -921,7 +932,7 @@ func (k *kvStorageBackend) listModifiedSinceDataStore(ctx context.Context, key N
 				return
 			}
 
-			if dataKey.ResourceVersion < sinceRv {
+			if dataKey.ResourceVersion < sinceRV || dataKey.ResourceVersion > latestRV {
 				continue
 			}
 
@@ -980,11 +991,13 @@ func (k *kvStorageBackend) listModifiedSinceDataStore(ctx context.Context, key N
 	}
 }
 
-func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key NamespacedResource, sinceRv int64) iter.Seq2[*ModifiedResource, error] {
+// listModifiedSinceEventStore uses the event store to find events in the
+// [sinceRV, latestRV] range.
+func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key NamespacedResource, sinceRV, latestRV int64) iter.Seq2[*ModifiedResource, error] {
 	return func(yield func(*ModifiedResource, error) bool) {
 		// we only care about the latest revision of every resource in the list
 		seen := make(map[string]struct{})
-		for evtKeyStr, err := range k.eventStore.ListKeysSince(ctx, subtractDurationFromSnowflake(sinceRv, defaultLookbackPeriod), SortOrderDesc) {
+		for evtKeyStr, err := range k.eventStore.ListKeysSince(ctx, sinceRV, SortOrderDesc) {
 			if err != nil {
 				yield(&ModifiedResource{}, err)
 				return
@@ -996,7 +1009,7 @@ func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key 
 				return
 			}
 
-			if evtKey.ResourceVersion < sinceRv {
+			if evtKey.ResourceVersion > latestRV {
 				continue
 			}
 

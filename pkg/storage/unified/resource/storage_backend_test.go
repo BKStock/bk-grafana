@@ -1,9 +1,11 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/grafana/grafana/pkg/apimachinery/utils"
+	"github.com/grafana/grafana/pkg/storage/unified/resource/kv"
 	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 )
 
@@ -950,11 +953,20 @@ func TestKvStorageBackend_ListModifiedSince(t *testing.T) {
 			require.Equal(t, mr.Key.Resource, ns.Resource)
 
 			expectedMr, ok := expectation.changes[mr.Key.Name]
-			require.True(t, ok, "ListModifiedSince yielded unexpected resource: ", mr.Key.String())
-			require.Equal(t, mr.ResourceVersion, expectedMr.ResourceVersion)
-			require.Equal(t, mr.Action, expectedMr.Action)
-			require.Equal(t, string(mr.Value), string(expectedMr.Value))
-			delete(expectation.changes, mr.Key.Name)
+			if ok {
+				require.Equal(t, mr.ResourceVersion, expectedMr.ResourceVersion)
+				require.Equal(t, mr.Action, expectedMr.Action)
+				require.Equal(t, string(mr.Value), string(expectedMr.Value))
+				delete(expectation.changes, mr.Key.Name)
+			} else {
+				// The lookback window (sinceRV - 500ms) may return resources
+				// modified slightly before the expectation boundary. Verify
+				// the resource version falls within that lookback period.
+				lookbackRV := subtractDurationFromSnowflake(expectation.rv, 500*time.Millisecond)
+				require.GreaterOrEqual(t, mr.ResourceVersion, lookbackRV,
+					"unexpected resource %q with RV %d is outside the 500ms lookback window (lookback RV: %d, sinceRV: %d)",
+					mr.Key.Name, mr.ResourceVersion, lookbackRV, expectation.rv)
+			}
 		}
 
 		require.Equal(t, 0, len(expectation.changes), "ListModifiedSince failed to return one or more expected items")
@@ -990,7 +1002,7 @@ func randomStringGenerator() func() string {
 }
 
 // creates 2 hour old snowflake for testing
-func generateOldSnowflake(t *testing.T) int64 {
+func generateOldSnowflake() int64 {
 	// Generate a snowflake for 2 hours ago using the snowflakeFromTime utility
 	// which properly handles the epoch
 	twoHoursAgo := time.Now().Add(-2 * time.Hour)
@@ -1010,7 +1022,7 @@ func seedBackend(t *testing.T, backend *kvStorageBackend, ctx context.Context, n
 	// initial test will contain the same "changes" as the second one (first one added by the for loop below)
 	// this is done with a 2 hour old RV so it uses the event store instead of the data store to check for changes
 	expectations = append(expectations, expectation{
-		rv:      generateOldSnowflake(t),
+		rv:      generateOldSnowflake(),
 		changes: make(map[string]*ModifiedResource),
 	})
 
@@ -1018,11 +1030,11 @@ func seedBackend(t *testing.T, backend *kvStorageBackend, ctx context.Context, n
 		updates := rand.IntN(5)
 		shouldDelete := rand.IntN(100) < 10
 		mr := createAndSaveTestObject(t, backend, ctx, ns, uniqueStringGen, updates, shouldDelete)
+
 		expectations = append(expectations, expectation{
 			rv:      mr.ResourceVersion,
 			changes: make(map[string]*ModifiedResource),
 		})
-
 		for _, expect := range expectations {
 			expect.changes[mr.Key.Name] = mr
 		}
@@ -1111,7 +1123,7 @@ func TestKvStorageBackend_ListModifiedSince_WithFolder(t *testing.T) {
 		},
 		{
 			name:     "via data store (old RV > 1 hour)",
-			sinceRV:  func() int64 { return generateOldSnowflake(t) },
+			sinceRV:  func() int64 { return generateOldSnowflake() },
 			codePath: "listModifiedSinceDataStore",
 		},
 	}
@@ -1249,6 +1261,92 @@ func updateTestObject(t *testing.T, backend *kvStorageBackend, ctx context.Conte
 	rv, err := backend.WriteEvent(ctx, writeEvent)
 	require.NoError(t, err)
 	return rv
+}
+
+// saveToStores writes an event directly to both the event store and data store with
+// a specific RV, bypassing WriteEvent. This simulates a write that persisted with a
+// specific RV at a specific point in time.
+func saveToStores(t *testing.T, backend *kvStorageBackend, ctx context.Context, ns NamespacedResource, name string, rv int64, action kv.DataAction) {
+	t.Helper()
+
+	testObj, err := createTestObjectWithName(name, ns, "data-"+name)
+	require.NoError(t, err)
+	value := objectToJSONBytes(t, testObj)
+
+	// Save to data store
+	dataKey := DataKey{
+		Namespace:       ns.Namespace,
+		Group:           ns.Group,
+		Resource:        ns.Resource,
+		Name:            name,
+		ResourceVersion: rv,
+		Action:          action,
+	}
+	err = backend.dataStore.Save(ctx, dataKey, bytes.NewReader(value))
+	require.NoError(t, err)
+
+	// Save to event store
+	event := Event{
+		Namespace:       ns.Namespace,
+		Group:           ns.Group,
+		Resource:        ns.Resource,
+		Name:            name,
+		ResourceVersion: rv,
+		Action:          action,
+	}
+	err = backend.eventStore.Save(ctx, event)
+	require.NoError(t, err)
+}
+
+// collectNames iterates a ModifiedResource iterator and collects all resource names.
+func collectNames(t *testing.T, seq iter.Seq2[*ModifiedResource, error]) []string {
+	t.Helper()
+	var names []string
+	for mr, err := range seq {
+		require.NoError(t, err)
+		names = append(names, mr.Key.Name)
+	}
+	return names
+}
+
+func TestKvStorageBackend_ListModifiedSince_OutOfOrderResourceVersions(t *testing.T) {
+	backend := setupTestStorageBackend(t)
+	ctx := context.Background()
+
+	typeA := NamespacedResource{
+		Namespace: "default",
+		Group:     "typea.test",
+		Resource:  "resources",
+	}
+
+	// Write typeA:base via normal WriteEvent → get sinceRV.
+	rvBase, _ := addTestObject(t, backend, ctx, typeA, "base", "base-data")
+	sinceRV := rvBase
+
+	// Generate rvLow and rvHigh via sequential snowflake (sub-ms apart,
+	// both within the 500ms lookback window).
+	rvLow := backend.snowflake.Generate().Int64()
+	rvHigh := backend.snowflake.Generate().Int64()
+
+	// Save typeA:high with rvHigh directly (persists first, simulating concurrent writes).
+	saveToStores(t, backend, ctx, typeA, "high", rvHigh, kv.DataActionCreated)
+
+	newRV, iter := backend.ListModifiedSince(ctx, typeA, sinceRV)
+	names := collectNames(t, iter)
+	require.Contains(t, names, "high")
+	require.Equal(t, rvHigh, newRV)
+
+	// Save typeA:low with rvLow directly (delayed persistence).
+	saveToStores(t, backend, ctx, typeA, "low", rvLow, kv.DataActionCreated)
+
+	// Save typeA:trigger via WriteEvent (advances global latestRV).
+	addTestObject(t, backend, ctx, typeA, "trigger", "trigger-data")
+
+	// ListModifiedSince should return the missed `rvLow` event.
+	_, iter = backend.ListModifiedSince(ctx, typeA, rvHigh)
+	newNames := collectNames(t, iter)
+	require.Contains(t, newNames, "low")
+	require.Contains(t, newNames, "trigger")
 }
 
 func TestKvStorageBackend_ListHistory_Success(t *testing.T) {
