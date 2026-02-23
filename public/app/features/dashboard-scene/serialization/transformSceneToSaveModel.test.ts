@@ -203,7 +203,7 @@ describe('transformSceneToSaveModel', () => {
             {
               ...NEW_LINK,
               title: 'Link 2',
-              source: { type: 'datasource', ref: { group: 'loki' } },
+              origin: { type: 'datasource', ref: { group: 'loki' } },
             },
           ],
         } as DashboardDataDTO,
@@ -266,7 +266,7 @@ describe('transformSceneToSaveModel', () => {
                 type: 'custom',
 
                 // This marks that the variable was registered by a datasource
-                source: {
+                origin: {
                   type: 'datasource',
                   ref: { group: 'loki' },
                 },

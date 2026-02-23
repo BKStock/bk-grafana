@@ -302,7 +302,7 @@ lineage: schemas: [{
 			// If true, includes current time range in the link as query params
 			keepTime: bool | *false
 			// The source that registered the link (if any)
-			source?: #ControlSourceRef
+			origin?: #ControlSourceRef
 
 		} @cuetsy(kind="interface")
 

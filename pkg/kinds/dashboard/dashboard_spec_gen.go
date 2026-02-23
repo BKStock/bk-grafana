@@ -288,7 +288,7 @@ type DashboardLink struct {
 	// If true, includes current time range in the link as query params
 	KeepTime bool `json:"keepTime"`
 	// The source that registered the link (if any)
-	Source *ControlSourceRef `json:"source,omitempty"`
+	Origin *ControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardLink creates a new DashboardLink object.

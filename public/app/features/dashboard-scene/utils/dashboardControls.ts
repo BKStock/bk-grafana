@@ -39,7 +39,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
       if (dsVariables && dsVariables.length) {
         defaultVariables.push(
           ...dsVariables.map((v) => {
-            v.spec.source = {
+            v.spec.origin = {
               type: 'datasource' as const,
               ref: { group: ref.type },
             };
@@ -63,7 +63,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
               ...l,
               // Putting under the dashboard-controls menu by default
               placement: 'inControlsMenu' as const,
-              source: {
+              origin: {
                 type: 'datasource' as const,
                 ref: { group: ref.type },
               },
@@ -169,4 +169,4 @@ const sortByProp = <T>(items: T[], propGetter: (item: T) => Object | undefined) 
 };
 
 export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.source);
-export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.source);
+export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.origin);

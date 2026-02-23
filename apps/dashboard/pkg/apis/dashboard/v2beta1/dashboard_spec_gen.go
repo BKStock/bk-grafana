@@ -1633,7 +1633,7 @@ type DashboardDashboardLink struct {
 	// Placement can be used to display the link somewhere else on the dashboard other than above the visualisations.
 	Placement *string `json:"placement,omitempty"`
 	// The source that registered the link (if any)
-	Source *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardDashboardLink creates a new DashboardDashboardLink object.
@@ -1823,7 +1823,7 @@ type DashboardQueryVariableSpec struct {
 	AllowCustomValue   bool                                          `json:"allowCustomValue"`
 	StaticOptions      []DashboardVariableOption                     `json:"staticOptions,omitempty"`
 	StaticOptionsOrder *DashboardQueryVariableSpecStaticOptionsOrder `json:"staticOptionsOrder,omitempty"`
-	Source             *DashboardControlSourceRef                    `json:"source,omitempty"`
+	Origin             *DashboardControlSourceRef                    `json:"origin,omitempty"`
 }
 
 // NewDashboardQueryVariableSpec creates a new DashboardQueryVariableSpec object.
@@ -1994,7 +1994,7 @@ type DashboardTextVariableSpec struct {
 	Hide        DashboardVariableHide      `json:"hide"`
 	SkipUrlSync bool                       `json:"skipUrlSync"`
 	Description *string                    `json:"description,omitempty"`
-	Source      *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin      *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardTextVariableSpec creates a new DashboardTextVariableSpec object.
@@ -2050,7 +2050,7 @@ type DashboardConstantVariableSpec struct {
 	Hide        DashboardVariableHide      `json:"hide"`
 	SkipUrlSync bool                       `json:"skipUrlSync"`
 	Description *string                    `json:"description,omitempty"`
-	Source      *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin      *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardConstantVariableSpec creates a new DashboardConstantVariableSpec object.
@@ -2113,7 +2113,7 @@ type DashboardDatasourceVariableSpec struct {
 	SkipUrlSync      bool                       `json:"skipUrlSync"`
 	Description      *string                    `json:"description,omitempty"`
 	AllowCustomValue bool                       `json:"allowCustomValue"`
-	Source           *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin           *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardDatasourceVariableSpec creates a new DashboardDatasourceVariableSpec object.
@@ -2180,7 +2180,7 @@ type DashboardIntervalVariableSpec struct {
 	Hide        DashboardVariableHide      `json:"hide"`
 	SkipUrlSync bool                       `json:"skipUrlSync"`
 	Description *string                    `json:"description,omitempty"`
-	Source      *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin      *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardIntervalVariableSpec creates a new DashboardIntervalVariableSpec object.
@@ -2247,7 +2247,7 @@ type DashboardCustomVariableSpec struct {
 	Description      *string                                  `json:"description,omitempty"`
 	AllowCustomValue bool                                     `json:"allowCustomValue"`
 	ValuesFormat     *DashboardCustomVariableSpecValuesFormat `json:"valuesFormat,omitempty"`
-	Source           *DashboardControlSourceRef               `json:"source,omitempty"`
+	Origin           *DashboardControlSourceRef               `json:"origin,omitempty"`
 }
 
 // NewDashboardCustomVariableSpec creates a new DashboardCustomVariableSpec object.
@@ -2304,7 +2304,7 @@ type DashboardGroupByVariableSpec struct {
 	Hide         DashboardVariableHide      `json:"hide"`
 	SkipUrlSync  bool                       `json:"skipUrlSync"`
 	Description  *string                    `json:"description,omitempty"`
-	Source       *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin       *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardGroupByVariableSpec creates a new DashboardGroupByVariableSpec object.
@@ -2365,7 +2365,7 @@ type DashboardAdhocVariableSpec struct {
 	SkipUrlSync      bool                             `json:"skipUrlSync"`
 	Description      *string                          `json:"description,omitempty"`
 	AllowCustomValue bool                             `json:"allowCustomValue"`
-	Source           *DashboardControlSourceRef       `json:"source,omitempty"`
+	Origin           *DashboardControlSourceRef       `json:"origin,omitempty"`
 }
 
 // NewDashboardAdhocVariableSpec creates a new DashboardAdhocVariableSpec object.
@@ -2465,7 +2465,7 @@ type DashboardSwitchVariableSpec struct {
 	Hide          DashboardVariableHide      `json:"hide"`
 	SkipUrlSync   bool                       `json:"skipUrlSync"`
 	Description   *string                    `json:"description,omitempty"`
-	Source        *DashboardControlSourceRef `json:"source,omitempty"`
+	Origin        *DashboardControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardSwitchVariableSpec creates a new DashboardSwitchVariableSpec object.

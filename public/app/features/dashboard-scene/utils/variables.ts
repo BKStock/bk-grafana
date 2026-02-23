@@ -158,7 +158,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.name,
     label: variable.label,
     description: variable.description,
-    source: variable.source,
+    source: variable.origin,
   };
   if (variable.type === 'adhoc') {
     const originFilters: AdHocVariableFilter[] = [];

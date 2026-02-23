@@ -98,7 +98,7 @@ export function transformSceneToSaveModelSchemaV2(scene: DashboardScene, isSnaps
     links: (sceneDash.links || [])
       // Links with a `source` property didn't come from the persisted JSON schema, so we also skip them
       // from generating the JSON model from the scenes object.
-      .filter((link) => link.source === undefined)
+      .filter((link) => link.origin === undefined)
       .map((link) => ({
         title: link.title ?? defaultDashboardLink().title,
         url: link.url ?? defaultDashboardLink().url,

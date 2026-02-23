@@ -324,7 +324,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.spec.name,
     label: variable.spec.label,
     description: variable.spec.description,
-    source: variable.spec.source,
+    source: variable.spec.origin,
   };
   if (variable.kind === defaultAdhocVariableKind().kind) {
     const ds = getDataSourceForQuery(

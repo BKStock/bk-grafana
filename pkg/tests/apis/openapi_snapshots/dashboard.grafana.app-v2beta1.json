@@ -1197,7 +1197,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -1683,7 +1683,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -1807,7 +1807,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           },
           "valuesFormat": {
@@ -1854,7 +1854,7 @@
             "description": "Placement can be used to display the link somewhere else on the dashboard other than above the visualisations.",
             "type": "string"
           },
-          "source": {
+          "origin": {
             "description": "The source that registered the link (if any)",
             "allOf": [
               {
@@ -2113,7 +2113,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -2579,7 +2579,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -2726,7 +2726,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -3264,7 +3264,7 @@
             "type": "string",
             "default": ""
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           },
           "staticOptions": {
@@ -3688,7 +3688,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }
@@ -3854,7 +3854,7 @@
             "type": "boolean",
             "default": false
           },
-          "source": {
+          "origin": {
             "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardDatasourceControlSourceRef"
           }
         }

@@ -220,7 +220,7 @@ describe('transformSceneToSaveModelSchemaV2', () => {
           targetBlank: false,
           tooltip: '',
           type: 'link',
-          source: {
+          origin: {
             type: 'datasource',
             ref: {
               group: 'datasource',

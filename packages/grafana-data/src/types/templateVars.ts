@@ -199,7 +199,7 @@ export interface BaseVariableModel {
   error: any | null;
   description: string | null;
   usedInRepeat?: boolean;
-  source?: ControlSourceRef;
+  origin?: ControlSourceRef;
 }
 
 export interface SnapshotVariableModel extends VariableWithOptions {
