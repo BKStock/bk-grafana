@@ -236,12 +236,10 @@ export function usePaginatedRows(
 
       if (currRow.__depth === 0) {
         count++;
-        if (count < 1 || count > rowsPerPage) {
-          continue;
-        }
       }
-
-      result.push(currRow);
+      if (count >= 1 && count <= rowsPerPage) {
+        result.push(currRow);
+      }
     }
 
     return result;

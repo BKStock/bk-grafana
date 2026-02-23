@@ -277,6 +277,69 @@ describe('TableNG hooks', () => {
       expect(result.current.pageRangeEnd).toBe(3);
       expect(result.current.rows.length).toBe(1);
     });
+
+    it('should handle nested frames correctly', () => {
+      const { fields } = setupData();
+      const frame = createDataFrame({
+        fields: [
+          { name: 'id', type: FieldType.string, values: ['1', '2', '3', '4', '5'], config: {} },
+          {
+            name: 'nested',
+            type: FieldType.nestedFrames,
+            values: Array(5).fill([[createDataFrame({ fields })]]),
+            config: {},
+          },
+        ],
+      });
+      const rows = frameToRecords(frame, 'nested');
+      const { result } = renderHook(() =>
+        usePaginatedRows(rows, {
+          enabled: true,
+          height: 140,
+          width: 800,
+          rowHeight: 10,
+          headerHeight: TABLE.HEADER_HEIGHT,
+          footerHeight: 45,
+          hasNestedFrames: true,
+        })
+      );
+
+      expect(result.current.page).toBe(0);
+      expect(result.current.rows.length).toBe(4);
+      expect(result.current.rows[0].__index).toBe(0);
+      expect(result.current.rows[1].__index).toBe(0);
+      expect(result.current.rows[2].__index).toBe(1);
+      expect(result.current.rows[3].__index).toBe(1);
+      expect(result.current.pageRangeStart).toBe(1);
+      expect(result.current.pageRangeEnd).toBe(2);
+      expect(result.current.rowsPerPage).toBe(2);
+
+      act(() => {
+        result.current.setPage(1);
+      });
+
+      expect(result.current.page).toBe(1);
+      expect(result.current.rows.length).toBe(4);
+      expect(result.current.rows[0].__index).toBe(2);
+      expect(result.current.rows[1].__index).toBe(2);
+      expect(result.current.rows[2].__index).toBe(3);
+      expect(result.current.rows[3].__index).toBe(3);
+      expect(result.current.pageRangeStart).toBe(3);
+      expect(result.current.pageRangeEnd).toBe(4);
+      expect(result.current.rowsPerPage).toBe(2);
+
+      act(() => {
+        result.current.setPage(2);
+      });
+
+      expect(result.current.page).toBe(2);
+      expect(result.current.rows.length).toBe(2);
+      expect(result.current.rows[0].__index).toBe(4);
+      expect(result.current.rows[1].__index).toBe(4);
+      expect(result.current.pageRangeStart).toBe(5);
+      expect(result.current.pageRangeEnd).toBe(5);
+      expect(result.current.rowsPerPage).toBe(2);
+    });
   });
 
   describe('useNestedRows', () => {
@@ -584,6 +647,7 @@ describe('TableNG hooks', () => {
       it('calculates the height to return using default height', () => {
         const { fields } = setupData();
         const nestedRows = frameToRecords(createDataFrame({ fields }), 'nested');
+        const defaultNonNestedHeight = 60;
         const defaultHeight = 40;
 
         expect(
@@ -594,7 +658,7 @@ describe('TableNG hooks', () => {
                 { name: 'nested', type: FieldType.nestedFrames, values: [createDataFrame({ fields })], config: {} },
               ],
               columnWidths: [100],
-              defaultHeight,
+              defaultHeight: defaultNonNestedHeight,
               defaultNestedHeight: defaultHeight,
               typographyCtx: typographyCtx,
               hasNestedFrames: true,
@@ -612,7 +676,32 @@ describe('TableNG hooks', () => {
               data: createDataFrame({ fields }),
             });
           }).result.current
-        ).toBe(defaultHeight * 4 + TABLE.CELL_PADDING * 2); // 3 rows + header + padding
+        ).toBe(defaultHeight * 3 + defaultNonNestedHeight + TABLE.CELL_PADDING * 2); // 3 nested rows + 1 non-nested row + header + padding
+      });
+
+      it('uses a string-based default height for the nested rows', () => {
+        const { fields } = setupData();
+        const nestedRows = frameToRecords(createDataFrame({ fields }), 'nested');
+
+        expect(
+          renderHook(() => {
+            return useRowHeight({
+              fields: [
+                { name: 'id', type: FieldType.string, values: ['1'], config: {} },
+                { name: 'nested', type: FieldType.nestedFrames, values: [createDataFrame({ fields })], config: {} },
+              ],
+              columnWidths: [100],
+              defaultHeight: 40,
+              defaultNestedHeight: 'min-content',
+              typographyCtx: typographyCtx,
+              hasNestedFrames: true,
+              nestedRows: [{ raw: nestedRows, final: nestedRows }],
+              nestedFields: fields,
+              nestedColWidths: [100, 100, 100],
+              visibleNestedRowCounts: [3],
+            });
+          }).result.current
+        ).toBe('min-content');
       });
 
       it('removes the header if configured', () => {
@@ -693,6 +782,7 @@ describe('TableNG hooks', () => {
               fields: fieldsWithWrappedText,
               columnWidths: [100, 100, 100],
               defaultHeight,
+              defaultNestedHeight: defaultHeight,
               typographyCtx: typographyCtx,
               hasNestedFrames: false,
               visibleNestedRowCounts: [],
@@ -729,6 +819,7 @@ describe('TableNG hooks', () => {
             fields: fieldsWithWrappedText,
             columnWidths: [100, 100, 100],
             defaultHeight: 40,
+            defaultNestedHeight: 40,
             typographyCtx: { ...typographyCtx, measureHeight: measureHeightFn, estimateHeight: estimateHeightFn },
             hasNestedFrames: false,
             visibleNestedRowCounts: [],
@@ -775,6 +866,7 @@ describe('TableNG hooks', () => {
             fields: topFrame.fields,
             columnWidths: [330],
             defaultHeight: 40,
+            defaultNestedHeight: 40,
             typographyCtx: { ...typographyCtx, measureHeight: measureHeightFn, estimateHeight: estimateHeightFn },
             hasNestedFrames: true,
             visibleNestedRowCounts: [3],
@@ -797,6 +889,25 @@ describe('TableNG hooks', () => {
           0,
           22
         );
+      });
+
+      it('uses a string-based default height when set', () => {
+        const { fields } = setupData();
+        const { result } = renderHook(() => {
+          return useRowHeight({
+            fields,
+            columnWidths: [100, 100, 100],
+            defaultHeight: 'min-content',
+            defaultNestedHeight: 40,
+            typographyCtx: typographyCtx,
+            hasNestedFrames: false,
+            visibleNestedRowCounts: [],
+            nestedRows: [],
+            nestedFields: [],
+            nestedColWidths: [],
+          });
+        });
+        expect(result.current).toBe('min-content');
       });
     });
   });

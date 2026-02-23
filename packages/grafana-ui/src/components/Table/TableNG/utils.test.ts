@@ -922,7 +922,7 @@ describe('TableNG utils', () => {
       expect(result).toBe(expected);
     });
 
-    it('returns "min-content" if a field is present with the dynamicHeight cellOption  is false', () => {
+    it('returns "min-content" if a field is present with the dynamicHeight=true cellOption', () => {
       expect(
         getDefaultRowHeight(
           theme,
