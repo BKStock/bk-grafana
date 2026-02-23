@@ -77,6 +77,7 @@ func (s *LogGroupsService) GetLogGroups(ctx context.Context, req resources.LogGr
 }
 
 // sortLogGroupsBy sorts result in place by name or accountId, asc or desc.
+// Uses case-insensitive comparison for true alphabetical order.
 func sortLogGroupsBy(result []resources.ResourceResponse[resources.LogGroup], orderBy string) {
 	if orderBy == "" {
 		return
@@ -87,15 +88,17 @@ func sortLogGroupsBy(result []resources.ResourceResponse[resources.LogGroup], or
 		}
 		return ""
 	}
+	lessName := func(a, b string) bool { return strings.ToLower(a) < strings.ToLower(b) }
+	lessAccountId := func(a, b string) bool { return strings.ToLower(a) < strings.ToLower(b) }
 	switch orderBy {
-	case resources.OrderByNameAsc:
-		sort.Slice(result, func(i, j int) bool { return strings.Compare(result[i].Value.Name, result[j].Value.Name) < 0 })
 	case resources.OrderByNameDesc:
-		sort.Slice(result, func(i, j int) bool { return strings.Compare(result[i].Value.Name, result[j].Value.Name) > 0 })
+		sort.Slice(result, func(i, j int) bool { return lessName(result[j].Value.Name, result[i].Value.Name) })
+	case resources.OrderByNameAsc:
+		sort.Slice(result, func(i, j int) bool { return lessName(result[i].Value.Name, result[j].Value.Name) })
 	case resources.OrderByAccountIDAsc:
-		sort.Slice(result, func(i, j int) bool { return strings.Compare(accountId(result[i]), accountId(result[j])) < 0 })
+		sort.Slice(result, func(i, j int) bool { return lessAccountId(accountId(result[i]), accountId(result[j])) })
 	case resources.OrderByAccountIDDesc:
-		sort.Slice(result, func(i, j int) bool { return strings.Compare(accountId(result[i]), accountId(result[j])) > 0 })
+		sort.Slice(result, func(i, j int) bool { return lessAccountId(accountId(result[j]), accountId(result[i])) })
 	}
 }
 

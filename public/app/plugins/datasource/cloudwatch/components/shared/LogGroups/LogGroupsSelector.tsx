@@ -30,8 +30,8 @@ import Search from './Search';
 const ORDER_BY_OPTIONS: Array<{ value: LogGroupOrderBy; label: string }> = [
   { value: 'nameAsc', label: 'Name (A–Z)' },
   { value: 'nameDesc', label: 'Name (Z–A)' },
-  { value: 'accountIdAsc', label: 'Account ID (A–Z)' },
-  { value: 'accountIdDesc', label: 'Account ID (Z–A)' },
+  { value: 'accountIdAsc', label: 'Account ID (0-9)' },
+  { value: 'accountIdDesc', label: 'Account ID (9-0)' },
 ];
 
 type CrossAccountLogsQueryProps = {
@@ -96,14 +96,18 @@ export const LogGroupsSelector = ({
     return idsToNames;
   }, [accountOptions]);
 
-  const searchFn = async (searchTerm?: string, accountId?: string) => {
+  const searchFn = async (
+    searchTerm?: string,
+    accountId?: string,
+    orderByOverride?: LogGroupOrderBy
+  ) => {
     setIsLoading(true);
     try {
       const possibleLogGroups = await fetchLogGroups({
         logGroupPattern: searchTerm,
         accountId: accountId,
         listAllLogGroups: true,
-        orderBy,
+        orderBy: orderByOverride ?? orderBy,
       });
       setSelectableLogGroups(
         possibleLogGroups.map((lg) => ({
@@ -170,7 +174,7 @@ export const LogGroupsSelector = ({
                 const v = opt?.value;
                 if (v) {
                   setOrderBy(v);
-                  searchFn(searchPhrase, searchAccountId);
+                  searchFn(searchPhrase, searchAccountId, v);
                 }
               }}
               aria-label="Sort log groups by"

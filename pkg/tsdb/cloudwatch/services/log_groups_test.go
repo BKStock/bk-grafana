@@ -179,7 +179,29 @@ func TestGetLogGroups(t *testing.T) {
 		}, resp)
 	})
 
-	t.Run("Should sort by name descending when OrderBy is nameDesc", func(t *testing.T) {
+	t.Run("Should sort by name ascending (A–Z) when OrderBy is nameAsc", func(t *testing.T) {
+		mockLogsAPI := &mocks.LogsAPI{}
+		mockLogsAPI.On("DescribeLogGroups", mock.Anything).Return(
+			&cloudwatchlogs.DescribeLogGroupsOutput{
+				LogGroups: []cloudwatchlogstypes.LogGroup{
+					{Arn: utils.Pointer("arn:aws:logs:us-east-1:111:log-group:group_a"), LogGroupName: utils.Pointer("group_a")},
+					{Arn: utils.Pointer("arn:aws:logs:us-east-1:222:log-group:group_b"), LogGroupName: utils.Pointer("group_b")},
+					{Arn: utils.Pointer("arn:aws:logs:us-east-1:333:log-group:group_c"), LogGroupName: utils.Pointer("group_c")},
+				},
+			}, nil)
+		service := NewLogGroupsService(mockLogsAPI, false)
+
+		resp, err := service.GetLogGroups(context.Background(), resources.LogGroupsRequest{
+			OrderBy: resources.OrderByNameAsc,
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, "group_a", resp[0].Value.Name)
+		assert.Equal(t, "group_b", resp[1].Value.Name)
+		assert.Equal(t, "group_c", resp[2].Value.Name)
+	})
+
+	t.Run("Should sort by name descending (Z–A) when OrderBy is nameDesc", func(t *testing.T) {
 		mockLogsAPI := &mocks.LogsAPI{}
 		mockLogsAPI.On("DescribeLogGroups", mock.Anything).Return(
 			&cloudwatchlogs.DescribeLogGroupsOutput{

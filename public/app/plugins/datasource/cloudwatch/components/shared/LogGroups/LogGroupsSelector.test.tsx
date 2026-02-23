@@ -115,7 +115,7 @@ describe('LogGroupsSelector', () => {
       accountId: 'all',
       logGroupPattern: 'something',
       listAllLogGroups: true,
-      orderBy: 'nameAsc',
+      orderBy: 'nameDesc',
     });
   });
 
@@ -149,7 +149,7 @@ describe('LogGroupsSelector', () => {
       accountId: 'account-id123',
       logGroupPattern: '',
       listAllLogGroups: true,
-      orderBy: 'nameAsc',
+      orderBy: 'nameDesc',
     });
   });
 
