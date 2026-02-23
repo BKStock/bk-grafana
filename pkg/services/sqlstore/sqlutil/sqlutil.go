@@ -116,8 +116,10 @@ func sqLite3TestDB() (*TestDB, error) {
 
 	ret.ConnStr = "file:" + sqliteDb + "?cache=private&mode=rwc"
 	if os.Getenv("SQLITE_JOURNAL_MODE") != "false" {
-		// For tests, set sync=OFF for faster commits. Reference: https://www.sqlite.org/pragma.html#pragma_synchronous.
-		ret.ConnStr += "&_journal_mode=WAL&_synchronous=OFF"
+		// For tests, set sync=OFF for faster commits. Reference: https://www.sqlite.org/pragma.html#pragma_synchronous
+		// Sync is used in more production-y environments to avoid the database becoming corrupted. Test databases are fine to break.
+		// Use _txlock immediate to assume most transactions will write: https://kerkour.com/sqlite-for-servers
+		ret.ConnStr += "&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate"
 	}
 	ret.Path = sqliteDb
 
