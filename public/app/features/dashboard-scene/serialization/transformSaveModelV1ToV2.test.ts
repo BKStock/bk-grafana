@@ -180,10 +180,9 @@ describe('V1 to V2 Dashboard Transformation Comparison', () => {
   const LATEST_API_VERSION = 'dashboard.grafana.app/v2beta1';
 
   // Known backend/frontend drift: these files produce different output from the backend
-  // conversion vs the frontend transformation. The backend golden files were regenerated
-  // and exposed pre-existing mismatches. Each entry should be fixed and removed.
+  // conversion vs the frontend transformation. Each entry should be fixed and removed.
   const SKIPPED_FILES: Record<string, string> = {
-    // Backend resolves datasource group as "elasticsearch", frontend resolves as "prometheus" (falls back to default ds type)
+    // Backend resolves elasticsearch datasource group differently than frontend (falls back to default ds type)
     'migrated_dev_dashboards/datasource-elasticsearch/v1beta1.elasticsearch_complex.v42.json':
       'Backend resolves elasticsearch datasource group differently than frontend',
     'migrated_dev_dashboards/datasource-elasticsearch/v1beta1.elasticsearch_migration.v42.json':

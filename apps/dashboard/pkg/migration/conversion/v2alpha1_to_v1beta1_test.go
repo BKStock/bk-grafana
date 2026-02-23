@@ -1,7 +1,6 @@
 package conversion
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -161,8 +160,7 @@ func TestV2alpha1ToV2beta1WriteOutputFiles(t *testing.T) {
 			outputFileName := fmt.Sprintf("v2alpha1.%s.v2beta1.json", baseName)
 			outputPath := filepath.Join(outputDir, outputFileName)
 
-			// Write or compare output file
-			writeOrCompareOutputFile(t, v2beta1, outputPath, outputFileName)
+			writeOrCompareOutputFile(t, v2beta1, outputPath)
 		})
 	}
 }
@@ -195,12 +193,10 @@ func TestV2alpha1ToV1beta1FromInputFiles(t *testing.T) {
 		expectedOutputFile := baseName + ".v1beta1.json"
 
 		t.Run(fmt.Sprintf("Convert_%s", file.Name()), func(t *testing.T) {
-			// Read the v2alpha1 input file
 			inputFile := filepath.Join(inputDir, file.Name())
 			var v2alpha1 dashv2alpha1.Dashboard
 			readInputFile(t, inputFile, &v2alpha1)
 
-			// Convert v2alpha1 → v1beta1
 			var convertedV1beta1 dashv1.Dashboard
 			err = scheme.Convert(&v2alpha1, &convertedV1beta1, nil)
 			require.NoError(t, err, "Failed to convert v2alpha1 to v1beta1")
@@ -235,18 +231,14 @@ func TestV2alpha1ToV1beta1FromInputFiles(t *testing.T) {
 			err = json.Unmarshal(expectedSpecJSON, &expectedSpec)
 			require.NoError(t, err, "Failed to unmarshal expected spec")
 
-			// Compare dashboard structures directly at the spec level (no "dashboard" wrapper)
-			// Compare key fields
 			assert.Equal(t, expectedSpec["title"], convertedSpec["title"], "Title mismatch")
 			assert.Equal(t, expectedSpec["description"], convertedSpec["description"], "Description mismatch")
 			assert.Equal(t, expectedSpec["tags"], convertedSpec["tags"], "Tags mismatch")
 
-			// Compare panels count
 			expectedPanels, _ := expectedSpec["panels"].([]interface{})
 			convertedPanels, _ := convertedSpec["panels"].([]interface{})
 			assert.Equal(t, len(expectedPanels), len(convertedPanels), "Panel count mismatch")
 
-			// Compare variables count
 			expectedTemplating, _ := expectedSpec["templating"].(map[string]interface{})
 			convertedTemplating, _ := convertedSpec["templating"].(map[string]interface{})
 			if expectedTemplating != nil && convertedTemplating != nil {
@@ -255,7 +247,6 @@ func TestV2alpha1ToV1beta1FromInputFiles(t *testing.T) {
 				assert.Equal(t, len(expectedVars), len(convertedVars), "Variable count mismatch")
 			}
 
-			// Compare annotations count
 			expectedAnnotations, _ := expectedSpec["annotations"].(map[string]interface{})
 			convertedAnnotations, _ := convertedSpec["annotations"].(map[string]interface{})
 			if expectedAnnotations != nil && convertedAnnotations != nil {
