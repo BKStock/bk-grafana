@@ -49,12 +49,10 @@ refs:
 ---
 
 {{< admonition type="caution" >}}
-Starting March 2026 in Alerting, datasource-managed alerts can not be created in new stacks for Grafana Cloud.
-New Grafana Cloud stacks use Grafana-managed alerting (GMA) by default.Datasource-managed alerting (DMA) is not provisioned in new stacks. Existing stacks are not affected.
+Starting in February in Alerting, data source-managed alerts can not be created in new stacks in Grafana.
+New Grafana stacks will use Grafana-managed alerting (GMA) by default. Datasource-managed alerting (DMA) is not provisioned in new stacks. Existing stacks are not affected.
 
-This means:
-- Cloud Alertmanager will not be available and Grafana will not provision the data source for it.
-- Users are no longer able to create alert rules in Mimir and Loki.
+Users will no longer be able to create alert rules in Mimir and Loki, and Cloud Alertmanager will not be available nor will Grafana provision the data source for it.
 {{< /admonition >}}
 
 # Configure Alertmanagers
