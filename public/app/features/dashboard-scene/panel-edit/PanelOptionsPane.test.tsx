@@ -197,7 +197,6 @@ function setupTest(panelId: string) {
     panelRef: panel.getRef(),
     listMode: OptionFilter.All,
     searchQuery: '',
-    suggestionApplied: false,
   });
 
   // The following happens on DahsboardScene activation. For the needs of this test this activation aint needed hence we hand-call it

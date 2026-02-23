@@ -240,7 +240,6 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
         listMode: OptionFilter.All,
         isVizPickerOpen: this.state.isNewPanel,
         isNewPanel: this.state.isNewPanel,
-        suggestionApplied: false,
       });
 
       this.setState({
@@ -339,10 +338,13 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
 
     if (this.state.optionsPane?.state.suggestionApplied) {
       const panel = this.state.panelRef.resolve();
-      VizSuggestionsInteractions.suggestionSaved({
+      VizSuggestionsInteractions.panelSaved({
         pluginId: panel.state.pluginId,
-        fromSuggestions: true,
+        isNewPanel: this.state.isNewPanel,
+        ...this.state.optionsPane.state.suggestionApplied,
       });
+
+      this.state.optionsPane.setState({ suggestionApplied: undefined });
     }
 
     // Remember that we have done changes

@@ -150,6 +150,10 @@ export function VisualizationSuggestions({ onChange, data, panel, searchQuery, i
         fieldConfig: suggestion.fieldConfig,
         withModKey: !shouldCloseVizPicker,
         fromSuggestions: true,
+        suggestionMetadata: {
+          suggestionName: suggestion.name,
+          suggestionIndex: suggestionIndex + 1,
+        },
       });
     },
     [onChange, panelState]

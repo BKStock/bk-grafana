@@ -41,7 +41,10 @@ export interface PanelOptionsPaneState extends SceneObjectState {
   panelRef: SceneObjectRef<VizPanel>;
   isNewPanel?: boolean;
   hasPickedViz?: boolean;
-  suggestionApplied: boolean;
+  suggestionApplied?: {
+    suggestionName: string;
+    suggestionIndex: number;
+  };
 }
 
 interface PluginOptionsCache {
@@ -75,8 +78,7 @@ export class PanelOptionsPane extends SceneObjectBase<PanelOptionsPaneState> {
       from_suggestions: options.fromSuggestions ?? false,
     });
 
-    // reset state as needed
-    this.setState({ suggestionApplied: options.fromSuggestions ?? false });
+    this.setState({ suggestionApplied: options.suggestionMetadata });
 
     // clear custom options
     let newFieldConfig: FieldConfigSource = {
