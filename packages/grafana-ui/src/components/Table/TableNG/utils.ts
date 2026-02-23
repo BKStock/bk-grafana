@@ -60,7 +60,7 @@ export function getDefaultRowHeight(
   cellHeight?: TableCellHeight
 ): NonNullable<CSSProperties['height']> {
   if (fields?.some((field) => field.config?.custom?.cellOptions?.dynamicHeight)) {
-    return 'auto';
+    return 'min-content';
   }
 
   switch (cellHeight) {

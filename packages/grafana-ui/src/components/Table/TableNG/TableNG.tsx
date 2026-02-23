@@ -235,11 +235,6 @@ export function TableNG(props: TableNGProps) {
   const [selectedRows, setSelectedRows] = useState((): ReadonlySet<string> => new Set());
 
   // vt scrollbar accounting for column auto-sizing
-
-  const defaultRowHeight = useMemo(
-    () => getDefaultRowHeight(theme, visibleFields, cellHeight),
-    [theme, visibleFields, cellHeight]
-  );
   const gridRef = useRef<DataGridHandle>(null);
   const scrollbarWidth = useScrollbarWidth(gridRef, height);
   const availableWidth = useMemo(
@@ -289,12 +284,21 @@ export function TableNG(props: TableNGProps) {
     [firstRowNestedData]
   );
   const [nestedFieldWidths] = useColWidths(nestedVisibleFields, availableWidth);
+  const defaultRowHeight = useMemo(
+    () => getDefaultRowHeight(theme, visibleFields, cellHeight),
+    [theme, visibleFields, cellHeight]
+  );
+  const defaultNestedRowHeight = useMemo(
+    () => getDefaultRowHeight(theme, nestedVisibleFields, cellHeight),
+    [theme, nestedVisibleFields, cellHeight]
+  );
 
   const rowHeight = useRowHeight({
     columnWidths: widths,
     fields: visibleFields,
     hasNestedFrames,
     defaultHeight: defaultRowHeight,
+    defaultNestedHeight: defaultNestedRowHeight,
     visibleNestedRowCounts,
     typographyCtx,
     maxHeight: maxRowHeight,
@@ -321,6 +325,12 @@ export function TableNG(props: TableNGProps) {
     rowHeight,
     hasNestedFrames,
   });
+
+  const isExpanded = useCallback(
+    (row: TableRow) =>
+      expandedRows.has(row.__index) && row.__index + 1 >= pageRangeStart && row.__index + 1 <= pageRangeEnd,
+    [expandedRows, pageRangeStart, pageRangeEnd]
+  );
 
   const [scrollToIndex, setScrollToIndex] = useState(initialRowIndex);
   useEffect(() => {
@@ -363,24 +373,29 @@ export function TableNG(props: TableNGProps) {
 
   // normalize the row height into a function which returns a number, so we avoid a bunch of conditionals during rendering.
   const rowHeightFn = useMemo((): ((row: TableRow) => number) => {
+    if (typeof defaultNestedRowHeight === 'string') {
+      return (row: TableRow) => (isExpanded(row) ? TABLE.MAX_CELL_HEIGHT : 0);
+    }
     if (typeof rowHeight === 'function') {
-      return rowHeight;
+      // this is safe because we only return a (row: TableRow) => string function when defaultNestedRowHeight is a string.
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      return rowHeight as unknown as (row: TableRow) => number;
     }
     if (typeof rowHeight === 'string') {
       return () => TABLE.MAX_CELL_HEIGHT;
     }
     return () => rowHeight;
-  }, [rowHeight]);
+  }, [rowHeight, defaultNestedRowHeight, isExpanded]);
 
   const renderRow = useMemo(
-    () => renderRowFactory(data.fields, panelContext, expandedRows, enableSharedCrosshair),
-    [data, enableSharedCrosshair, expandedRows, panelContext]
+    () => renderRowFactory(data.fields, panelContext, isExpanded, enableSharedCrosshair),
+    [data, enableSharedCrosshair, isExpanded, panelContext]
   );
 
   const commonDataGridProps = useMemo(
     () =>
       ({
-        enableVirtualization: !IS_SAFARI_26 && enableVirtualization !== false && rowHeight !== 'auto',
+        enableVirtualization: !IS_SAFARI_26 && enableVirtualization !== false && typeof rowHeight !== 'string',
         defaultColumnOptions: {
           minWidth: 50,
           resizable: true,
@@ -451,14 +466,16 @@ export function TableNG(props: TableNGProps) {
           return (
             <RowExpander
               rowId={rowId}
-              isExpanded={expandedRows.has(rowIdx)}
+              isExpanded={isExpanded(row)}
               onCellExpand={() => {
-                if (expandedRows.has(rowIdx)) {
-                  expandedRows.delete(rowIdx);
-                } else {
-                  expandedRows.add(rowIdx);
-                }
-                setExpandedRows(new Set(expandedRows));
+                setExpandedRows((er) => {
+                  if (er.has(rowIdx)) {
+                    er.delete(rowIdx);
+                  } else {
+                    er.add(rowIdx);
+                  }
+                  return new Set(er);
+                });
               }}
             />
           );
@@ -504,11 +521,11 @@ export function TableNG(props: TableNGProps) {
       styles.displayNone,
       styles.noDataNested,
       data.fields.length,
-      uniqueId,
-      nestedRows,
       commonDataGridProps,
+      isExpanded,
+      nestedRows,
       onCellClick,
-      expandedRows,
+      uniqueId,
     ]
   );
 
@@ -578,8 +595,8 @@ export function TableNG(props: TableNGProps) {
           : undefined;
 
         const shouldOverflow =
-          !IS_SAFARI_26 && rowHeight !== 'auto' && (shouldTextOverflow(field) || Boolean(maxRowHeight));
-        const textWrap = rowHeight === 'auto' || shouldTextWrap(field);
+          !IS_SAFARI_26 && typeof rowHeight !== 'string' && (shouldTextOverflow(field) || Boolean(maxRowHeight));
+        const textWrap = typeof rowHeight === 'string' || shouldTextWrap(field);
         const canBeColorized = canFieldBeColorized(cellType, applyToRowBgFn);
         const cellStyleOptions: TableCellStyleOptions = {
           textAlign,
@@ -866,7 +883,7 @@ export function TableNG(props: TableNGProps) {
 
     // pre-calculate renderRow and expandedColumns based on the first nested frame's fields.
     const hasNestedHeaders = firstRowNestedData.meta?.custom?.noHeader !== true;
-    const renderRow = renderRowFactory(firstRowNestedData.fields, panelContext, expandedRows, enableSharedCrosshair);
+    const renderRow = renderRowFactory(firstRowNestedData.fields, panelContext, isExpanded, enableSharedCrosshair);
 
     const expanderCellRenderer: CellRootRenderer = (key, props) => <Cell key={key} {...props} />;
     result.cellRootRenderers[EXPANDED_COLUMN_KEY] = expanderCellRenderer;
@@ -885,9 +902,9 @@ export function TableNG(props: TableNGProps) {
     buildNestedTableExpanderColumn,
     data,
     enableSharedCrosshair,
-    expandedRows,
     firstRowNestedData,
     fromFields,
+    isExpanded,
     nestedColumnsMatrix,
     panelContext,
     rows,
@@ -997,7 +1014,7 @@ export function TableNG(props: TableNGProps) {
 const renderRowFactory = (
   fields: Field[],
   panelContext: PanelContext,
-  expandedRows: Set<number>,
+  isExpanded: (row: TableRow) => boolean,
   enableSharedCrosshair: boolean
 ) => {
   const onMouseLeave = () => {
@@ -1021,9 +1038,9 @@ const renderRowFactory = (
   const renderRow = (key: React.Key, props: RenderRowProps<TableRow, TableSummaryRow>): React.ReactNode => {
     const { row } = props;
 
-    const isExpanded = expandedRows.has(row.__index);
     // Don't render non expanded child rows
-    if (row.__depth > 0 && !isExpanded) {
+    const exp = isExpanded(row);
+    if (row.__depth > 0 && !exp) {
       return null;
     }
 
@@ -1034,10 +1051,10 @@ const renderRowFactory = (
     }
 
     const a11yProps: AriaAttributes = {
-      'aria-level': row.__index + 1,
+      'aria-level': row.__depth + 1,
     };
     if (row.data) {
-      a11yProps['aria-expanded'] = isExpanded;
+      a11yProps['aria-expanded'] = exp;
     }
 
     return <Row key={key} {...props} {...handlers} {...a11yProps} />;

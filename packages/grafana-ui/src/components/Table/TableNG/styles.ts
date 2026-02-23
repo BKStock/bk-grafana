@@ -115,6 +115,10 @@ export const getGridStyles = (theme: GrafanaTheme2, enablePagination?: boolean, 
       overflowY: 'hidden',
       marginLeft: COLUMN.EXPANDER_WIDTH - TABLE.CELL_PADDING - 1,
       marginBlock: TABLE.CELL_PADDING,
+      // usually row height will be set to 0 when not expanded, but auto cell height may lead to some rendering errors.
+      '&[aria-expanded="false"]': {
+        display: 'none',
+      },
     }),
     cellNested: css({
       '&[aria-selected=true]': { outline: 'none' },

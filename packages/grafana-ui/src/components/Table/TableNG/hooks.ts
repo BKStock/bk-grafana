@@ -365,6 +365,7 @@ interface UseRowHeightOptions {
   fields: Field[];
   hasNestedFrames: boolean;
   defaultHeight: NonNullable<CSSProperties['height']>;
+  defaultNestedHeight: NonNullable<CSSProperties['height']>;
   visibleNestedRowCounts: Array<number | null>;
   typographyCtx: TypographyCtx;
   maxHeight?: number;
@@ -380,13 +381,14 @@ export function useRowHeight({
   columnWidths,
   fields,
   defaultHeight,
+  defaultNestedHeight,
   typographyCtx,
   maxHeight,
   hasNestedFrames,
-  visibleNestedRowCounts,
+  nestedRows,
   nestedFields,
   nestedColWidths,
-  nestedRows,
+  visibleNestedRowCounts,
 }: UseRowHeightOptions): NonNullable<CSSProperties['height']> | ((row: TableRow) => number) {
   const nestedMeasurers = useMemo(
     () => buildCellHeightMeasurers(nestedFields, typographyCtx, maxHeight),
@@ -394,12 +396,12 @@ export function useRowHeight({
   );
 
   const getNestedRowHeightWithCache = useMemo(() => {
-    if (typeof defaultHeight === 'string') {
+    if (typeof defaultNestedHeight === 'string') {
       return () => 0;
     }
 
     if ((nestedMeasurers?.length ?? 0) === 0) {
-      return () => defaultHeight;
+      return () => defaultNestedHeight;
     }
 
     const nestedRowCache: Array<number[] | undefined> = visibleNestedRowCounts.map((count) =>
@@ -416,10 +418,6 @@ export function useRowHeight({
         return 0;
       }
 
-      if (typeof defaultHeight === 'string') {
-        return 0;
-      }
-
       const trueNestedColWidths = getTrueColWidths(nestedColWidths);
       let result = nestedRowCacheEntry[row.__index];
       if (result == null) {
@@ -427,13 +425,13 @@ export function useRowHeight({
           nestedFields,
           row,
           trueNestedColWidths,
-          defaultHeight,
+          defaultNestedHeight,
           nestedMeasurers
         );
       }
       return result;
     };
-  }, [nestedFields, nestedColWidths, defaultHeight, nestedMeasurers, visibleNestedRowCounts]);
+  }, [nestedFields, nestedColWidths, defaultNestedHeight, nestedMeasurers, visibleNestedRowCounts]);
 
   const measurers = useMemo(
     () => buildCellHeightMeasurers(fields, typographyCtx, maxHeight),
@@ -467,7 +465,11 @@ export function useRowHeight({
       return defaultHeight;
     }
 
-    return (row: TableRow) => {
+    if (typeof defaultNestedHeight === 'string') {
+      return defaultNestedHeight;
+    }
+
+    return (row: TableRow): number => {
       // nested rows
       if (row.__depth > 0) {
         // if unexpanded, height === 0
@@ -495,6 +497,7 @@ export function useRowHeight({
     getNestedRowHeightWithCache,
     getRowHeightWithCache,
     defaultHeight,
+    defaultNestedHeight,
     hasNestedFrames,
     hasWrappedCols,
     nestedRows,
