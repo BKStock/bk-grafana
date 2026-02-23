@@ -14252,6 +14252,11 @@
           "settings": "Settings"
         }
       },
+      "team-folders": {
+        "text": {
+          "folders": "Folders"
+        }
+      },
       "team-group-sync": {
         "text": {
           "external-group-sync": "External group sync"
@@ -14299,6 +14304,19 @@
       "loading-teams": "Loading teams...",
       "new-team": "New Team",
       "placeholder-search-teams": "Search teams"
+    },
+    "team-pages": {
+      "team-folders": {
+        "empty": "No folders owned by this team",
+        "error-loading-folders": "Could not load team folders",
+        "loading": "Loading...",
+        "open-folder": "Open folder",
+        "open-parent-folder": "Open parent folder",
+        "table": {
+          "name": "Name",
+          "parent-folder": "Parent folder"
+        }
+      }
     },
     "team-settings": {
       "description-email": "This is optional and is primarily used to set the team profile avatar (via the Gravatar service)",
