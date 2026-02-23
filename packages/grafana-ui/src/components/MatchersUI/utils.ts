@@ -69,6 +69,7 @@ export function useFieldDisplayNames(data: DataFrame[], filter?: (field: Field) 
 
 /**
  * @internal
+ * Gets field names for annotation and series frames
  */
 export function useAllFieldDisplayNames(series: DataFrame[], annotations: DataFrame[]) {
   const seriesNames = useFieldDisplayNames(series);

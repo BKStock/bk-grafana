@@ -10,7 +10,6 @@ import { DataFrame, Field, FieldConfig, ValueLinkConfig } from './dataFrame';
 import { DataLink, LinkModel } from './dataLink';
 import { OptionEditorConfig } from './options';
 import { InterpolateFunction } from './panel';
-import { DataTopic } from './query';
 import { TimeZone } from './time';
 import { MatcherConfig } from './transformations';
 
@@ -22,9 +21,6 @@ export interface DynamicConfigValue {
 export interface ConfigOverrideRule {
   matcher: MatcherConfig;
   properties: DynamicConfigValue[];
-  dataTopic?: DataTopic;
-  // Data frame name?
-  frame?: string;
 }
 
 /**
@@ -135,7 +131,6 @@ export interface ApplyFieldOverrideOptions {
   theme: GrafanaTheme2;
   timeZone?: TimeZone;
   dataLinkPostProcessor?: DataLinkPostProcessor;
-  dataTopic?: DataTopic;
 }
 
 export enum FieldConfigProperty {
