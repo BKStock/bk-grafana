@@ -22,18 +22,12 @@ interface RenderSidebarCardProps {
   id?: string;
   isSelected?: boolean;
   onClick?: jest.Mock;
-  addQuery?: jest.Mock;
-  setSelectedQuery?: jest.Mock;
-  setPendingExpression?: jest.Mock;
 }
 
 function renderSidebarCard({
   id = 'A',
   isSelected = false,
   onClick = jest.fn(),
-  addQuery = jest.fn().mockReturnValue('B'),
-  setSelectedQuery = jest.fn(),
-  setPendingExpression = jest.fn(),
 }: RenderSidebarCardProps = {}) {
   const queries: DataQuery[] = [{ refId: id, datasource: { type: 'test', uid: 'test' } }];
   const item = {
@@ -57,12 +51,10 @@ function renderSidebarCard({
     {
       queries,
       selectedQuery: queries[0],
-      uiStateOverrides: { setSelectedQuery, setPendingExpression },
-      actionsOverrides: { addQuery },
     }
   );
 
-  return { ...result, addQuery, setSelectedQuery, setPendingExpression, onClick };
+  return { ...result, onClick };
 }
 
 describe('SidebarCard', () => {
@@ -124,55 +116,10 @@ describe('SidebarCard', () => {
     expect(setSelectedQuery).not.toHaveBeenCalled();
   });
 
-  describe('add button and menu', () => {
-    it('renders the card and add button', () => {
-      renderSidebarCard();
+  it('renders the card content', () => {
+    renderSidebarCard();
 
-      expect(screen.getByRole('button', { name: /select card A/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /add below A/i })).toBeInTheDocument();
-      expect(screen.getByText('Card content')).toBeInTheDocument();
-    });
-
-    it('clicking "Add query" calls addQuery with the card refId as afterRefId', async () => {
-      const { user, addQuery, setSelectedQuery } = renderSidebarCard({ id: 'A' });
-
-      await user.click(screen.getByRole('button', { name: /add below A/i }));
-      await user.click(screen.getByRole('menuitem', { name: /add query/i }));
-
-      expect(addQuery).toHaveBeenCalledWith(undefined, 'A');
-      expect(setSelectedQuery).toHaveBeenCalledWith({ refId: 'B', hide: false });
-    });
-
-    it('auto-selects the newly added query', async () => {
-      const addQuery = jest.fn().mockReturnValue('C');
-      const { user, setSelectedQuery } = renderSidebarCard({ id: 'B', addQuery });
-
-      await user.click(screen.getByRole('button', { name: /add below B/i }));
-      await user.click(screen.getByRole('menuitem', { name: /add query/i }));
-
-      expect(setSelectedQuery).toHaveBeenCalledWith({ refId: 'C', hide: false });
-    });
-
-    it('does not call setSelectedQuery when addQuery returns undefined', async () => {
-      const addQuery = jest.fn().mockReturnValue(undefined);
-      const { user, setSelectedQuery } = renderSidebarCard({ addQuery });
-
-      await user.click(screen.getByRole('button', { name: /add below A/i }));
-      await user.click(screen.getByRole('menuitem', { name: /add query/i }));
-
-      expect(addQuery).toHaveBeenCalled();
-      expect(setSelectedQuery).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('add expression', () => {
-    it('clicking "Add expression" calls setPendingExpression with insertAfter', async () => {
-      const { user, setPendingExpression } = renderSidebarCard({ id: 'A' });
-
-      await user.click(screen.getByRole('button', { name: /add below A/i }));
-      await user.click(screen.getByRole('menuitem', { name: /add expression/i }));
-
-      expect(setPendingExpression).toHaveBeenCalledWith({ insertAfter: 'A' });
-    });
+    expect(screen.getByRole('button', { name: /select card A/i })).toBeInTheDocument();
+    expect(screen.getByText('Card content')).toBeInTheDocument();
   });
 });

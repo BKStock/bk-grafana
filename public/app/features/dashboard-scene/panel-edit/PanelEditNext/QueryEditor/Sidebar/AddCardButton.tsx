@@ -12,25 +12,12 @@ import { AccessControlAction } from 'app/types/accessControl';
 
 import { useActionsContext, useQueryEditorUIContext } from '../QueryEditorContext';
 
-function getButtonAriaLabel(variant: 'query' | 'transformation', afterId?: string) {
-  if (variant === 'transformation') {
-    return afterId
-      ? t('query-editor-next.sidebar.add-transformation-below', 'Add transformation below {{id}}', { id: afterId })
-      : t('query-editor-next.sidebar.add-transformation', 'Add transformation');
-  }
-
-  return afterId
-    ? t('query-editor-next.sidebar.add-below', 'Add below {{id}}', { id: afterId })
-    : t('query-editor-next.sidebar.add-query-or-expression', 'Add query or expression');
-}
-
 interface AddCardButtonProps {
   variant: 'query' | 'transformation';
-  afterId?: string;
   alwaysVisible?: boolean;
 }
 
-export const AddCardButton = ({ variant, afterId, alwaysVisible = false }: AddCardButtonProps) => {
+export const AddCardButton = ({ variant, alwaysVisible = false }: AddCardButtonProps) => {
   const styles = useStyles2(getStyles, alwaysVisible);
   const theme = useTheme2();
   const { addQuery } = useActionsContext();
@@ -48,13 +35,13 @@ export const AddCardButton = ({ variant, afterId, alwaysVisible = false }: AddCa
 
   const addAndSelectQuery = useCallback(
     (query?: Partial<DataQuery>) => {
-      const newRefId = addQuery(query, afterId);
+      const newRefId = addQuery(query);
       if (newRefId) {
         const selectTarget: DataQuery = { refId: newRefId, hide: false };
         setSelectedQuery(selectTarget);
       }
     },
-    [addQuery, afterId, setSelectedQuery]
+    [addQuery, setSelectedQuery]
   );
 
   const handleMenuVisibleChange = useCallback((visible: boolean) => {
@@ -85,19 +72,22 @@ export const AddCardButton = ({ variant, afterId, alwaysVisible = false }: AddCa
           label={t('query-editor-next.sidebar.add-expression', 'Add expression')}
           icon="calculator-alt"
           onClick={() => {
-            setPendingExpression({ insertAfter: afterId ?? '' });
+            setPendingExpression({ insertAfter: '' });
           }}
         />
       </Menu>
     ),
-    [addAndSelectQuery, canReadQueries, openDrawer, queryLibraryEnabled, setPendingExpression, afterId]
+    [addAndSelectQuery, canReadQueries, openDrawer, queryLibraryEnabled, setPendingExpression]
   );
 
   const handleTransformationClick = useCallback(() => {
-    setPendingTransformation({ insertAfter: afterId });
-  }, [afterId, setPendingTransformation]);
+    setPendingTransformation({ insertAfter: undefined });
+  }, [setPendingTransformation]);
 
-  const ariaLabel = getButtonAriaLabel(variant, afterId);
+  const ariaLabel =
+    variant === 'transformation'
+      ? t('query-editor-next.sidebar.add-transformation', 'Add transformation')
+      : t('query-editor-next.sidebar.add-query-or-expression', 'Add query or expression');
 
   if (variant === 'transformation') {
     return (
