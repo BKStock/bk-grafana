@@ -119,7 +119,7 @@ func sqLite3TestDB() (*TestDB, error) {
 		// For tests, set sync=OFF for faster commits. Reference: https://www.sqlite.org/pragma.html#pragma_synchronous
 		// Sync is used in more production-y environments to avoid the database becoming corrupted. Test databases are fine to break.
 		// Use _txlock immediate to assume most transactions will write: https://kerkour.com/sqlite-for-servers
-		ret.ConnStr += "&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate"
+		ret.ConnStr += "&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate&_busy_timeout=15000&_temp_store=memory&_cache_size=1000000000"
 	}
 	ret.Path = sqliteDb
 

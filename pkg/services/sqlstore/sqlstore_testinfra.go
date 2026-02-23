@@ -373,7 +373,7 @@ func newSQLite3DB(tb TestingTB) (*testDB, error) {
 	return &testDB{
 		Driver: "sqlite3",
 		Path:   tmp.Name(),
-		Conn:   fmt.Sprintf("file:%s?cache=private&mode=rwc&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate", tmp.Name()),
+		Conn:   fmt.Sprintf("file:%s?cache=private&mode=rwc&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate&_busy_timeout=15000&_temp_store=memory&_cache_size=1000000000", tmp.Name()),
 	}, nil
 }
 
