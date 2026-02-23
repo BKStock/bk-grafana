@@ -369,10 +369,11 @@ func newSQLite3DB(tb TestingTB) (*testDB, error) {
 
 	// For tests, set sync=OFF for faster commits. Reference: https://www.sqlite.org/pragma.html#pragma_synchronous
 	// Sync is used in more production-y environments to avoid the database becoming corrupted. Test databases are fine to break.
+	// Use _txlock immediate to assume most transactions will write: https://kerkour.com/sqlite-for-servers
 	return &testDB{
 		Driver: "sqlite3",
 		Path:   tmp.Name(),
-		Conn:   fmt.Sprintf("file:%s?cache=private&mode=rwc&_journal_mode=WAL&_synchronous=OFF", tmp.Name()),
+		Conn:   fmt.Sprintf("file:%s?cache=private&mode=rwc&_journal_mode=WAL&_synchronous=OFF&_txlock=immediate", tmp.Name()),
 	}, nil
 }
 
