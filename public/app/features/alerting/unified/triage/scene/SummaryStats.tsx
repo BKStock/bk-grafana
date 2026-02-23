@@ -5,7 +5,7 @@ import { DataFrameView, GrafanaTheme2 } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
 import { SceneObjectBase, SceneObjectState } from '@grafana/scenes';
 import { useQueryRunner, useSceneContext } from '@grafana/scenes-react';
-import { Box, Button, ErrorBoundaryAlert, Icon, Stack, Tooltip, useStyles2 } from '@grafana/ui';
+import { Box, Button, ErrorBoundaryAlert, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
 import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { AllLabelsDrawer, LabelBadgeCounts, addOrReplaceFilter } from './AllLabelsDrawer';
@@ -94,21 +94,21 @@ function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: C
   return (
     <div className={styles.statRow}>
       <Icon name={icon} size="sm" className={colorClass} />
-      <span className={`${styles.stateLabel} ${colorClass}`}>
+      <Text element="span" weight="medium" color={color}>
         {stateLabel === 'firing' ? (
           <Trans i18nKey="alerting.triage.compact-firing">firing</Trans>
         ) : (
           <Trans i18nKey="alerting.triage.compact-pending">pending</Trans>
         )}
-      </span>
+      </Text>
       <span className={`${styles.statValue} ${colorClass}`}>{instanceCount}</span>
-      <span className={styles.statLabel}>
+      <Text element="span" color="secondary" variant="bodySmall">
         <Trans i18nKey="alerting.triage.compact-instances">instances</Trans>
-      </span>
+      </Text>
       <span className={`${styles.statValue} ${colorClass}`}>{ruleCount}</span>
-      <span className={styles.statLabel}>
+      <Text element="span" color="secondary" variant="bodySmall">
         <Trans i18nKey="alerting.triage.compact-rules">rules</Trans>
-      </span>
+      </Text>
     </div>
   );
 }
@@ -117,20 +117,24 @@ function LabelTooltipContent({ label }: { label: TopLabel }) {
   const styles = useStyles2(getTooltipStyles);
 
   return (
-    <div className={styles.tooltipContainer}>
-      <div className={styles.tooltipHeader}>
-        <Trans i18nKey="alerting.triage.top-label-tooltip-header" values={{ key: label.key, count: label.count }}>
-          {'{{ key }} ({{ count }} instances)'}
-        </Trans>
-      </div>
+    <Box padding={0.5}>
+      <Box marginBottom={0.5}>
+        <Text weight="bold">
+          <Trans i18nKey="alerting.triage.top-label-tooltip-header" values={{ key: label.key, count: label.count }}>
+            {'{{ key }} ({{ count }} instances)'}
+          </Trans>
+        </Text>
+      </Box>
       <div className={styles.tooltipDivider} />
       {label.values.map(({ value, count }) => (
-        <div key={value} className={styles.tooltipRow}>
-          <span className={styles.tooltipValue}>{value}</span>
-          <span className={styles.tooltipCount}>{count}</span>
-        </div>
+        <Stack key={value} direction="row" justifyContent="space-between" gap={2}>
+          <span>{value}</span>
+          <Text element="span" color="secondary">
+            {count}
+          </Text>
+        </Stack>
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -151,9 +155,9 @@ function TopLabelsSection() {
   return (
     <Stack direction="column" gap={1}>
       <Stack justifyContent="space-between" alignItems="center">
-        <span className={styles.sectionHeader}>
+        <Text weight="medium">
           <Trans i18nKey="alerting.triage.high-activity-labels">High Activity Labels</Trans>
-        </span>
+        </Text>
         <Button variant="secondary" fill="outline" size="sm" onClick={() => setIsDrawerOpen(true)}>
           <Trans i18nKey="alerting.triage.all-labels">All labels</Trans>
         </Button>
@@ -166,17 +170,17 @@ function TopLabelsSection() {
               type="button"
               onClick={() => addOrReplaceFilter(sceneContext, label.key, '=~', '.+')}
             >
-              <span className={styles.labelKey}>{label.key}</span>
+              <span>{label.key}</span>
               <LabelBadgeCounts firing={label.firing} pending={label.pending} />
             </button>
           </Tooltip>
         ))}
         {hiddenCount > 0 && (
-          <span className={styles.hiddenCount}>
+          <Text color="secondary" variant="bodySmall">
             <Trans i18nKey="alerting.triage.hidden-label-count" values={{ count: hiddenCount }}>
               {'and {{ count }} more'}
             </Trans>
-          </span>
+          </Text>
         )}
       </Stack>
       {isDrawerOpen && <AllLabelsDrawer allLabels={labels} onClose={() => setIsDrawerOpen(false)} />}
@@ -289,13 +293,6 @@ const getCompactStatStyles = (theme: GrafanaTheme2) => ({
     textAlign: 'right',
     fontVariantNumeric: 'tabular-nums',
   }),
-  stateLabel: css({
-    fontWeight: theme.typography.fontWeightMedium,
-  }),
-  statLabel: css({
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.bodySmall.fontSize,
-  }),
   errorColor: css({
     color: theme.colors.error.text,
   }),
@@ -305,43 +302,13 @@ const getCompactStatStyles = (theme: GrafanaTheme2) => ({
 });
 
 const getTooltipStyles = (theme: GrafanaTheme2) => ({
-  tooltipContainer: css({
-    padding: theme.spacing(0.5),
-    minWidth: 160,
-  }),
-  tooltipHeader: css({
-    fontWeight: theme.typography.fontWeightBold,
-    marginBottom: theme.spacing(0.5),
-  }),
   tooltipDivider: css({
     borderBottom: `1px solid ${theme.colors.border.medium}`,
     marginBottom: theme.spacing(0.5),
   }),
-  tooltipRow: css({
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: theme.spacing(2),
-    padding: `${theme.spacing(0.25)} 0`,
-  }),
-  tooltipValue: css({
-    color: theme.colors.text.primary,
-  }),
-  tooltipCount: css({
-    color: theme.colors.text.secondary,
-    fontVariantNumeric: 'tabular-nums',
-  }),
 });
 
 const getTopLabelsStyles = (theme: GrafanaTheme2) => ({
-  sectionHeader: css({
-    fontSize: theme.typography.body.fontSize,
-    fontWeight: theme.typography.fontWeightMedium,
-    color: theme.colors.text.primary,
-  }),
-  hiddenCount: css({
-    fontSize: theme.typography.bodySmall.fontSize,
-    color: theme.colors.text.secondary,
-  }),
   labelBadge: css({
     display: 'inline-flex',
     alignItems: 'center',
@@ -358,8 +325,5 @@ const getTopLabelsStyles = (theme: GrafanaTheme2) => ({
     '&:hover': {
       backgroundColor: theme.colors.action.hover,
     },
-  }),
-  labelKey: css({
-    color: theme.colors.text.primary,
   }),
 });
