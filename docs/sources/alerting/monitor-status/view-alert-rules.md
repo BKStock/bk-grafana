@@ -27,8 +27,6 @@ refs:
       destination: /docs/grafana-cloud/alerting-and-irm/alerting/monitor-status/view-alert-state/
 ---
 
-
-
 # View alert rules
 
 The Alert rules list view page lists all existing recording and alert rules. The rules are organized in a hierarchical structure, from folder -> rule group -> rules.
