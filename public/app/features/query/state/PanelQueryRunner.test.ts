@@ -323,7 +323,7 @@ describe('PanelQueryRunner', () => {
   );
 
   describeQueryRunnerScenario(
-    'anno field overrides',
+    'annotation field overrides',
     (ctx) => {
       it('should apply when field override options are set', async () => {
         ctx.runner.getData({ withTransforms: true, withFieldConfig: true }).subscribe({
