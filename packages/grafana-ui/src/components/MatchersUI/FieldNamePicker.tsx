@@ -29,7 +29,6 @@ export const FieldNamePicker = ({ value, onChange, context, item, id }: Props) =
   return (
     <>
       <Select
-        allowCustomValue={true}
         inputId={id}
         value={selectedOption}
         placeholder={
