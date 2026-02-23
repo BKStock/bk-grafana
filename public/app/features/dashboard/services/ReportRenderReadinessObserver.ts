@@ -17,9 +17,9 @@ interface MessageEvent<T extends MessageEventType> {
  * Performance observer that signals to the grafana-image-renderer when a dashboard
  * has finished rendering all panels for report capture.
  *
- * Sets `window.__grafana_report_render_complete` to `true` when a `dashboard_view`
- * interaction completes, meaning all panels have gone through the full lifecycle
- * (queries, transforms, field config, rendering).
+ * Sends a `REPORT_RENDER_COMPLETE` message via the `window.__grafanaImageRendererMessageChannel`
+ * chromedp binding when a `dashboard_view` interaction completes, meaning all panels have gone
+ * through the full lifecycle (queries, transforms, field config, rendering).
  *
  * This observer is only registered for report routes to avoid any overhead on
  * normal dashboard usage.

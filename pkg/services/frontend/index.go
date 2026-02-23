@@ -110,7 +110,6 @@ func (p *IndexProvider) HandleRequest(writer http.ResponseWriter, request *http.
 	ofClient := openfeature.NewDefaultClient()
 	renderBindingSupported, _ := ofClient.BooleanValue(ctx, featuremgmt.FlagReportRenderBinding, false, openfeature.TransactionContext(ctx))
 
-	p.log.Info("Render binding supported", "reportRenderBinding", renderBindingSupported)
 	data := IndexViewData{
 		AppTitle:                   "Grafana",
 		AppSubUrl:                  p.config.AppSubURL,
