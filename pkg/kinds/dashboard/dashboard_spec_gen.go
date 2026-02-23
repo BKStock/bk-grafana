@@ -323,15 +323,15 @@ func NewControlSourceRef() *ControlSourceRef {
 }
 
 type DatasourceControlSourceRef struct {
-	Type string                                 `json:"type"`
-	Ref  DashboardDatasourceControlSourceRefRef `json:"ref"`
+	Type string `json:"type"`
+	// The plugin type-id
+	Group string `json:"group"`
 }
 
 // NewDatasourceControlSourceRef creates a new DatasourceControlSourceRef object.
 func NewDatasourceControlSourceRef() *DatasourceControlSourceRef {
 	return &DatasourceControlSourceRef{
 		Type: "datasource",
-		Ref:  *NewDashboardDatasourceControlSourceRefRef(),
 	}
 }
 
@@ -1135,15 +1135,6 @@ type DashboardSpecTemplating struct {
 // NewDashboardSpecTemplating creates a new DashboardSpecTemplating object.
 func NewDashboardSpecTemplating() *DashboardSpecTemplating {
 	return &DashboardSpecTemplating{}
-}
-
-type DashboardDatasourceControlSourceRefRef struct {
-	Group *string `json:"group,omitempty"`
-}
-
-// NewDashboardDatasourceControlSourceRefRef creates a new DashboardDatasourceControlSourceRefRef object.
-func NewDashboardDatasourceControlSourceRefRef() *DashboardDatasourceControlSourceRefRef {
-	return &DashboardDatasourceControlSourceRefRef{}
 }
 
 type DashboardFieldConfigSourceOverrides struct {

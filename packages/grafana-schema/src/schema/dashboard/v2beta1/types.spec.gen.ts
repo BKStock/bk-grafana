@@ -1039,16 +1039,13 @@ export const defaultControlSourceRef = (): ControlSourceRef => (defaultDatasourc
 // Source information for controls (e.g. variables or links)
 export interface DatasourceControlSourceRef {
 	type: "datasource";
-	ref: {
-		// The plugin type-id
-		group?: string;
-	};
+	// The plugin type-id
+	group: string;
 }
 
 export const defaultDatasourceControlSourceRef = (): DatasourceControlSourceRef => ({
 	type: "datasource",
-	ref: {
-},
+	group: "",
 });
 
 // Time configuration

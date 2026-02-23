@@ -886,12 +886,9 @@ export type DashboardGridLayoutKindOrRowsLayoutKindOrAutoGridLayoutKindOrTabsLay
   RowsLayoutKind?: DashboardRowsLayoutKind;
   TabsLayoutKind?: DashboardTabsLayoutKind;
 };
-export type DashboardV2Beta1DatasourceControlSourceRefRef = {
-  /** The plugin type-id */
-  group?: string;
-};
 export type DashboardDatasourceControlSourceRef = {
-  ref: DashboardV2Beta1DatasourceControlSourceRefRef;
+  /** The plugin type-id */
+  group: string;
   type: string;
 };
 export type DashboardDashboardLink = {

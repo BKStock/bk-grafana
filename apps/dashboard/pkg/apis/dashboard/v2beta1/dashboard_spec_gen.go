@@ -1683,15 +1683,15 @@ func NewDashboardControlSourceRef() *DashboardControlSourceRef {
 // Source information for controls (e.g. variables or links)
 // +k8s:openapi-gen=true
 type DashboardDatasourceControlSourceRef struct {
-	Type string                                        `json:"type"`
-	Ref  DashboardV2beta1DatasourceControlSourceRefRef `json:"ref"`
+	Type string `json:"type"`
+	// The plugin type-id
+	Group string `json:"group"`
 }
 
 // NewDashboardDatasourceControlSourceRef creates a new DashboardDatasourceControlSourceRef object.
 func NewDashboardDatasourceControlSourceRef() *DashboardDatasourceControlSourceRef {
 	return &DashboardDatasourceControlSourceRef{
 		Type: "datasource",
-		Ref:  *NewDashboardV2beta1DatasourceControlSourceRefRef(),
 	}
 }
 
@@ -2651,22 +2651,6 @@ func NewDashboardV2beta1ActionStyle() *DashboardV2beta1ActionStyle {
 // OpenAPIModelName returns the OpenAPI model name for DashboardV2beta1ActionStyle.
 func (DashboardV2beta1ActionStyle) OpenAPIModelName() string {
 	return "com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardV2beta1ActionStyle"
-}
-
-// +k8s:openapi-gen=true
-type DashboardV2beta1DatasourceControlSourceRefRef struct {
-	// The plugin type-id
-	Group *string `json:"group,omitempty"`
-}
-
-// NewDashboardV2beta1DatasourceControlSourceRefRef creates a new DashboardV2beta1DatasourceControlSourceRefRef object.
-func NewDashboardV2beta1DatasourceControlSourceRefRef() *DashboardV2beta1DatasourceControlSourceRefRef {
-	return &DashboardV2beta1DatasourceControlSourceRefRef{}
-}
-
-// OpenAPIModelName returns the OpenAPI model name for DashboardV2beta1DatasourceControlSourceRefRef.
-func (DashboardV2beta1DatasourceControlSourceRefRef) OpenAPIModelName() string {
-	return "com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardV2beta1DatasourceControlSourceRefRef"
 }
 
 // +k8s:openapi-gen=true

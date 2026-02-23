@@ -320,7 +320,7 @@ describe('dashboardControls', () => {
           hide: 'inControlsMenu',
           origin: {
             type: 'datasource',
-            ref: { group: 'prometheus' },
+            group: 'prometheus',
           },
         },
       });
@@ -331,7 +331,7 @@ describe('dashboardControls', () => {
           hide: 'inControlsMenu',
           origin: {
             type: 'datasource',
-            ref: { group: 'loki' },
+            group: 'loki',
           },
         },
       });
@@ -364,7 +364,7 @@ describe('dashboardControls', () => {
         placement: 'inControlsMenu',
         origin: {
           type: 'datasource',
-          ref: { group: 'prometheus' },
+          group: 'prometheus',
         },
       });
       expect(result.defaultLinks[1]).toMatchObject({
@@ -372,7 +372,7 @@ describe('dashboardControls', () => {
         placement: 'inControlsMenu',
         origin: {
           type: 'datasource',
-          ref: { group: 'prometheus' },
+          group: 'prometheus',
         },
       });
     });

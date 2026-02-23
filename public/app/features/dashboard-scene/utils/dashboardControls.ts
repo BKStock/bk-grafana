@@ -41,7 +41,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
           ...dsVariables.map((v) => {
             v.spec.origin = {
               type: 'datasource' as const,
-              ref: { group: ref.type },
+              group: ref.type,
             };
             v.spec.hide = 'inControlsMenu';
 
@@ -65,7 +65,7 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
               placement: 'inControlsMenu' as const,
               origin: {
                 type: 'datasource' as const,
-                ref: { group: ref.type },
+                group: ref.type,
               },
             };
           })

@@ -1993,16 +1993,12 @@
         "type": "object",
         "required": [
           "type",
-          "ref"
+          "group"
         ],
         "properties": {
-          "ref": {
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardV2beta1DatasourceControlSourceRefRef"
-              }
-            ]
+          "group": {
+            "description": "The plugin type-id",
+            "type": "string"
           },
           "type": {
             "type": "string",
@@ -4037,15 +4033,6 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
-          }
-        }
-      },
-      "com.github.grafana.grafana.apps.dashboard.pkg.apis.dashboard.v2beta1.DashboardV2beta1DatasourceControlSourceRefRef": {
-        "type": "object",
-        "properties": {
-          "group": {
-            "description": "The plugin type-id",
             "type": "string"
           }
         }

@@ -853,9 +853,8 @@ lineage: schemas: [{
 
 		#DatasourceControlSourceRef: {
 			type: "datasource"
-			ref: {
-				group?: string
-			}
+			// The plugin type-id
+			group: string
 		} 
 
 		#ControlSourceRef: #DatasourceControlSourceRef
