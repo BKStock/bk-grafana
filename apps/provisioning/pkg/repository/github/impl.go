@@ -27,10 +27,13 @@ const (
 func (r *githubClient) GetBranchProtection(ctx context.Context, owner, repository, branch string) (*BranchProtection, error) {
 	protection, _, err := r.gh.Repositories.GetBranchProtection(ctx, owner, repository, branch)
 	if err != nil {
+		// Branch has no protection rules at all.
 		if errors.Is(err, github.ErrBranchNotProtected) {
 			return nil, nil
 		}
 
+		// 403: token lacks permission to read branch protection (graceful skip).
+		// 404: branch or repo not found via this endpoint (graceful skip).
 		var ghErr *github.ErrorResponse
 		if errors.As(err, &ghErr) {
 			switch ghErr.Response.StatusCode {
@@ -42,6 +45,14 @@ func (r *githubClient) GetBranchProtection(ctx context.Context, owner, repositor
 		return nil, fmt.Errorf("failed to get branch protection: %w", err)
 	}
 
+	// Map the GitHub API response to our simplified model.
+	//
+	// Nil checks on pointer fields: the GitHub API only includes these objects
+	// when the corresponding setting is actively enabled. A nil field means
+	// the setting is off.
+	//
+	// LockBranch and EnforceAdmins require an additional .Enabled check because
+	// the API can return the wrapper object with Enabled: false.
 	bp := &BranchProtection{
 		RequiredPullRequestReviews: protection.RequiredPullRequestReviews != nil,
 		RequiredStatusChecks:       protection.RequiredStatusChecks != nil,
