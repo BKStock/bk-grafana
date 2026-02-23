@@ -235,6 +235,36 @@ func NewMapperRegistry() MapperRegistry {
 			"serviceaccounts": newResourceTranslation("serviceaccounts", "uid", false, map[string]bool{utils.VerbCreate: true}),
 			// Teams is a special case. We translate user permissions from id to uid based.
 			"teams": newResourceTranslation("teams", "uid", false, map[string]bool{utils.VerbCreate: true}),
+			// Members subresource for teams - uses team scope (teams:uid:...) but team permission actions
+			"teams/members": translation{
+				resource:  "teams",
+				attribute: "uid",
+				verbMapping: map[string]string{
+					utils.VerbGet:  "teams.permissions:read",
+					utils.VerbList: "teams.permissions:read",
+				},
+				folderSupport: false,
+			},
+			// Groups subresource for teams - uses team scope (teams:uid:...) but team permission actions
+			"teams/groups": translation{
+				resource:  "teams",
+				attribute: "uid",
+				verbMapping: map[string]string{
+					utils.VerbGet:  "teams.permissions:read",
+					utils.VerbList: "teams.permissions:read",
+				},
+				folderSupport: false,
+			},
+			// Teams subresource for users - uses user scope (users:uid:...) but user read action
+			"users/teams": translation{
+				resource:  "users",
+				attribute: "uid",
+				verbMapping: map[string]string{
+					utils.VerbGet:  "users:read",
+					utils.VerbList: "users:read",
+				},
+				folderSupport: false,
+			},
 			"coreroles": translation{
 				resource:  "roles",
 				attribute: "uid",
