@@ -922,7 +922,7 @@ describe('TableNG utils', () => {
       expect(result).toBe(expected);
     });
 
-    it('returns "auto" if a field is present with the dynamicHeight cellOption  is false', () => {
+    it('returns "min-content" if a field is present with the dynamicHeight cellOption  is false', () => {
       expect(
         getDefaultRowHeight(
           theme,
@@ -948,7 +948,7 @@ describe('TableNG utils', () => {
           ],
           TableCellHeight.Sm
         )
-      ).toBe('auto');
+      ).toBe('min-content');
     });
 
     it('calculates height based on theme when cellHeight is undefined', () => {
