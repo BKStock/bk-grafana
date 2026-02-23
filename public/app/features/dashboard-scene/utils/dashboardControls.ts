@@ -3,7 +3,6 @@ import { SceneVariable } from '@grafana/scenes';
 import { DashboardLink, DataSourceRef } from '@grafana/schema';
 import { Spec as DashboardV2Spec, VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
-import { DashboardModel } from 'app/features/dashboard/state/DashboardModel';
 import { DashboardDTO } from 'app/types/dashboard';
 
 import { getRuntimePanelDataSource } from '../serialization/layoutSerializers/utils';
@@ -75,31 +74,61 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
   return { defaultVariables, defaultLinks };
 };
 
-export const getDsRefsFromV1Dashboard = (rsp: DashboardDTO) => {
-  const dashboardModel = new DashboardModel(rsp.dashboard, rsp.meta);
+function getDatasourceRefFromPanel(panel: {
+  datasource?: DataSourceRef | null;
+  targets?: Array<{ datasource?: DataSourceRef | null }>;
+}): DataSourceRef | null | undefined {
+  if (panel.datasource != null) {
+    return panel.datasource;
+  }
+  const targetWithDatasource = panel.targets?.find((t) => t.datasource != null);
+  return targetWithDatasource?.datasource;
+}
 
-  // Datasources from panels
-  const datasourceRefs = dashboardModel.panels
-    .filter((panel) => panel.type !== 'row')
-    .map((panel): DataSourceRef | null | undefined =>
-      panel.datasource
-        ? panel.datasource
-        : panel.targets?.find((t) => t.datasource !== null && t.datasource !== undefined)?.datasource
-    )
-    .filter((ref) => ref !== null && ref !== undefined);
-
-  // Datasources from variables
-  if (dashboardModel.templating?.list) {
-    for (const variable of dashboardModel.templating.list) {
-      if (variable.type === 'query' && variable.datasource) {
-        datasourceRefs.push(variable.datasource);
-      } else if (variable.type === 'datasource' && variable.query) {
-        datasourceRefs.push({ type: variable.query });
-      }
+function getDsRefsFromV1Panels(
+  panels: Array<{
+    type?: string;
+    datasource?: DataSourceRef | null;
+    targets?: Array<{ datasource?: DataSourceRef | null }>;
+  }> = []
+): Array<DataSourceRef | null | undefined> {
+  const refs: Array<DataSourceRef | null | undefined> = [];
+  for (const panel of panels) {
+    if (panel.type === 'row') {
+      continue;
+    }
+    const ref = getDatasourceRefFromPanel(panel);
+    if (ref != null) {
+      refs.push(ref);
     }
   }
+  return refs;
+}
 
-  return deduplicateDatasourceRefsByType(datasourceRefs);
+function getDsRefsFromV1Variables(
+  variableList: Array<{
+    type?: string;
+    datasource?: DataSourceRef | null;
+    query?: string | Record<string, unknown>;
+  }> = []
+): Array<DataSourceRef | null | undefined> {
+  const refs: Array<DataSourceRef | null | undefined> = [];
+  for (const variable of variableList) {
+    if (variable.type === 'query' && variable.datasource) {
+      refs.push(variable.datasource);
+    } else if (variable.type === 'datasource' && typeof variable.query === 'string') {
+      refs.push({ type: variable.query });
+    }
+  }
+  return refs;
+}
+
+export const getDsRefsFromV1Dashboard = (rsp: DashboardDTO): DataSourceRef[] => {
+  const dashboard = rsp.dashboard;
+  const refsFromPanels = getDsRefsFromV1Panels(dashboard.panels);
+  const refsFromVariables = getDsRefsFromV1Variables(dashboard.templating?.list);
+
+  return deduplicateDatasourceRefsByType([...refsFromPanels, ...refsFromVariables]);
 };
 
 export const getDsRefsFromV2Dashboard = (rsp: DashboardWithAccessInfo<DashboardV2Spec>) => {
