@@ -115,6 +115,7 @@ export interface PaginatedRowsOptions {
   footerHeight: number;
   paginationHeight?: number;
   enabled: boolean;
+  hasNestedFrames?: boolean;
 }
 
 export interface PaginatedRowsResult {
@@ -122,6 +123,7 @@ export interface PaginatedRowsResult {
   page: number;
   setPage: React.Dispatch<React.SetStateAction<number>>;
   numPages: number;
+  numRows: number;
   rowsPerPage: number;
   pageRangeStart: number;
   pageRangeEnd: number;
@@ -133,11 +135,11 @@ const PAGINATION_HEIGHT = 38;
 
 export function usePaginatedRows(
   rows: TableRow[],
-  { height, width, headerHeight, footerHeight, rowHeight, enabled }: PaginatedRowsOptions
+  { height, width, headerHeight, footerHeight, rowHeight, enabled, hasNestedFrames }: PaginatedRowsOptions
 ): PaginatedRowsResult {
   // TODO: allow persisted page selection via url
   const [page, setPage] = useState(0);
-  const numRows = rows.length;
+  const numRows = useMemo(() => rows.filter((r) => r.__depth === 0).length, [rows]);
 
   // calculate average row height if row height is variable.
   const avgRowHeight = useMemo(() => {
@@ -155,8 +157,19 @@ export function usePaginatedRows(
       return TABLE.MAX_CELL_HEIGHT;
     }
 
-    // we'll just measure 100 rows to estimate
-    return rows.slice(0, 100).reduce((avg, row, _, { length }) => avg + rowHeight(row) / length, 0);
+    // we'll just measure 100 rows to estimate (skipping nested rows. we don't want to consider nested rows to avoid hiding and showing
+    // them as they are collapsed and expanded)
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < Math.min(100, rows.length); i++) {
+      const row = rows[i];
+      if (row.__depth > 0) {
+        continue;
+      }
+      sum += rowHeight(rows[i]);
+      count++;
+    }
+    return sum / count;
   }, [rows, rowHeight, enabled]);
 
   const smallPagination = useMemo(() => enabled && width < TABLE.PAGINATION_LIMIT, [enabled, width]);
@@ -211,13 +224,33 @@ export function usePaginatedRows(
     if (!enabled) {
       return rows;
     }
+
+    const result = [];
     const pageOffset = page * rowsPerPage;
-    return rows.slice(pageOffset, pageOffset + rowsPerPage);
-  }, [page, rowsPerPage, rows, enabled]);
+
+    let count = hasNestedFrames ? -1 * pageOffset : 0;
+    let i = hasNestedFrames ? 0 : pageOffset;
+    while (count <= rowsPerPage && i < rows.length) {
+      const currRow = rows[i];
+      i++;
+
+      if (currRow.__depth === 0) {
+        count++;
+        if (count < 1 || count > rowsPerPage) {
+          continue;
+        }
+      }
+
+      result.push(currRow);
+    }
+
+    return result;
+  }, [page, rowsPerPage, rows, enabled, hasNestedFrames]);
 
   return {
     rows: paginatedRows,
     page: enabled ? page : -1,
+    numRows,
     setPage,
     numPages,
     rowsPerPage,

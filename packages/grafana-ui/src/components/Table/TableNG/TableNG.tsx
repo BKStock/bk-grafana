@@ -308,6 +308,7 @@ export function TableNG(props: TableNGProps) {
     page,
     setPage,
     numPages,
+    numRows,
     pageRangeStart,
     pageRangeEnd,
     smallPagination,
@@ -318,6 +319,7 @@ export function TableNG(props: TableNGProps) {
     footerHeight,
     headerHeight: hasHeader ? TABLE.HEADER_HEIGHT : 0,
     rowHeight,
+    hasNestedFrames,
   });
 
   const [scrollToIndex, setScrollToIndex] = useState(initialRowIndex);
@@ -905,7 +907,6 @@ export function TableNG(props: TableNGProps) {
   // we need to have variables with these exact names for the localization to work properly
   const itemsRangeStart = pageRangeStart;
   const displayedEnd = pageRangeEnd;
-  const numRows = sortedRows.length;
 
   let rendered = (
     <>
