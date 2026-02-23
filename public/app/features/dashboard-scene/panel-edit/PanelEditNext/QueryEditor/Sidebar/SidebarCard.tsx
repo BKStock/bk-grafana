@@ -6,10 +6,8 @@ import { t } from '@grafana/i18n';
 import { useStyles2 } from '@grafana/ui';
 
 import { ActionItem, Actions } from '../../Actions';
-import { QUERY_EDITOR_COLORS, QueryEditorType } from '../../constants';
+import { QUERY_EDITOR_COLORS } from '../../constants';
 import { getEditorBorderColor } from '../utils';
-
-import { AddCardButton } from './AddCardButton';
 
 interface SidebarCardProps {
   children: React.ReactNode;
@@ -34,7 +32,6 @@ export const SidebarCard = ({
   onToggleHide,
   variant = 'default',
 }: SidebarCardProps) => {
-  const addVariant = item.type === QueryEditorType.Transformation ? 'transformation' : 'query';
   const hasActions = onDelete || onDuplicate || onToggleHide;
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
 
@@ -107,7 +104,6 @@ export const SidebarCard = ({
           </div>
         )}
       </div>
-      <AddCardButton variant={addVariant} afterId={id} />
     </div>
   );
 };
@@ -156,39 +152,6 @@ function getStyles(
     wrapper: css({
       position: 'relative',
       marginInlineStart: theme.spacing(2),
-
-      // Two slim pseudo-element strips extend the hover zone to the left and
-      // below the card, covering the path to the "+" button without overlapping
-      // the card's clickable area.
-
-      // Left strip: narrow gutter running along the card's left edge and below.
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: `calc(-1 * ${theme.spacing(3.5)})`,
-        width: theme.spacing(3.5),
-        height: `calc(100% + ${theme.spacing(1.5)})`,
-      },
-
-      // Bottom strip: runs along the card's bottom edge extending to the left.
-      '&::after': {
-        content: '""',
-        position: 'absolute',
-        top: '100%',
-        left: `calc(-1 * ${theme.spacing(3.5)})`,
-        width: `calc(100% + ${theme.spacing(3.5)})`,
-        height: theme.spacing(1.5),
-      },
-
-      '&:hover': {
-        zIndex: 1,
-      },
-
-      '&:hover [data-add-button], & [data-menu-open]': {
-        opacity: 1,
-        pointerEvents: 'auto',
-      },
     }),
 
     card: css({
