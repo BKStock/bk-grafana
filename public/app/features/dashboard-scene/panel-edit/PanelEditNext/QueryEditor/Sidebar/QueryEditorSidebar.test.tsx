@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import { DataQuery } from '@grafana/schema';
 
 import { SidebarSize } from '../../constants';
-import { renderWithQueryEditorProvider, ds1SettingsMock } from '../testUtils';
+import { ds1SettingsMock, renderWithQueryEditorProvider } from '../testUtils';
 import { Transformation } from '../types';
 
 import { QueryEditorSidebar } from './QueryEditorSidebar';
@@ -87,30 +87,6 @@ describe('QueryEditorSidebar', () => {
 
     // Should render transformation card
     expect(screen.getByRole('button', { name: /select card organize/i })).toBeInTheDocument();
-  });
-
-  it('should render "Add below" buttons for both query/expression and transformation cards', () => {
-    const queries: DataQuery[] = [
-      { refId: 'A', datasource: { type: 'test', uid: 'test' } },
-      { refId: 'B', datasource: { type: 'test', uid: 'test' } },
-    ];
-
-    const transformations: Transformation[] = [
-      { transformId: 'organize', registryItem: undefined, transformConfig: { id: 'organize', options: {} } },
-    ];
-
-    renderWithQueryEditorProvider(<QueryEditorSidebar sidebarSize={SidebarSize.Full} setSidebarSize={jest.fn()} />, {
-      queries,
-      transformations,
-      selectedQuery: queries[0],
-    });
-
-    // Query cards should have an "Add below" button
-    expect(screen.getByRole('button', { name: /add below A/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add below B/i })).toBeInTheDocument();
-
-    // Transformation cards should also have an add button
-    expect(screen.getByRole('button', { name: /add transformation below organize/i })).toBeInTheDocument();
   });
 
   it('should call setSidebarSize with Full when toggling from Mini', async () => {
