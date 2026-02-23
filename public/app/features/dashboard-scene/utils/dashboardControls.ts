@@ -33,19 +33,20 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
   // Default variables
   for (const ds of datasources) {
     if (ds.getDefaultVariables) {
-      const ref = ds.getRef();
       const dsVariables = await ds.getDefaultVariables();
 
       if (dsVariables && dsVariables.length) {
         defaultVariables.push(
           ...dsVariables.map((v) => {
-            v.spec.origin = {
-              type: 'datasource' as const,
-              group: ref.type,
+            const variable = { ...v };
+            variable.spec = {
+              ...variable.spec,
+              origin: {
+                type: 'datasource' as const,
+                group: ds.type,
+              },
             };
-            v.spec.hide = 'inControlsMenu';
-
-            return v;
+            return variable;
           })
         );
       }
@@ -53,7 +54,6 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
 
     // Default links
     if (ds.getDefaultLinks) {
-      const ref = ds.getRef();
       const dsLinks = await ds.getDefaultLinks();
 
       if (dsLinks && dsLinks.length) {
@@ -61,11 +61,9 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
           ...dsLinks.map((l) => {
             return {
               ...l,
-              // Putting under the dashboard-controls menu by default
-              placement: 'inControlsMenu' as const,
               origin: {
                 type: 'datasource' as const,
-                group: ref.type,
+                group: ds.type,
               },
             };
           })
@@ -168,5 +166,5 @@ const sortByProp = <T>(items: T[], propGetter: (item: T) => Object | undefined) 
   });
 };
 
-export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.source);
+export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.origin);
 export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.origin);

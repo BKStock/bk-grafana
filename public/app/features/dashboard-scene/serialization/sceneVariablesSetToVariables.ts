@@ -57,7 +57,7 @@ export function sceneVariablesSetToVariables(set: SceneVariables, keepQueryOptio
   for (const variable of set.state.variables) {
     // Skipping default variables
     // (Default variables don't get persisted to the JSON schema.)
-    if (variable.state.source !== undefined) {
+    if (variable.state.origin !== undefined) {
       continue;
     }
 
@@ -325,7 +325,7 @@ export function sceneVariablesSetToSchemaV2Variables(
   for (const variable of set.state.variables) {
     // Skipping default variables
     // (Default variables don't get persisted to the JSON schema.)
-    if (variable.state.source !== undefined) {
+    if (variable.state.origin !== undefined) {
       continue;
     }
 
@@ -607,5 +607,5 @@ export function validateFiltersOrigin(filters?: SceneAdHocFilterWithLabels[]): A
 }
 
 export function isVariableEditable(variable: SceneVariable) {
-  return variable.state.type !== 'system' && variable.state.source === undefined;
+  return variable.state.type !== 'system' && variable.state.origin === undefined;
 }

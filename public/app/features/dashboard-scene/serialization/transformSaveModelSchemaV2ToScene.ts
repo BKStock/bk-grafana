@@ -297,17 +297,15 @@ function createVariablesForDashboard(dashboard: DashboardV2Spec, defaultVariable
     .filter(isDefined);
 
   const defaultVariableObjects = defaultVariables
-    ? defaultVariables
-        .map((v) => {
-          try {
-            return createSceneVariableFromVariableModel(v);
-          } catch (err) {
-            console.error(err);
-            return null;
-          }
-        })
-        .filter(isDefined)
-    : [];
+    .map((v) => {
+      try {
+        return createSceneVariableFromVariableModel(v);
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    })
+    .filter(isDefined);
 
   // Explicitly disable scopes for public dashboards
   if (config.featureToggles.scopeFilters && !config.publicDashboardAccessToken) {
@@ -315,7 +313,7 @@ function createVariablesForDashboard(dashboard: DashboardV2Spec, defaultVariable
   }
 
   return new SceneVariableSet({
-    variables: [...variableObjects, ...defaultVariableObjects],
+    variables: [...defaultVariableObjects, ...variableObjects],
   });
 }
 
@@ -324,7 +322,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.spec.name,
     label: variable.spec.label,
     description: variable.spec.description,
-    source: variable.spec.origin,
+    origin: variable.spec.origin,
   };
   if (variable.kind === defaultAdhocVariableKind().kind) {
     const ds = getDataSourceForQuery(

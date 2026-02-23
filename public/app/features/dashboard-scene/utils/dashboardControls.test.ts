@@ -317,7 +317,6 @@ describe('dashboardControls', () => {
         ...mockVariable1,
         spec: {
           ...mockVariable1.spec,
-          hide: 'inControlsMenu',
           origin: {
             type: 'datasource',
             group: 'prometheus',
@@ -328,7 +327,6 @@ describe('dashboardControls', () => {
         ...mockVariable2,
         spec: {
           ...mockVariable2.spec,
-          hide: 'inControlsMenu',
           origin: {
             type: 'datasource',
             group: 'loki',
@@ -361,7 +359,6 @@ describe('dashboardControls', () => {
       expect(result.defaultLinks).toHaveLength(2);
       expect(result.defaultLinks[0]).toMatchObject({
         ...mockLink1,
-        placement: 'inControlsMenu',
         origin: {
           type: 'datasource',
           group: 'prometheus',
@@ -369,7 +366,6 @@ describe('dashboardControls', () => {
       });
       expect(result.defaultLinks[1]).toMatchObject({
         ...mockLink2,
-        placement: 'inControlsMenu',
         origin: {
           type: 'datasource',
           group: 'prometheus',

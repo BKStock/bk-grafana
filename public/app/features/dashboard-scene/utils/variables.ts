@@ -39,17 +39,15 @@ export function createVariablesForDashboard(oldModel: DashboardModel, defaultVar
     .filter((v): v is SceneVariable => Boolean(v));
 
   const defaultVariableObjects = defaultVariables
-    ? defaultVariables
-        .map((v) => {
-          try {
-            return createSceneVariableFromVariableModelV2(v);
-          } catch (err) {
-            console.error(err);
-            return null;
-          }
-        })
-        .filter((v): v is SceneVariable => Boolean(v))
-    : [];
+    .map((v) => {
+      try {
+        return createSceneVariableFromVariableModelV2(v);
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    })
+    .filter((v): v is SceneVariable => Boolean(v));
 
   // Explicitly disable scopes for public dashboards
   if (config.featureToggles.scopeFilters && !config.publicDashboardAccessToken) {
@@ -158,7 +156,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.name,
     label: variable.label,
     description: variable.description,
-    source: variable.origin,
+    origin: variable.origin,
   };
   if (variable.type === 'adhoc') {
     const originFilters: AdHocVariableFilter[] = [];
