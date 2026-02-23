@@ -325,8 +325,8 @@ describe('PanelQueryRunner', () => {
   describeQueryRunnerScenario(
     'annotation field overrides',
     (ctx) => {
-      it('should apply when field override options are set', async () => {
-        ctx.runner.getData({ withTransforms: true, withFieldConfig: true }).subscribe({
+      it('applies overrides when withFieldConfig is set', async () => {
+        ctx.runner.getData({ withTransforms: false, withFieldConfig: true }).subscribe({
           next: (data: grafanaData.PanelData) => {
             return data;
           },
@@ -373,6 +373,40 @@ describe('PanelQueryRunner', () => {
           expect.objectContaining({
             fieldConfig: {
               // no defaults
+              defaults: {},
+              overrides: annotationOverrides,
+            },
+          })
+        );
+      });
+
+      it('applies overrides once when withFieldConfig is false', async () => {
+        ctx.runner.getData({ withTransforms: false, withFieldConfig: false }).subscribe({
+          next: (data: grafanaData.PanelData) => {
+            return data;
+          },
+        });
+
+        expect(applyFieldOverridesMock).toBeCalledTimes(2);
+
+        // series 1
+        expect(applyFieldOverridesMock).nthCalledWith(
+          1,
+          expect.objectContaining({
+            fieldConfig: {
+              defaults: {
+                unit: 'm/s',
+              },
+              overrides: annotationOverrides,
+            },
+          })
+        );
+
+        // Annotations
+        expect(applyFieldOverridesMock).nthCalledWith(
+          2,
+          expect.objectContaining({
+            fieldConfig: {
               defaults: {},
               overrides: annotationOverrides,
             },
