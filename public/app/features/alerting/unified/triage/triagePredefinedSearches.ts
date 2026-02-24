@@ -13,13 +13,10 @@ import { toUrl } from '../../../variables/adhoc/urlParser';
 import { SavedSearch } from '../components/saved-searches/savedSearchesSchema';
 
 import { URL_PARAMS } from './constants';
+import { defaultTimeRange } from './scene/utils';
 
 /** Prefix for predefined search IDs; used to identify predefined items for overrides and dismissed handling. */
 export const TRIAGE_PREDEFINED_SEARCH_ID_PREFIX = 'triage-predefined-';
-
-/** Default time range for predefined searches (matches applyTriageSavedSearchState fallback). */
-const DEFAULT_TIME_FROM = 'now-4h';
-const DEFAULT_TIME_TO = 'now';
 
 /** Label for evaluation group in state history / GRAFANA_ALERTS metric. */
 const EVAL_GROUP_LABEL = 'rule_group';
@@ -47,8 +44,8 @@ function buildTriageQueryString(options: {
     }
   });
 
-  params.set(URL_PARAMS.timeFrom, options.from ?? DEFAULT_TIME_FROM);
-  params.set(URL_PARAMS.timeTo, options.to ?? DEFAULT_TIME_TO);
+  params.set(URL_PARAMS.timeFrom, options.from ?? defaultTimeRange.from);
+  params.set(URL_PARAMS.timeTo, options.to ?? defaultTimeRange.to);
 
   return params.toString();
 }
@@ -62,7 +59,7 @@ const PREDEFINED_IDS = [
 
 /**
  * Pre-defined triage saved searches for common scenarios.
- * Uses default time range (matches applyTriageSavedSearchState: now-4h to now).
+ * Uses default time range from scene/utils (15m).
  * Order defines display order in the dropdown (before user saves).
  * Must be called from a component or function so t() is not used at top level.
  */

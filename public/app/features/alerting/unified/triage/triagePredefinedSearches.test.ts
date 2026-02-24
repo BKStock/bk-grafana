@@ -19,10 +19,10 @@ describe('triagePredefinedSearches', () => {
       }
     });
 
-    it('all predefined searches use default time range (now-4h to now)', () => {
+    it('all predefined searches use default time range (15m from scene/utils)', () => {
       for (const search of getTriagePredefinedSearches()) {
         const params = new URLSearchParams(search.query);
-        expect(params.get('from')).toBe('now-4h');
+        expect(params.get('from')).toBe('now-15m');
         expect(params.get('to')).toBe('now');
       }
     });
