@@ -176,6 +176,7 @@ type Cfg struct {
 	RendererDefaultImageWidth      int
 	RendererDefaultImageHeight     int
 	RendererDefaultImageScale      float64
+	RendererCACert                 string
 
 	// Security
 	DisableInitAdminCreation             bool
@@ -527,6 +528,10 @@ type Cfg struct {
 	Storage StorageSettings
 
 	Search SearchSettings
+
+	// MaxNestedFolderDepth is the hard ceiling for folder nesting depth.
+	// The SQL query builders use this value to generate JOIN chains.
+	MaxNestedFolderDepth int
 
 	SecureSocksDSProxy SecureSocksDSProxySettings
 
@@ -1121,6 +1126,8 @@ func NewCfg() *Cfg {
 		IsFeatureToggleEnabled: func(_ string) bool {
 			return false
 		},
+
+		MaxNestedFolderDepth: maxDeptFolderSettings(nil),
 	}
 }
 
@@ -1427,6 +1434,7 @@ func (cfg *Cfg) parseINIFile(iniFile *ini.File) error {
 
 	cfg.Storage = readStorageSettings(iniFile)
 	cfg.Search = readSearchSettings(iniFile)
+	cfg.MaxNestedFolderDepth = maxDeptFolderSettings(iniFile)
 
 	var err error
 	cfg.SecureSocksDSProxy, err = readSecureSocksDSProxySettings(iniFile)
@@ -1940,6 +1948,7 @@ func (cfg *Cfg) readRenderingSettings(iniFile *ini.File) {
 	cfg.RendererDefaultImageWidth = renderSec.Key("default_image_width").MustInt(1000)
 	cfg.RendererDefaultImageHeight = renderSec.Key("default_image_height").MustInt(500)
 	cfg.RendererDefaultImageScale = renderSec.Key("default_image_scale").MustFloat64(1)
+	cfg.RendererCACert = valueAsString(renderSec, "ca_cert_file_path", "")
 	cfg.ImagesDir = filepath.Join(cfg.DataPath, "png")
 	cfg.CSVsDir = filepath.Join(cfg.DataPath, "csv")
 	cfg.PDFsDir = filepath.Join(cfg.DataPath, "pdf")
