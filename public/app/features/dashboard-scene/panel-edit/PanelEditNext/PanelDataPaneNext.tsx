@@ -17,7 +17,7 @@ import {
 } from '@grafana/scenes';
 import { DataQuery, DataSourceRef } from '@grafana/schema';
 import { addQuery } from 'app/core/utils/query';
-import { getLastUsedDatasourceFromStorage } from 'app/features/dashboard/utils/dashboard';
+import { getLastUsedDatasourceFromStorage } from 'app/features/dashboard-shared/utils/dashboard';
 import { storeLastUsedDataSourceInLocalStorage } from 'app/features/datasources/components/picker/utils';
 import { MIXED_DATASOURCE_NAME } from 'app/plugins/datasource/mixed/MixedDataSource';
 import { QueryGroupOptions } from 'app/types/query';

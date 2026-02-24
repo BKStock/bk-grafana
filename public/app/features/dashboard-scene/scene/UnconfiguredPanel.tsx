@@ -19,7 +19,7 @@ import {
   useStyles2,
 } from '@grafana/ui';
 
-import { NEW_PANEL_TITLE } from '../../dashboard/utils/dashboard';
+import { NEW_PANEL_TITLE } from 'app/features/dashboard-shared/utils/dashboard';
 import { DashboardInteractions } from '../utils/interactions';
 import { findVizPanelByKey, getVizPanelKeyForPanelId } from '../utils/utils';
 

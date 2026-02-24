@@ -13,7 +13,7 @@ import { SaveDashboardAsOptions, SaveDashboardOptions } from 'app/features/dashb
 import { DashboardSavedEvent } from 'app/types/events';
 import { useDispatch } from 'app/types/store';
 
-import { updateDashboardUidLastUsedDatasource } from '../../dashboard/utils/dashboard';
+import { updateDashboardUidLastUsedDatasource } from 'app/features/dashboard-shared/utils/dashboard';
 import { DashboardScene } from '../scene/DashboardScene';
 import { DashboardInteractions } from '../utils/interactions';
 import { trackDashboardSceneCreatedOrSaved } from '../utils/tracking';

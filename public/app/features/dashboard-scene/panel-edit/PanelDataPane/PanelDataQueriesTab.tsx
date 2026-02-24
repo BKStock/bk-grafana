@@ -18,7 +18,7 @@ import { DataQuery, DataSourceRef } from '@grafana/schema';
 import { Button, Stack, Tab } from '@grafana/ui';
 import { contextSrv } from 'app/core/services/context_srv';
 import { addQuery } from 'app/core/utils/query';
-import { getLastUsedDatasourceFromStorage } from 'app/features/dashboard/utils/dashboard';
+import { getLastUsedDatasourceFromStorage } from 'app/features/dashboard-shared/utils/dashboard';
 import { storeLastUsedDataSourceInLocalStorage } from 'app/features/datasources/components/picker/utils';
 import { dataSource as expressionDatasource } from 'app/features/expressions/ExpressionDatasource';
 import { ExpressionTypeDropdown } from 'app/features/expressions/components/ExpressionTypeDropdown';
