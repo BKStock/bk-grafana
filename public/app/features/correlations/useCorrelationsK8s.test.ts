@@ -118,7 +118,15 @@ describe('useCorrelationsK8s', () => {
   });
 
   it('should pass the right limit based on page size', async () => {
-    useListCorrelationMock.mockReturnValue({ data: [] });
+    useListCorrelationMock.mockReturnValue({
+      data: {
+        items: [],
+        metadata: { remainingItemCount: 0 },
+      },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    });
     renderHook(() => useCorrelationsK8s(10, 5));
     expect(useListCorrelationMock).toHaveBeenCalledWith({ limit: 50 });
   });

@@ -32,7 +32,7 @@ jest.mock('@grafana/api-clients/rtkq/correlations/v0alpha1', () => ({
 //const useListCorrelationQueryMock = useListCorrelationQuery as jest.Mock;
 //const useCreateCorrelationMutationMock = useCreateCorrelationMutation as jest.Mock;
 
-const useListCorrelationQueryMock = useListCorrelationQuery as jest.Mock;
+const useListCorrelationQueryMock = useListCorrelationQuery as jest.MockedFunction<typeof useListCorrelationQuery>;
 
 //const mockCreateCorrelation = jest.fn();
 const useCreateCorrelationMutationMock = useCreateCorrelationMutation as jest.MockedFunction<
@@ -417,12 +417,14 @@ describe('CorrelationsPage - App platform', () => {
         originalArgs: { correlation: {} },
       };*/
 
+      // return a fully‑formed hook result so TypeScript is happy and the
+      // metadata field is available in downstream code. we only care about the
+      // shape the component reads, so a minimal object is fine.
       useListCorrelationQueryMock.mockReturnValue({
-        data: {
-          items: [],
-        },
+        data: [],
         isLoading: false,
-        isError: false,
+        error: undefined,
+        refetch: jest.fn(),
       });
       expect(await screen.findByRole('table')).toBeInTheDocument();
     });
