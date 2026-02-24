@@ -374,6 +374,18 @@ export type TabsTestSetup = {
  * Setups a tabs drag and drop test scenario
  */
 export function setupTabsTest(senario: TabsTestSetup) {
+  const allChars = senario.tabs.join('');
+  const dragCount = allChars.split(senario.drag).length - 1;
+  const dropCount = allChars.split(senario.drop).length - 1;
+
+  if (dragCount > 1) {
+    throw new Error(`Drag tab "${senario.drag}" is defined ${dragCount} times in the setup. It must be unique.`);
+  }
+
+  if (dropCount > 1) {
+    throw new Error(`Drop tab "${senario.drop}" is defined ${dropCount} times in the setup. It must be unique.`);
+  }
+
   let drag: TabItem | undefined = undefined;
   let destIndex = 0;
   let destManager: TabsLayoutManager | undefined = undefined;
