@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 
@@ -41,8 +42,7 @@ func (r *noopREST) GetSingularName() string {
 // Connect implements [rest.Connecter].
 func (*noopREST) Connect(ctx context.Context, id string, options runtime.Object, r rest.Responder) (http.Handler, error) {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","message":"noop"}`))
+		r.Object(200, &v1.Status{Message: "noop"})
 	}), nil
 }
 

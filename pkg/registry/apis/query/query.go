@@ -35,11 +35,6 @@ import (
 	"github.com/grafana/grafana/pkg/web"
 )
 
-type queryREST struct {
-	logger  log.Logger
-	builder *QueryAPIBuilder
-}
-
 type MyCacheService struct {
 	legacy ds_service.LegacyDataSourceLookup
 }

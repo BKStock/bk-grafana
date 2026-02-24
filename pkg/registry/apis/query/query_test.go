@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	claims "github.com/grafana/authlib/types"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -197,7 +196,9 @@ func TestQueryAPI(t *testing.T) {
 			builder.QueryDatasources(rr, req)
 
 			result := rr.Result()
-			defer result.Body.Close()
+			defer func() {
+				_ = result.Body.Close()
+			}()
 
 			require.Equal(t, tc.expectedStatus, result.StatusCode, "Should return expected status code")
 
@@ -240,23 +241,6 @@ func TestQueryAPI(t *testing.T) {
 			t.Logf("Test case '%s' completed successfully", tc.name)
 		})
 	}
-}
-
-type mockResponder struct {
-	statusCode int
-	response   runtime.Object
-	err        error
-}
-
-// Object writes the provided object to the response. Invoking this method multiple times is undefined.
-func (m *mockResponder) Object(statusCode int, obj runtime.Object) {
-	m.statusCode = statusCode
-	m.response = obj
-}
-
-// Error writes the provided error to the response. This method may only be invoked once.
-func (m *mockResponder) Error(err error) {
-	m.err = err
 }
 
 type mockClient struct {
