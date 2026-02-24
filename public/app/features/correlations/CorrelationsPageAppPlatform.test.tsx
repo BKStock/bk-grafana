@@ -1,0 +1,175 @@
+import { render, waitFor, screen, within, Matcher } from '@testing-library/react';
+import { TestProvider } from 'test/helpers/TestProvider';
+import { MockDataSourceApi } from 'test/mocks/datasource_srv';
+import { getGrafanaContextMock } from 'test/mocks/getGrafanaContextMock';
+
+import { DataSourceSrv, reportInteraction, setAppEvents, setDataSourceSrv, config } from '@grafana/runtime';
+import { appEvents } from 'app/core/app_events';
+import { contextSrv } from 'app/core/services/context_srv';
+import { configureStore } from 'app/store/configureStore';
+
+import { mockDataSource } from '../alerting/unified/mocks';
+
+import { CorrelationsPageAppPlatform } from './CorrelationsPageWrapper';
+import { setupCorrelationsMswServer } from './mocks/server';
+import { MockDataSourceSrv } from './mocks/useCorrelations.mocks';
+
+setupCorrelationsMswServer();
+
+const originalFeatureToggles = config.featureToggles;
+
+// Set app events up, otherwise plugin modules will fail to load
+setAppEvents(appEvents);
+
+const renderWithContext = async (datasources: ConstructorParameters<typeof MockDataSourceSrv>[0] = {}) => {
+  const grafanaContext = getGrafanaContextMock();
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const dsServer = new MockDataSourceSrv(datasources) as unknown as DataSourceSrv;
+  dsServer.get = (name: string) => {
+    const dsApi = new MockDataSourceApi(name);
+    // Mock the QueryEditor component
+    dsApi.components = {
+      QueryEditor: () => <>{name} query editor</>,
+    };
+    return Promise.resolve(dsApi);
+  };
+
+  setDataSourceSrv(dsServer);
+
+  // the new render method doesn't seem to offer custom queries for now, so we can't change over yet
+  const renderResult = render(
+    <TestProvider store={configureStore({})} grafanaContext={grafanaContext}>
+      <CorrelationsPageAppPlatform />
+    </TestProvider>,
+    {
+      queries: {
+        /**
+         * Gets all the rows in the table having the given text in the given column
+         */
+        queryRowsByCellValue: (
+          container: HTMLElement,
+          columnName: Matcher,
+          textValue: Matcher
+        ): HTMLTableRowElement[] => {
+          const table = within(container).getByRole('table');
+          const headers = within(table).getAllByRole('columnheader');
+          const headerIndex = headers.findIndex((h) => {
+            return within(h).queryByText(columnName);
+          });
+
+          // the first rowgroup is the header
+          const tableBody = within(table).getAllByRole('rowgroup')[1];
+
+          return within(tableBody)
+            .getAllByRole<HTMLTableRowElement>('row')
+            .filter((row) => {
+              const rowCells = within(row).getAllByRole('cell');
+              const cell = rowCells[headerIndex];
+              return within(cell).queryByText(textValue);
+            });
+        },
+        /**
+         * Gets all the cells in the table for the given column name
+         */
+        queryCellsByColumnName: (container: HTMLElement, columnName: Matcher) => {
+          const table = within(container).getByRole('table');
+          const headers = within(table).getAllByRole('columnheader');
+          const headerIndex = headers.findIndex((h) => {
+            return within(h).queryByText(columnName);
+          });
+          const tbody = table.querySelector('tbody');
+          if (!tbody) {
+            return [];
+          }
+          return within(tbody)
+            .getAllByRole('row')
+            .map((r) => {
+              const cells = within(r).getAllByRole<HTMLTableCellElement>('cell');
+              return cells[headerIndex];
+            });
+        },
+        /**
+         * Gets the table header cell matching the given name
+         */
+        getHeaderByName: (container: HTMLElement, columnName: Matcher): HTMLTableCellElement => {
+          const table = within(container).getByRole('table');
+          const headers = within(table).getAllByRole<HTMLTableCellElement>('columnheader');
+          const header = headers.find((h) => {
+            return within(h).queryByText(columnName);
+          });
+          if (!header) {
+            throw new Error(`Could not find header with name ${columnName}`);
+          }
+          return header;
+        },
+      },
+    }
+  );
+
+  await waitFor(() => {
+    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+  });
+
+  return renderResult;
+};
+
+jest.mock('app/core/services/context_srv');
+
+const mocks = {
+  contextSrv: jest.mocked(contextSrv),
+  reportInteraction: jest.fn(),
+};
+
+jest.mock('@grafana/runtime', () => {
+  const runtime = jest.requireActual('@grafana/runtime');
+
+  return {
+    ...runtime,
+    reportInteraction: (...args: Parameters<typeof reportInteraction>) => {
+      mocks.reportInteraction(...args);
+    },
+  };
+});
+
+beforeAll(() => {
+  mocks.contextSrv.hasPermission.mockImplementation(() => true);
+  config.featureToggles.kubernetesCorrelations = true;
+});
+
+afterAll(() => {
+  jest.restoreAllMocks();
+  config.featureToggles = originalFeatureToggles;
+});
+
+describe('CorrelationsPage - App Platform', () => {
+  describe('With correlations', () => {
+    beforeEach(async () => {
+      await renderWithContext({
+        loki: mockDataSource(
+          {
+            uid: 'loki',
+            name: 'loki',
+            readOnly: false,
+            jsonData: {},
+            type: 'datasource',
+          },
+          { logs: true }
+        ),
+        prometheus: mockDataSource(
+          {
+            uid: 'prometheus',
+            name: 'prometheus',
+            readOnly: false,
+            jsonData: {},
+            type: 'datasource',
+          },
+          { metrics: true, module: 'core:plugin/prometheus' }
+        ),
+      });
+    });
+
+    it('shows a table with correlations', async () => {
+      expect(await screen.findByRole('table')).toBeInTheDocument();
+    });
+  });
+});
