@@ -12,7 +12,6 @@ import { usePluginInteractionReporter } from './usePluginInteractionReporter';
  *
  * @param pluginId - The plugin ID (e.g. `'grafana-cloudwatch-datasource'`)
  * @param getProperties - A function returning additional properties to include in the interaction event.
- *   Called at event time so it always reflects the latest state.
  *
  * @alpha
  */
