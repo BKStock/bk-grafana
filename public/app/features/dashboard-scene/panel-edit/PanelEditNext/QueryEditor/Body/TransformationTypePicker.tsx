@@ -6,8 +6,8 @@ import { selectors } from '@grafana/e2e-selectors';
 import { Trans, t } from '@grafana/i18n';
 import { EmptyState, FilterPill, Grid, IconButton, Input, Stack, Switch, useStyles2 } from '@grafana/ui';
 import config from 'app/core/config';
-import { SqlExpressionsBanner } from 'app/features/dashboard/components/TransformationsEditor/SqlExpressions/SqlExpressionsBanner';
-import { TransformationCard } from 'app/features/dashboard/components/TransformationsEditor/TransformationCard';
+import { SqlExpressionsBanner } from 'app/features/dashboard-shared/components/TransformationsEditor/SqlExpressions/SqlExpressionsBanner';
+import { TransformationCard } from 'app/features/dashboard-shared/components/TransformationsEditor/TransformationCard';
 
 import { useQueryEditorUIContext, useQueryRunnerContext } from '../QueryEditorContext';
 
