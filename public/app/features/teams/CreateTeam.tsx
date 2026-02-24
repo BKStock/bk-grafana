@@ -17,7 +17,7 @@ import {
   FolderCreationState,
   getFolderResultCardState,
   getTeamResultCardState,
-  StepResultCard,
+  StepResultAlert,
   TeamCreationState,
 } from './CreateTeamResultCard';
 import { useCreateTeam } from './hooks';
@@ -184,17 +184,9 @@ const CreateTeam = (): JSX.Element => {
 
             {shouldShowStatusCards && (
               <Stack direction="column" gap={1}>
-                <StepResultCard
-                  heading={t('teams.create-team.team-card-heading', 'Team')}
-                  state={teamResultCardState}
-                />
+                <StepResultAlert state={teamResultCardState} />
 
-                {autocreateTeamFolder && (
-                  <StepResultCard
-                    heading={t('teams.create-team.folder-card-heading', 'Folder')}
-                    state={folderResultCardState}
-                  />
-                )}
+                {autocreateTeamFolder && <StepResultAlert state={folderResultCardState} />}
               </Stack>
             )}
           </Stack>

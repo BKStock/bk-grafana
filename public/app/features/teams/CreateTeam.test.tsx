@@ -92,6 +92,6 @@ describe('Create team', () => {
     await attemptCreateTeam(user, { teamName: MOCK_TEAMS[0].spec.title });
 
     expect(screen.queryByText(/edit team page/i)).not.toBeInTheDocument();
-    expect(await screen.findByText(/failed to create team/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/team name taken|failed to create team/i);
   });
 });
