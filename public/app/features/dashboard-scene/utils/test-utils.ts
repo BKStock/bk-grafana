@@ -439,22 +439,40 @@ export function setupTabsTest(senario: TabsTestSetup) {
       orchestrator.stopTabDrag(destIndex);
     },
     assertExpectedTabs: () => {
-      const all = managers.map((manager) =>
-        manager
-          .getTabsIncludingRepeats()
-          .map((t) => t.state.title)
-          .join('')
-      );
-      expect(all).toEqual(senario.expected.map((t) => t.replace(/ /g, '')));
+      const all = managers.map((manager) => {
+        const tabs = manager.getTabsIncludingRepeats();
+        return getTabGroups(tabs);
+      });
+      expect(all).toEqual(senario.expected);
     },
     assertInitialTabs: () => {
-      const all = managers.map((manager) =>
-        manager
-          .getTabsIncludingRepeats()
-          .map((t) => t.state.title)
-          .join('')
-      );
-      expect(all).toEqual(senario.tabs.map((t) => t.replace(/ /g, '')));
+      const all = managers.map((manager) => {
+        const tabs = manager.getTabsIncludingRepeats();
+        return getTabGroups(tabs);
+      });
+      expect(all).toEqual(senario.tabs);
     },
   };
+}
+
+function getTabGroups(tabs: TabItem[]): string {
+  const groups: string[] = [];
+  let currentGroup = '';
+
+  tabs.forEach((tab) => {
+    if (tab.state.repeatSourceKey) {
+      currentGroup += tab.state.title;
+    } else {
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+      currentGroup = tab.state.title || '';
+    }
+  });
+
+  if (currentGroup) {
+    groups.push(currentGroup);
+  }
+
+  return groups.join(' ');
 }
