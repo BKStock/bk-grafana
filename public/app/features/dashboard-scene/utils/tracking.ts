@@ -2,7 +2,7 @@ import { store } from '@grafana/data';
 import { config } from '@grafana/runtime';
 import { getFeatureFlagClient } from '@grafana/runtime/internal';
 import { SceneGridItemLike } from '@grafana/scenes';
-import { getDatasourceTypes } from 'app/features/dashboard/dashgrid/DashboardLibrary/utils/dashboardLibraryHelpers';
+import { getDatasourceTypes } from 'app/features/dashboard-shared/dashgrid/DashboardLibrary/utils/dashboardLibraryHelpers';
 
 import { DashboardScene } from '../scene/DashboardScene';
 import { AutoGridItem } from '../scene/layout-auto-grid/AutoGridItem';
