@@ -1,5 +1,5 @@
 {
-  "_docs": "Team notifications configuration. To onboard a team: add an entry below with codeowners_teams, area_labels, Slack channel IDs, and invite the bot to each channel.",
+  "_docs": "Team notifications configuration. To onboard a team: add an entry below with codeowners_teams, area_labels (main parent area label), Slack channel IDs, and invite the bot to each channel.",
   "teams": [
     {
       "name": "alerting",
