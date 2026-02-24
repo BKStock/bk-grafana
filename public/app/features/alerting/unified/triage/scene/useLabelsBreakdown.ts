@@ -4,7 +4,7 @@ import { useQueryRunner } from '@grafana/scenes-react';
 
 import { INTERNAL_LABELS } from '../constants';
 
-import { dataFrameToLabelMaps } from './fetchSeries';
+import { dataFrameToLabelMaps } from './dataFrameUtils';
 import { alertInstancesQuery } from './queries';
 import { useQueryFilter } from './utils';
 
@@ -27,8 +27,8 @@ export function useLabelsBreakdown(): {
   labels: LabelStats[];
   isLoading: boolean;
 } {
-  const filter = useQueryFilter();
-  const dataProvider = useQueryRunner({ queries: [alertInstancesQuery(filter)] });
+  const { filter, alertStateFilter } = useQueryFilter();
+  const dataProvider = useQueryRunner({ queries: [alertInstancesQuery(filter, alertStateFilter)] });
   const { data } = dataProvider.useState();
   const frame = data?.series?.at(0);
 

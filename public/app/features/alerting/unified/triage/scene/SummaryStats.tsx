@@ -30,39 +30,15 @@ export interface RuleFrame {
   Value: number;
 }
 
-export function parseAlertstateFilter(filter: string): AlertState[] {
-  const hasFiring = filter.match(/alertstate\s*=~?\s*"firing"/);
-  const hasPending = filter.match(/alertstate\s*=~?\s*"pending"/);
-
-  const states: AlertState[] = [];
-
-  // If both or neither match, include both states
-  if ((hasFiring && hasPending) || (!hasFiring && !hasPending)) {
-    return [PromAlertingRuleState.Firing, PromAlertingRuleState.Pending];
-  }
-
-  if (hasFiring) {
-    states.push(PromAlertingRuleState.Firing);
-  }
-  if (hasPending) {
-    states.push(PromAlertingRuleState.Pending);
-  }
-
-  return states;
-}
-
-export function countRules(ruleDfv: DataFrameView<RuleFrame>, alertstateFilter: AlertState[]) {
+export function countRules(ruleDfv: DataFrameView<RuleFrame>) {
   const counts = {
     [PromAlertingRuleState.Firing]: new Set<string>(),
     [PromAlertingRuleState.Pending]: new Set<string>(),
   };
 
-  // Only count rules for states we're interested in
   ruleDfv.fields.grafana_rule_uid.values.forEach((ruleUID, i) => {
     const alertstate = ruleDfv.fields.alertstate.values[i];
-    if (alertstateFilter.includes(alertstate)) {
-      counts[alertstate].add(ruleUID);
-    }
+    counts[alertstate]?.add(ruleUID);
   });
 
   return {
@@ -119,27 +95,24 @@ function LabelTooltipContent({ label }: { label: LabelStats }) {
   return (
     <Box padding={0.5}>
       <Box marginBottom={0.5}>
-        <Text weight="bold">
-          <Trans i18nKey="alerting.triage.top-label-tooltip-header" values={{ key: label.key, count: label.count }}>
-            {'{{ key }} ({{ count }} instances)'}
-          </Trans>
-        </Text>
+        <Stack direction="row" gap={1} alignItems="center">
+          <Text weight="bold">{label.key}</Text>
+          <LabelBadgeCounts firing={label.firing} pending={label.pending} />
+        </Stack>
       </Box>
       <div className={styles.tooltipDivider} />
-      {label.values.map(({ value, count }) => (
+      {label.values.map(({ value, firing, pending }) => (
         <Stack key={value} direction="row" justifyContent="space-between" gap={2}>
           <span>{value}</span>
-          <Text element="span" color="secondary">
-            {count}
-          </Text>
+          <LabelBadgeCounts firing={firing} pending={pending} />
         </Stack>
       ))}
     </Box>
   );
 }
 
-function LabelStatssSection() {
-  const styles = useStyles2(getLabelStatssStyles);
+function LabelStatsSection() {
+  const styles = useStyles2(getLabelStatsStyles);
   const { labels, isLoading } = useLabelsBreakdown();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const sceneContext = useSceneContext();
@@ -190,21 +163,14 @@ function LabelStatssSection() {
 
 function SummaryStatsContent() {
   const styles = useStyles2(getCompactStatStyles);
-  const filter = useQueryFilter();
-  const alertstateFilter = parseAlertstateFilter(filter);
-
-  // Strip alertstate from filter since the dedup queries add their own alertstate matchers
-  const cleanFilter = filter
-    .replace(/alertstate\s*=~?\s*"(firing|pending)"[,\s]*/, '')
-    .replace(/,\s*$/, '')
-    .replace(/^\s*,/, '');
+  const { filter, alertStateFilter } = useQueryFilter();
 
   const instanceDataProvider = useQueryRunner({
-    queries: [summaryInstanceCountQuery(cleanFilter)],
+    queries: [summaryInstanceCountQuery(filter, alertStateFilter)],
   });
 
   const ruleDataProvider = useQueryRunner({
-    queries: [summaryRuleCountQuery(cleanFilter)],
+    queries: [summaryRuleCountQuery(filter, alertStateFilter)],
   });
 
   const { data: instanceData } = instanceDataProvider.useState();
@@ -229,13 +195,15 @@ function SummaryStatsContent() {
   }
 
   const instances = countInstances(instanceDfv);
-  const rules = countRules(ruleDfv, alertstateFilter);
+  const rules = countRules(ruleDfv);
+  const hasFiring = instances.firing > 0 || rules.firing > 0;
+  const hasPending = instances.pending > 0 || rules.pending > 0;
 
   return (
     <Stack direction="column" gap={2}>
       <Box backgroundColor="secondary" borderRadius="default" padding={1.5}>
         <div className={styles.statsGrid}>
-          {alertstateFilter.includes(PromAlertingRuleState.Firing) && (
+          {hasFiring && (
             <CompactStatRow
               color="error"
               icon="exclamation-circle"
@@ -244,7 +212,7 @@ function SummaryStatsContent() {
               stateLabel={PromAlertingRuleState.Firing}
             />
           )}
-          {alertstateFilter.includes(PromAlertingRuleState.Pending) && (
+          {hasPending && (
             <CompactStatRow
               color="warning"
               icon="circle"
@@ -256,7 +224,7 @@ function SummaryStatsContent() {
         </div>
       </Box>
       <ErrorBoundaryAlert style="alertbox">
-        <LabelStatssSection />
+        <LabelStatsSection />
       </ErrorBoundaryAlert>
     </Stack>
   );
@@ -308,7 +276,7 @@ const getTooltipStyles = (theme: GrafanaTheme2) => ({
   }),
 });
 
-const getLabelStatssStyles = (theme: GrafanaTheme2) => ({
+const getLabelStatsStyles = (theme: GrafanaTheme2) => ({
   labelBadge: css({
     display: 'inline-flex',
     alignItems: 'center',

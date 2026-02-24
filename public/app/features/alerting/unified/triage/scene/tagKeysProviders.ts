@@ -7,8 +7,8 @@ import { AdHocFilterWithLabels, AdHocFiltersVariable, GroupByVariable, sceneGrap
 
 import { DATASOURCE_UID, METRIC_NAME } from '../constants';
 
-import { dataFrameToLabelMaps } from './fetchSeries';
-import { alertInstancesExpr } from './queries';
+import { dataFrameToLabelMaps } from './dataFrameUtils';
+import { alertInstancesQuery } from './queries';
 import { computeLabelStats } from './useLabelsBreakdown';
 
 const COMMON_GROUP = 'Common';
@@ -84,7 +84,7 @@ async function fetchTopLabelKeys(timeRange: TimeRange): Promise<string[]> {
       intervalMs: 0,
       range: timeRange,
       scopedVars: {},
-      targets: [{ refId: 'A', expr: alertInstancesExpr(''), instant: true, range: false }],
+      targets: [alertInstancesQuery('')],
       timezone: 'browser',
       app: CoreApp.UnifiedAlerting,
       startTime: Date.now(),

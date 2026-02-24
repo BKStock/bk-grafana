@@ -47,9 +47,9 @@ type AlertRuleInstancesProps = {
 export function AlertRuleInstances({ ruleUID, depth = 0 }: AlertRuleInstancesProps) {
   const { leftColumnWidth } = useWorkbenchContext();
   const [timeRange] = useTimeRange();
-  const queryFilter = useQueryFilter();
+  const { filter: queryFilter, alertStateFilter } = useQueryFilter();
 
-  const queryRunner = useQueryRunner({ queries: [alertRuleInstancesQuery(ruleUID, queryFilter)] });
+  const queryRunner = useQueryRunner({ queries: [alertRuleInstancesQuery(ruleUID, queryFilter, alertStateFilter)] });
 
   const isLoading = !queryRunner.isDataReadyToDisplay();
   const { data } = queryRunner.useState();

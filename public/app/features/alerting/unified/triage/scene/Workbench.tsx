@@ -21,16 +21,15 @@ export function WorkbenchRenderer() {
 
   const [groupByKeys = []] = useVariableValues<string>(VARIABLES.groupBy);
   const countBy = [...DEFAULT_FIELDS, ...groupByKeys].join(',');
-  const queryFilter = useQueryFilter();
+  const { filter: queryFilter, alertStateFilter, hasActiveFilters: hasFiltersApplied } = useQueryFilter();
 
   const runner = useQueryRunner({
-    queries: getWorkbenchQueries(countBy, queryFilter),
+    queries: getWorkbenchQueries(countBy, queryFilter, alertStateFilter),
   });
   const { data } = runner.useState();
 
   const [rows, setRows] = useState<ReturnType<typeof convertToWorkbenchRows>>([]);
   const [isPending, startTransition] = useTransition();
-  const hasFiltersApplied = queryFilter.length > 0;
 
   // convertToWorkbenchRows is expensive when processing large datasets.
   // We use runner.subscribeToState() instead of runner.useState() to transform data

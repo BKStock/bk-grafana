@@ -10,7 +10,12 @@ export function dataFrameToLabelMaps(frame: DataFrame): Array<Record<string, str
   for (let i = 0; i < frame.length; i++) {
     const labels: Record<string, string> = {};
     for (const field of labelFields) {
-      labels[field.name] = String(field.values[i] ?? '');
+      const value = field.values[i];
+      // Skip empty/null values — in the table format every series gets a column
+      // for every label key, but empty means the label wasn't present on that series.
+      if (value !== null && value !== undefined && value !== '') {
+        labels[field.name] = String(value);
+      }
     }
     result.push(labels);
   }

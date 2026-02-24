@@ -11,6 +11,8 @@ import { VARIABLES } from '../constants';
 
 import { type LabelStats, type LabelValueCount } from './useLabelsBreakdown';
 
+type AdHocFilterOperator = '=' | '!=' | '=~' | '!~' | '=|' | '!=|';
+
 // --- Public API ---
 
 interface AllLabelsDrawerProps {
@@ -113,7 +115,12 @@ export function LabelBadgeCounts({ firing, pending }: { firing: number; pending:
   );
 }
 
-export function addOrReplaceFilter(sceneContext: SceneObject, key: string, operator: string, value: string) {
+export function addOrReplaceFilter(
+  sceneContext: SceneObject,
+  key: string,
+  operator: AdHocFilterOperator,
+  value: string
+) {
   const filtersVariable = sceneGraph.lookupVariable(VARIABLES.filters, sceneContext);
   if (filtersVariable instanceof AdHocFiltersVariable) {
     const currentFilters = filtersVariable.state.filters;

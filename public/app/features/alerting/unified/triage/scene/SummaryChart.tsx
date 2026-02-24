@@ -35,10 +35,10 @@ const summaryChartVizConfig = VizConfigBuilders.timeseries()
   .build();
 
 export function SummaryChartReact() {
-  const filter = useQueryFilter();
+  const { filter, alertStateFilter } = useQueryFilter();
 
   const dataProvider = useQueryRunner({
-    queries: [summaryChartQuery(filter)],
+    queries: [summaryChartQuery(filter, alertStateFilter)],
   });
 
   return <VizPanel title="" viz={summaryChartVizConfig} dataProvider={dataProvider} hoverHeader={true} />;
