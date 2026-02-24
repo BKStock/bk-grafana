@@ -269,6 +269,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
 
   public startTabDrag(sourceTabsManagerId: string, draggedTabId: string): void {
     this._sourceDropTarget = this._findDropTargetByKey(sourceTabsManagerId);
+    this._targetTabIndex = undefined;
 
     this._draggedTab = sceneGraph.findByKeyAndType(this._getDashboard(), draggedTabId, TabItem);
     if (this._sourceDropTarget instanceof TabsLayoutManager) {
