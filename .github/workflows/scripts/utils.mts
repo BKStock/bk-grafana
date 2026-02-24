@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 export interface TeamConfig {
   name: string;
   adoption_date: string;
-  file_patterns?: string[];
+  codeowners_teams?: string[];
   area_labels: string[];
   slack_channels: {
     pr: string;
@@ -21,6 +21,12 @@ export interface TeamConfig {
     fr_notify: boolean;
     fr_weekly: boolean;
   };
+}
+
+export interface CodeownersEntry {
+  pattern: RegExp;
+  rawPattern: string;
+  owners: string[];
 }
 
 export interface Config {
@@ -263,6 +269,92 @@ export function globToRegex(pattern: string): RegExp {
     .replace(/\*/g, '[^/]*')
     .replace(/<<<GLOBSTAR>>>/g, '.*');
   return new RegExp(`^${escaped}`);
+}
+
+// =============================================================================
+// CODEOWNERS PARSING
+// =============================================================================
+
+const CODEOWNERS_PATH = '.github/CODEOWNERS';
+
+function codeownersPatternToRegex(pattern: string): RegExp {
+  let p = pattern;
+  if (p.startsWith('/')) p = p.slice(1);
+  if (p.endsWith('/')) p += '**';
+  if (!p.includes('/')) p = '**/' + p;
+  return globToRegex(p);
+}
+
+export function parseCodeowners(filePath: string = CODEOWNERS_PATH): CodeownersEntry[] {
+  if (!existsSync(filePath)) {
+    log.warning(`CODEOWNERS file not found: ${filePath}`);
+    return [];
+  }
+
+  const lines = readFileSync(filePath, 'utf-8').split('\n');
+  const entries: CodeownersEntry[] = [];
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) continue;
+
+    const rawPattern = parts[0];
+    const owners = parts.slice(1).filter((o) => o.startsWith('@'));
+
+    if (owners.length === 0) continue;
+
+    entries.push({
+      pattern: codeownersPatternToRegex(rawPattern),
+      rawPattern,
+      owners,
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * In CODEOWNERS the last matching rule wins. Returns the owners for a file
+ * by scanning all entries and keeping the last match.
+ */
+export function getFileOwners(file: string, entries: CodeownersEntry[]): string[] {
+  let owners: string[] = [];
+  for (const entry of entries) {
+    if (entry.pattern.test(file)) {
+      owners = entry.owners;
+    }
+  }
+  return owners;
+}
+
+/**
+ * Checks whether any file in the list is owned (per CODEOWNERS) by one of
+ * the team's handles. Returns the first matching file and owner for logging.
+ */
+export function matchFilesToCodeownersTeams(
+  files: string[],
+  entries: CodeownersEntry[],
+  teamHandles: string[],
+): { matched: boolean; file: string; owner: string } {
+  if (!teamHandles.length || !entries.length) {
+    return { matched: false, file: '', owner: '' };
+  }
+
+  const handleSet = new Set(teamHandles.map((h) => h.toLowerCase()));
+
+  for (const file of files) {
+    const owners = getFileOwners(file, entries);
+    for (const owner of owners) {
+      if (handleSet.has(owner.toLowerCase())) {
+        return { matched: true, file, owner };
+      }
+    }
+  }
+
+  return { matched: false, file: '', owner: '' };
 }
 
 // =============================================================================

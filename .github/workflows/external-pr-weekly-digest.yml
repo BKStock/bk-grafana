@@ -58,6 +58,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .github/team-notifications-config.json
+            .github/CODEOWNERS
             .github/workflows/scripts/utils.mts
             .github/workflows/scripts/pr-digest.mts
 

@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 import {
   loadConfig, requireEnv, log, setOutput, setOutputMultiline,
-  sanitizeInput, sanitizeForSlack, isValidIssueNumber, globToRegex,
+  sanitizeInput, sanitizeForSlack, isValidIssueNumber,
+  parseCodeowners, matchFilesToCodeownersTeams,
   validatePRClusterResponse, callOpenAI, sendSlackMessage,
   prLink, buildLinks, sleep,
   type PRClusterResult, type SlackBlock,
@@ -125,7 +126,12 @@ async function processTeams(): Promise<void> {
 
   const allPrs: PRData[] = JSON.parse(allPrsRaw);
   const config = loadConfig();
+  const codeownersEntries = parseCodeowners();
   const link = (n: number) => prLink(repo, n);
+
+  if (codeownersEntries.length === 0) {
+    console.log('No CODEOWNERS entries loaded, using area label routing only');
+  }
 
   for (const team of config.teams) {
     const teamName = team.name;
@@ -138,9 +144,9 @@ async function processTeams(): Promise<void> {
 
     log.groupStart(`Processing team: ${teamName}`);
     const teamAreaLabels = team.area_labels ?? [];
-    const teamFilePatterns = team.file_patterns ?? [];
+    const teamCodeownersHandles = team.codeowners_teams ?? [];
     console.log(`Area labels: ${teamAreaLabels.join(',')}`);
-    console.log(`File patterns: ${teamFilePatterns.join(',')}`);
+    console.log(`CODEOWNERS handles: ${teamCodeownersHandles.join(',')}`);
 
     const adoptionDate = team.adoption_date ?? '';
     if (adoptionDate) {
@@ -155,17 +161,12 @@ async function processTeams(): Promise<void> {
       if (adoptionDate && pr.createdAt.slice(0, 10) < adoptionDate) continue;
       const prNum = pr.number;
 
-      if (teamFilePatterns.length > 0) {
+      if (teamCodeownersHandles.length > 0 && codeownersEntries.length > 0) {
         const prFiles = pr.files.map((f) => f.path);
-        for (const pattern of teamFilePatterns) {
-          const regex = globToRegex(pattern);
-          if (prFiles.some((f) => regex.test(f))) {
-            if (!seen.has(prNum)) {
-              teamPrs.push(pr);
-              seen.add(prNum);
-            }
-            break;
-          }
+        const result = matchFilesToCodeownersTeams(prFiles, codeownersEntries, teamCodeownersHandles);
+        if (result.matched && !seen.has(prNum)) {
+          teamPrs.push(pr);
+          seen.add(prNum);
         }
       }
 

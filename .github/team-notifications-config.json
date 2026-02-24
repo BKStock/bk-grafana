@@ -1,14 +1,13 @@
 {
-  "_docs": "Team notifications configuration. To onboard a team: add an entry below with area_labels, file_patterns, Slack channel IDs, and invite the bot to each channel.",
+  "_docs": "Team notifications configuration. To onboard a team: add an entry below with codeowners_teams, area_labels, Slack channel IDs, and invite the bot to each channel.",
   "teams": [
     {
       "name": "alerting",
       "adoption_date": "YYYY-MM-DD",
-      "file_patterns": [
-        "pkg/services/ngalert/**",
-        "pkg/services/alerting/**",
-        "public/app/features/alerting/**",
-        "docs/alerting/**"
+      "codeowners_teams": [
+        "@grafana/alerting-backend",
+        "@grafana/alerting-frontend",
+        "@grafana/alerting-squad"
       ],
       "area_labels": ["area/alerting"],
       "slack_channels": {
@@ -25,10 +24,8 @@
     {
       "name": "dashboard",
       "adoption_date": "YYYY-MM-DD",
-      "file_patterns": [
-        "pkg/services/dashboards/**",
-        "public/app/features/dashboard/**",
-        "docs/dashboard/**"
+      "codeowners_teams": [
+        "@grafana/dashboards-squad"
       ],
       "area_labels": ["area/dashboard"],
       "slack_channels": {

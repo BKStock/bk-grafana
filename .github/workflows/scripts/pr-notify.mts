@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 import {
   loadConfig, requireEnv, log, setOutput,
-  sanitizeForSlack, isValidGitHubUsername, globToRegex,
+  sanitizeForSlack, isValidGitHubUsername,
+  parseCodeowners, matchFilesToCodeownersTeams,
   sendSlackMessage, callOpenAI,
   type TeamConfig,
 } from './utils.mts';
@@ -112,10 +113,14 @@ function checkEnabledTeams(): void {
   console.log(`Area labels: ${areaLabels.length > 0 ? areaLabels.join(' ') : 'none'}`);
 
   const config = loadConfig();
+  const codeownersEntries = parseCodeowners();
   const matchedTeams: string[] = [];
 
+  if (codeownersEntries.length === 0) {
+    console.log('No CODEOWNERS entries loaded, using area label routing only');
+  }
   if (areaLabels.length === 0) {
-    console.log('No area labels on PR, using file pattern routing only');
+    console.log('No area labels on PR, using CODEOWNERS routing only');
   }
 
   for (const team of config.teams) {
@@ -128,14 +133,11 @@ function checkEnabledTeams(): void {
 
     let teamMatched = false;
 
-    if (team.file_patterns?.length) {
-      for (const pattern of team.file_patterns) {
-        const regex = globToRegex(pattern);
-        if (files.some((f) => regex.test(f))) {
-          console.log(`✅ Team '${team.name}' matches via file pattern: ${pattern}`);
-          teamMatched = true;
-          break;
-        }
+    if (team.codeowners_teams?.length && files.length > 0) {
+      const result = matchFilesToCodeownersTeams(files, codeownersEntries, team.codeowners_teams);
+      if (result.matched) {
+        console.log(`✅ Team '${team.name}' matches via CODEOWNERS: ${result.owner} owns ${result.file}`);
+        teamMatched = true;
       }
     }
 
@@ -259,12 +261,16 @@ async function sendNotifications(): Promise<void> {
   const emoji = prType === 'docs' ? '📝' : prType === 'bugfix' ? '🐛' : '✨';
   const color = prSize === 'small' ? '#36a64f' : prSize === 'medium' ? '#ff9800' : prSize === 'large' ? '#f44336' : '#808080';
 
+  const codeownersEntries = parseCodeowners();
   let matchedTeamCount = 0;
   const matchedTeamNames: string[] = [];
   let notificationSent = false;
 
+  if (codeownersEntries.length === 0) {
+    console.log('No CODEOWNERS entries loaded, using area label routing only');
+  }
   if (areaLabels.length === 0) {
-    console.log('No area labels on PR, using file pattern routing only');
+    console.log('No area labels on PR, using CODEOWNERS routing only');
   }
 
   for (const team of config.teams) {
@@ -281,15 +287,11 @@ async function sendNotifications(): Promise<void> {
     let matchFound = false;
     let matchReason = '';
 
-    if (team.file_patterns?.length && allPrFiles.length > 0) {
-      for (const pattern of team.file_patterns) {
-        const regex = globToRegex(pattern);
-        const matched = allPrFiles.find((f) => regex.test(f));
-        if (matched) {
-          matchFound = true;
-          matchReason = `file pattern: ${pattern} (matched: ${matched})`;
-          break;
-        }
+    if (team.codeowners_teams?.length && allPrFiles.length > 0) {
+      const result = matchFilesToCodeownersTeams(allPrFiles, codeownersEntries, team.codeowners_teams);
+      if (result.matched) {
+        matchFound = true;
+        matchReason = `CODEOWNERS: ${result.owner} owns ${result.file}`;
       }
     }
 
