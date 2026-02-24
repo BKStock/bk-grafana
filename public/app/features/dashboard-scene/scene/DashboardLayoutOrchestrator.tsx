@@ -279,7 +279,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   }
 
   private _onTabDragPointerMove(evt: PointerEvent) {
-    const dropTarget = this._getDropTargetUnderMouse(evt) ?? this._sourceDropTarget;
+    const dropTarget = this._getDropTargetUnderMouse(evt);
 
     // Tabs can be dropped only to TabsLayoutManager
     if (dropTarget instanceof TabsLayoutManager) {
