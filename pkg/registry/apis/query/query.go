@@ -74,7 +74,7 @@ func (b *QueryAPIBuilder) QueryDatasources(w http.ResponseWriter, httpreq *http.
 	traceId := span.SpanContext().TraceID()
 	connectLogger := b.log.New("traceId", traceId.String(), "rule_uid", httpreq.Header.Get("X-Rule-Uid"))
 
-	responder := newResponderWrapper(w,
+	responder := newResponderWrapper(ctx, w,
 		func(statusCode *int, obj runtime.Object) {
 			if *statusCode/100 == 4 {
 				span.SetStatus(codes.Error, strconv.Itoa(*statusCode))
@@ -319,13 +319,15 @@ func handleQuery(
 
 type responderWrapper struct {
 	w          http.ResponseWriter
+	ctx        context.Context
 	onObjectFn func(statusCode *int, obj runtime.Object)
 	onErrorFn  func(err error)
 }
 
-func newResponderWrapper(w http.ResponseWriter, onObjectFn func(statusCode *int, obj runtime.Object), onErrorFn func(err error)) *responderWrapper {
+func newResponderWrapper(ctx context.Context, w http.ResponseWriter, onObjectFn func(statusCode *int, obj runtime.Object), onErrorFn func(err error)) *responderWrapper {
 	return &responderWrapper{
 		w:          w,
+		ctx:        ctx,
 		onObjectFn: onObjectFn,
 		onErrorFn:  onErrorFn,
 	}
@@ -349,7 +351,7 @@ func (r responderWrapper) Error(err error) {
 		r.onErrorFn(err)
 	}
 
-	errhttp.Write(context.Background(), err, r.w)
+	errhttp.Write(r.ctx, err, r.w)
 }
 
 func logEmptyRefids(queries []v0alpha1.DataQuery, logger log.Logger) {
