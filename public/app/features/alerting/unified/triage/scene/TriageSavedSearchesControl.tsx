@@ -13,7 +13,9 @@ import { SavedSearches } from '../../components/saved-searches/SavedSearches';
 import { SavedSearch } from '../../components/saved-searches/savedSearchesSchema';
 import { shouldUseTriageSavedSearches } from '../../featureToggles';
 import { VARIABLES } from '../constants';
+import { useTriagePredefinedOverrides } from '../hooks/useTriagePredefinedOverrides';
 import { trackTriageSavedSearchApplied, useTriageSavedSearches } from '../hooks/useTriageSavedSearches';
+import { getTriagePredefinedSearches, isTriagePredefinedSearchId } from '../triagePredefinedSearches';
 
 import { applyTriageSavedSearchState, generateTriageUrl, serializeTriageState } from './triageSavedSearchUtils';
 
@@ -51,6 +53,13 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
 
   const { savedSearches, isLoading, saveSearch, renameSearch, deleteSearch, setDefaultSearch } =
     useTriageSavedSearches();
+  const {
+    nameOverrides,
+    dismissedIds,
+    setNameOverride,
+    dismissId,
+    isLoading: predefinedOverridesLoading,
+  } = useTriagePredefinedOverrides();
 
   // Use Scene-aware hooks to get current state (triggers re-render on state change)
   const [timeRange] = useTimeRange();
@@ -89,6 +98,42 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
     return generateTriageUrl(search.query);
   }, []);
 
+  // Predefined list: exclude dismissed, apply custom names
+  const predefinedList = useMemo(
+    () =>
+      getTriagePredefinedSearches()
+        .filter((s) => !dismissedIds.includes(s.id))
+        .map((s) => ({
+          ...s,
+          name: nameOverrides[s.id] ?? s.name,
+        })),
+    [dismissedIds, nameOverrides]
+  );
+
+  const mergedSavedSearches = useMemo(() => [...predefinedList, ...savedSearches], [predefinedList, savedSearches]);
+
+  const handleRename = useCallback(
+    async (id: string, newName: string) => {
+      if (isTriagePredefinedSearchId(id)) {
+        await setNameOverride(id, newName);
+      } else {
+        await renameSearch(id, newName);
+      }
+    },
+    [setNameOverride, renameSearch]
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (isTriagePredefinedSearchId(id)) {
+        await dismissId(id);
+      } else {
+        await deleteSearch(id);
+      }
+    },
+    [dismissId, deleteSearch]
+  );
+
   // Don't render if feature is not enabled
   if (!isEnabled) {
     return null;
@@ -96,14 +141,14 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
 
   return (
     <SavedSearches
-      savedSearches={savedSearches}
+      savedSearches={mergedSavedSearches}
       currentSearchQuery={currentSearchQuery}
       onSave={saveSearch}
-      onRename={renameSearch}
-      onDelete={deleteSearch}
+      onRename={handleRename}
+      onDelete={handleDelete}
       onApply={handleApplySearch}
       onSetDefault={setDefaultSearch}
-      isLoading={isLoading}
+      isLoading={isLoading || predefinedOverridesLoading}
       getHref={getHref}
     />
   );
