@@ -1,7 +1,7 @@
 import { Scope, ScopeNode, store as storeImpl } from '@grafana/data';
 import { config, locationService } from '@grafana/runtime';
 import { performanceUtils } from '@grafana/scenes';
-import { getDashboardSceneProfiler } from 'app/features/dashboard/services/DashboardProfiler';
+import { getDashboardSceneProfiler } from 'app/features/dashboard-shared/services/DashboardProfiler';
 
 import { ScopesApiClient } from '../ScopesApiClient';
 import { ScopesServiceBase } from '../ScopesServiceBase';
