@@ -490,6 +490,16 @@ export function useColumnResize(
   return dataGridResizeHandler;
 }
 
+export function getScrollbarWidth(ref: RefObject<DataGridHandle | null>) {
+  const el = ref.current?.element;
+
+  if (!el || IS_SAFARI_26) {
+    return 0;
+  }
+
+  return el.offsetWidth - el.clientWidth;
+}
+
 export function useScrollbarWidth(ref: RefObject<DataGridHandle | null>, height: number) {
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
 

@@ -55,6 +55,7 @@ import { TableCellActions } from './components/TableCellActions';
 import { TableCellTooltip } from './components/TableCellTooltip';
 import { COLUMN, TABLE } from './constants';
 import {
+  getScrollbarWidth,
   useColumnResize,
   useColWidths,
   useFilteredRows,
@@ -62,7 +63,6 @@ import {
   useManagedSort,
   usePaginatedRows,
   useRowHeight,
-  useScrollbarWidth,
   useSortedRows,
 } from './hooks';
 import {
@@ -211,10 +211,9 @@ export function TableNG(props: TableNGProps) {
     [theme, visibleFields, cellHeight]
   );
   const gridRef = useRef<DataGridHandle>(null);
-  const scrollbarWidth = useScrollbarWidth(gridRef, height);
   const availableWidth = useMemo(
-    () => (hasNestedFrames ? width - COLUMN.EXPANDER_WIDTH : width) - scrollbarWidth,
-    [width, hasNestedFrames, scrollbarWidth]
+    () => (hasNestedFrames ? width - COLUMN.EXPANDER_WIDTH : width) - getScrollbarWidth(gridRef),
+    [width, hasNestedFrames]
   );
   const getCellColorInlineStyles = useMemo(() => getCellColorInlineStylesFactory(theme), [theme]);
   const applyToRowBgFn = useMemo(
