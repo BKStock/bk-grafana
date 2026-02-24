@@ -31,7 +31,6 @@ import {
 
 import { getTextColorForAlphaBackground } from '../../../utils/colors';
 import { TableCellInspectorMode } from '../TableCellInspector';
-import { RowExpander } from '../TableRT/RowExpander';
 import { TableCellOptions } from '../types';
 
 import { inferPills } from './Cells/PillCell';
@@ -659,9 +658,6 @@ export const processNestedTableRows = (
 };
 
 /* ----------------------------- Data grid sorting ---------------------------- */
-// Helper function to get displayed value
-const getDisplayedValue = (row: TableRow, key: string, fields: Field[]) => {};
-
 /**
  * @internal
  */
