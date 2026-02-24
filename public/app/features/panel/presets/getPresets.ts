@@ -3,8 +3,6 @@ import { config } from '@grafana/runtime';
 import { VizPanel } from '@grafana/scenes';
 import { importPanelPlugin } from 'app/features/plugins/importPanelPlugin';
 
-import { getAllPanelPluginMeta } from '../state/util';
-
 export interface PresetsResult {
   presets: VisualizationSuggestion[];
 }
@@ -19,13 +17,6 @@ export interface PresetsResult {
  */
 export async function getPresetsForPanel(pluginId: string, panel?: VizPanel): Promise<PresetsResult> {
   if (!config.featureToggles.vizPresets) {
-    return { presets: [] };
-  }
-
-  const pluginMeta = getAllPanelPluginMeta().find((p) => p.id === pluginId);
-  const hasPresetsSupport = Boolean(pluginMeta?.presets);
-
-  if (!hasPresetsSupport) {
     return { presets: [] };
   }
 
