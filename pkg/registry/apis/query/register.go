@@ -37,7 +37,10 @@ import (
 	"github.com/grafana/grafana/pkg/setting"
 )
 
-var _ builder.APIGroupBuilder = (*QueryAPIBuilder)(nil)
+var (
+	_ builder.APIGroupBuilder      = (*QueryAPIBuilder)(nil)
+	_ builder.OpenAPIPostProcessor = (*QueryAPIBuilder)(nil)
+)
 
 type QueryAPIBuilder struct {
 	log                  log.Logger
@@ -201,8 +204,7 @@ func (b *QueryAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *genericapiserver.APIG
 
 	storage := map[string]rest.Storage{}
 
-	// The query endpoint -- NOTE, this uses a rewrite hack to allow requests without a name parameter
-	storage["query"] = newQueryREST(b)
+	// The query endpoint is added explicitly
 
 	// Register the expressions query schemas
 	err := queryschema.RegisterQueryTypes(b.queryTypes, storage)
@@ -234,7 +236,7 @@ func (b *QueryAPIBuilder) PostProcessOpenAPI(oas *spec3.OpenAPI) (*spec3.OpenAPI
 		},
 		QueryTypes:       b.queryTypes,
 		Root:             root,
-		QueryPath:        "namespaces/{namespace}/query/{name}",
+		QueryPath:        "namespaces/{namespace}/query",
 		QueryDescription: "Query any datasources (with expressions)",
 
 		// An explicit set of examples (otherwise we iterate the query type examples)

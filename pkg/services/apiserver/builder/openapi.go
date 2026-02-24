@@ -3,6 +3,7 @@ package builder
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/http"
 	"strings"
@@ -141,6 +142,9 @@ func getOpenAPIPostProcessor(version string, builders []APIGroupBuilder, gvs []s
 		}
 
 		for _, gv := range gvs {
+			if strings.HasPrefix(gv.Group, "query") {
+				fmt.Printf("YYYY")
+			}
 			prefix := "/apis/" + gv.String() + "/"
 			if s.Paths.Paths[prefix] != nil {
 				copy := spec3.OpenAPI{
@@ -247,6 +251,10 @@ func getOpenAPIPostProcessor(version string, builders []APIGroupBuilder, gvs []s
 						}
 					}
 				}
+				if strings.HasPrefix(gv.Group, "query") {
+					fmt.Printf("YYYY")
+				}
+
 				result, err := addBuilderRoutes(gv, &copy, builders, apiResourceConfig)
 				if err != nil {
 					return nil, err
