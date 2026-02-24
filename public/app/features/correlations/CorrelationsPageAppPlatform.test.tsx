@@ -25,14 +25,16 @@ import { Correlation } from './types';
 
 jest.mock('@grafana/api-clients/rtkq/correlations/v0alpha1', () => ({
   ...jest.requireActual('@grafana/api-clients/rtkq/correlations/v0alpha1'),
-  useListCorrelationQuery: jest.fn().mockReturnValue([]),
+  useListCorrelationQuery: jest.fn(),
   useCreateCorrelationMutation: jest.fn(),
 }));
 
 //const useListCorrelationQueryMock = useListCorrelationQuery as jest.Mock;
 //const useCreateCorrelationMutationMock = useCreateCorrelationMutation as jest.Mock;
 
-const mockCreateCorrelation = jest.fn();
+const useListCorrelationQueryMock = useListCorrelationQuery as jest.Mock;
+
+//const mockCreateCorrelation = jest.fn();
 const useCreateCorrelationMutationMock = useCreateCorrelationMutation as jest.MockedFunction<
   typeof useCreateCorrelationMutation
 >;
@@ -223,7 +225,7 @@ describe('CorrelationsPage - App platform', () => {
 
     //Protip DeleteProvisionedDashboardDrawer
 
-    it.only('correctly adds first correlation', async () => {
+    it('correctly adds first correlation', async () => {
       const createdCorrelation = {
         correlation: {
           apiVersion: 'correlations.grafana.app/v0alpha1',
@@ -409,7 +411,19 @@ describe('CorrelationsPage - App platform', () => {
       getHeaderByName = renderResult.getHeaderByName;
     });
 
-    it('shows a table with correlations', async () => {
+    it.only('shows a table with correlations', async () => {
+      /*   const createMockReturnVal: ReturnType<typeof useCreateCorrelationMutation>[1] = {
+        reset: jest.fn(),
+        originalArgs: { correlation: {} },
+      };*/
+
+      useListCorrelationQueryMock.mockReturnValue({
+        data: {
+          items: [],
+        },
+        isLoading: false,
+        isError: false,
+      });
       expect(await screen.findByRole('table')).toBeInTheDocument();
     });
 

@@ -71,7 +71,9 @@ export const useCorrelationsK8s = (limit = 100, page: number) => {
     pagedLimit = limit * page;
   }
 
-  const { currentData, isLoading, error } = useListCorrelationQuery({ limit: pagedLimit });
+  const wat = useListCorrelationQuery({ limit: pagedLimit });
+  console.log('refetch', useListCorrelationQuery, wat);
+  const { currentData, isLoading, error } = wat ?? { currentData: undefined, isLoading: true, error: false };
   const startIdx = limit * (page - 1);
   const pagedData = currentData?.items.slice(startIdx, startIdx + limit) ?? [];
 
