@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	errInvalidPassword                       = errutil.Unauthorized("password-auth.invalid", errutil.WithPublicMessage("Invalid password or username"))
-	errPasswordAuthFailed                    = errutil.Unauthorized("password-auth.failed", errutil.WithPublicMessage("Invalid username or password"))
-	errPasswordClientTooManyLoginAttempts     = errutil.Unauthorized("login-attempt.blocked", errutil.WithPublicMessage("Too many consecutive incorrect login attempts - login temporarily blocked"))
+	errInvalidPassword                    = errutil.Unauthorized("password-auth.invalid", errutil.WithPublicMessage("Invalid password or username"))
+	errPasswordAuthFailed                 = errutil.Unauthorized("password-auth.failed", errutil.WithPublicMessage("Invalid username or password"))
+	errPasswordClientTooManyLoginAttempts = errutil.Unauthorized("login-attempt.blocked", errutil.WithPublicMessage("Login temporarily blocked"))
 )
 
 var _ authn.PasswordClient = new(Password)
