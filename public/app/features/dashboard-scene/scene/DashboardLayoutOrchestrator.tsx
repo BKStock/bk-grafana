@@ -447,6 +447,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     document.body.removeEventListener('pointermove', this._onNewPanelPointerMove, true);
     document.body.removeEventListener('pointerup', this._dropNewPanel, true);
     this._lastDropTarget = null;
+    this._targetTabIndex = undefined;
   }
 
   private _dropNewPanel = (evt: PointerEvent): void => {
