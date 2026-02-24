@@ -63,9 +63,7 @@ function buildDatasourceContext(
   queries: DataQuery[],
   ds?: DataSourceApi
 ): ChatContextItem[] {
-  const items: ChatContextItem[] = [
-    createAssistantContextItem('datasource', { datasourceUid: uid, img }),
-  ];
+  const items: ChatContextItem[] = [createAssistantContextItem('datasource', { datasourceUid: uid, img })];
 
   const nonEmptyQueries = queries.filter((q) => !isQueryEmpty(q, ds));
   if (nonEmptyQueries.length > 0) {
