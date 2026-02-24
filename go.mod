@@ -703,6 +703,7 @@ require (
 )
 
 require (
+	github.com/mark3labs/mcp-go v0.44.0 // indirect
 	github.com/pgvector/pgvector-go v0.3.0 // indirect
 	google.golang.org/genai v1.47.0 // indirect
 )
