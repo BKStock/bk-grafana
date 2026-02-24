@@ -40,10 +40,7 @@ export class PostgresDatasource extends SqlDatasource {
 
   // Strips redundant quotes from interpolated values on repeated panels
   // where the raw SQL already wraps the variable reference in quotes.
-  protected migrateInterpolatedVariable(
-    result: string | number,
-    variable: VariableWithMultiSupport
-  ): string | number {
+  protected migrateInterpolatedVariable(result: string | number, variable: VariableWithMultiSupport): string | number {
     return migrateInterpolation(result, variable.name, this._currentRawSql, this._currentSceneObj);
   }
 

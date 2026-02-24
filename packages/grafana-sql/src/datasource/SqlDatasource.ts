@@ -99,10 +99,7 @@ export abstract class SqlDatasource extends DataSourceWithBackend<SQLQuery, SQLO
    * Called at the end of interpolateVariable with the already-interpolated result.
    * Override in subclasses to handle cases like repeated panel quote stripping.
    */
-  protected migrateInterpolatedVariable(
-    result: string | number,
-    _variable: VariableWithMultiSupport
-  ): string | number {
+  protected migrateInterpolatedVariable(result: string | number, _variable: VariableWithMultiSupport): string | number {
     return result;
   }
 
