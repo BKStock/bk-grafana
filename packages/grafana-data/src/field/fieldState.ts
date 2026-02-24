@@ -255,11 +255,6 @@ function getSingleLabelName(frames: DataFrame[]): string | null {
     const frame = frames[i];
 
     for (const field of frame.fields) {
-      if (!field.labels) {
-        continue;
-      }
-
-      // yes this should be in!
       for (const labelKey in field.labels) {
         if (singleName === null) {
           singleName = labelKey;

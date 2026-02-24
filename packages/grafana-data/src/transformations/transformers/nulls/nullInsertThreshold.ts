@@ -26,6 +26,8 @@ function getRefField(frame: DataFrame, refFieldName?: string | null) {
 
 /** @internal */
 export function applyNullInsertThreshold(opts: NullInsertOptions): DataFrame {
+  return opts.frame;
+
   if (opts.frame.length === 0) {
     return opts.frame;
   }
