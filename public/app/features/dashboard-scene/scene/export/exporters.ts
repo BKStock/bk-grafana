@@ -8,6 +8,9 @@ import {
   PanelKind,
   LibraryPanelRef,
   LibraryPanelKind,
+  DataQueryKind,
+  AdhocVariableKind,
+  GroupByVariableKind,
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import config from 'app/core/config';
 import { createErrorNotification } from 'app/core/copy/appNotification';
@@ -415,7 +418,7 @@ async function convertLibraryPanelToInlinePanel(libraryPanelElement: LibraryPane
 }
 
 export async function makeExportableV2(dashboard: DashboardV2Spec, isSharingExternally = false) {
-  const dataQueryLabels: { [key: string]: Set<string> } = {};
+  const dataQueryLabels: { [key: string]: Map<string, number> } = {};
 
   // get all datasource variables
   const datasourceVariables = dashboard.variables.filter((v) => v.kind === 'DatasourceVariable');
@@ -467,18 +470,19 @@ export async function makeExportableV2(dashboard: DashboardV2Spec, isSharingExte
   };
 
   const getLabel = (datasourceGroup: string, datasourceUid: string) => {
-    const group = dataQueryLabels[datasourceGroup];
+    let group = dataQueryLabels[datasourceGroup];
 
-    if (group) {
-      const matchingUid = group.has(datasourceUid);
-      if (!matchingUid) {
-        group.add(datasourceUid);
-      }
-    } else {
-      dataQueryLabels[datasourceGroup] = new Set([datasourceUid]);
+    if (!group) {
+      group = new Map<string, number>();
+      dataQueryLabels[datasourceGroup] = group;
     }
 
-    return `${datasourceGroup}-${group?.size || 1}`;
+    if (!group.get(datasourceUid)) {
+      group.set(datasourceUid, group.size + 1);
+    }
+
+    const index = group.get(datasourceUid);
+    return `${datasourceGroup}-${index}`;
   };
 
   const processPanel = (panel: PanelKind) => {

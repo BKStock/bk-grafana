@@ -980,6 +980,9 @@ export type DashboardAdhocVariableKind = {
   datasource?: DashboardV2Beta1AdhocVariableKindDatasource;
   group: string;
   kind: string;
+  labels?: {
+    [key: string]: string;
+  };
   spec: DashboardAdhocVariableSpec;
 };
 export type DashboardStringOrArrayOfString = {
@@ -1068,6 +1071,9 @@ export type DashboardGroupByVariableKind = {
   datasource?: DashboardV2Beta1GroupByVariableKindDatasource;
   group: string;
   kind: string;
+  labels?: {
+    [key: string]: string;
+  };
   spec: DashboardGroupByVariableSpec;
 };
 export type DashboardIntervalVariableSpec = {
