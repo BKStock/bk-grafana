@@ -77,6 +77,7 @@ func GoBuildEnv(opts *GoBuildOpts) []containers.Env {
 	}
 
 	env = append(env, containers.EnvVar("GOEXPERIMENT", "noregabi"))
+	env = append(env, containers.EnvVar("GODEBUG", "asyncpreemptoff=1"))
 
 	if opts.CGOEnabled {
 		env = append(env, containers.EnvVar("GOARM", string(opts.GoARM)))
