@@ -659,14 +659,7 @@ export const processNestedTableRows = (
 
 /* ----------------------------- Data grid sorting ---------------------------- */
 // Helper function to get displayed value
-const getDisplayedValue = (row: TableRow, key: string, fields: Field[]) => {
-  const field = fields.find((field) => getDisplayName(field) === key);
-  if (!field || !field.display) {
-    return '';
-  }
-  const displayedValue = formattedValueToString(field.display(row[key]));
-  return displayedValue;
-};
+const getDisplayedValue = (row: TableRow, key: string, fields: Field[]) => {};
 
 /**
  * @internal
@@ -730,8 +723,10 @@ export function applyFilter(
       if (value.parentIndex != null && row.__parentIndex !== value.parentIndex) {
         return true;
       }
-      const displayedValue = getDisplayedValue(row, value.displayName, fields);
-      if (!value.filteredSet.has(displayedValue)) {
+      const field = fields.find((field) => getDisplayName(field) === value.displayName);
+      const displayedValue =
+        field && field.display ? formattedValueToString(field.display(row[value.displayName])) : null;
+      if (displayedValue != null && !value.filteredSet.has(displayedValue)) {
         return false;
       }
     }
