@@ -22,12 +22,12 @@
       }
     },
     {
-      "name": "dashboard",
+      "name": "dataviz",
       "adoption_date": "YYYY-MM-DD",
       "codeowners_teams": [
-        "@grafana/dashboards-squad"
+        "@grafana/dataviz-squad"
       ],
-      "area_labels": ["area/dashboard"],
+      "area_labels": ["area/panel"],
       "slack_channels": {
         "pr": "REPLACE_WITH_CHANNEL_ID",
         "fr": "REPLACE_WITH_CHANNEL_ID"
