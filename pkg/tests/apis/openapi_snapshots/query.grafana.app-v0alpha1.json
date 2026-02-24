@@ -135,28 +135,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Wraps backend.QueryDataResponse, however it includes TypeMeta and implements runtime.Object",
-                  "type": "object",
-                  "required": [
-                    "results"
-                  ],
-                  "properties": {
-                    "apiVersion": {
-                      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-                      "type": "string"
-                    },
-                    "kind": {
-                      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-                      "type": "string"
-                    },
-                    "results": {
-                      "description": "Responses is a map of RefIDs (Unique Query ID) to *DataResponse.",
-                      "type": "object",
-                      "additionalProperties": {
-                        "default": {}
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryDataResponse"
                 }
               }
             }
@@ -271,6 +250,567 @@
           }
         },
         "additionalProperties": false
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.BasicColumn": {
+        "description": "BasicColumn represents the column type for data that is input to a SQL expression.",
+        "type": "object",
+        "required": [
+          "name",
+          "mysqlType",
+          "nullable",
+          "dataFrameFieldType"
+        ],
+        "properties": {
+          "dataFrameFieldType": {
+            "description": "The DataFrameFieldType is the Grafana Plugin SDK data.FieldType that best represents this column we need to somehow expose this as a string value because the JSONMarshaler will write it as a string",
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "mysqlType": {
+            "type": "string",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "nullable": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSource": {
+        "type": "object",
+        "required": [
+          "metadata",
+          "spec"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          },
+          "secure": {
+            "description": "Secure values allows setting values that are never shown to users The returned properties are only the names of the configured values",
+            "type": "object",
+            "additionalProperties": {
+              "default": {}
+            }
+          },
+          "spec": {
+            "description": "DataSource configuration -- these properties are all visible to anyone able to query the data source from their browser"
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceApiServer": {
+        "description": "The data source resource is a reflection of the individual datasource instances that are exposed in the groups: {datasource}.datasource.grafana.app The status is updated periodically. The name is the plugin id",
+        "type": "object",
+        "required": [
+          "title",
+          "groupVersion"
+        ],
+        "properties": {
+          "aliasIDs": {
+            "description": "Possible alternative plugin IDs",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "description": {
+            "description": "Describe the plugin",
+            "type": "string"
+          },
+          "groupVersion": {
+            "description": "The group + preferred version",
+            "type": "string",
+            "default": ""
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          },
+          "title": {
+            "description": "The display name",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceApiServerList": {
+        "description": "List of datasource plugins",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {}
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceConnection": {
+        "description": "Connection to a datasource instance",
+        "type": "object",
+        "required": [
+          "title",
+          "name",
+          "group",
+          "version"
+        ],
+        "properties": {
+          "group": {
+            "type": "string",
+            "default": ""
+          },
+          "name": {
+            "description": "The datasource identifier inside the group/version (or UID within legacy grafana apis)",
+            "type": "string",
+            "default": ""
+          },
+          "plugin": {
+            "type": "string"
+          },
+          "title": {
+            "description": "The configured display name",
+            "type": "string",
+            "default": ""
+          },
+          "version": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceConnectionList": {
+        "description": "List of all datasource instances across all datasource apiservers",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {}
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceConnectionQuery": {
+        "description": "List of all datasource instances across all datasource apiservers",
+        "type": "object",
+        "required": [
+          "namespace"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "name": {
+            "description": "The datasource identifier inside the group/version (or UID within legacy grafana apis)",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "the namespace",
+            "type": "string",
+            "default": ""
+          },
+          "plugin": {
+            "description": "The plugin ID",
+            "type": "string"
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DataSourceList": {
+        "type": "object",
+        "required": [
+          "metadata",
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {}
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.DatasourceAccessInfo": {
+        "type": "object",
+        "required": [
+          "Permissions"
+        ],
+        "properties": {
+          "Permissions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.GenericDataSourceSpec": {
+        "type": "object",
+        "required": [
+          "title",
+          "jsonData"
+        ],
+        "properties": {
+          "access": {
+            "description": "Possible enum values:\n - `\"direct\"` The frontend can connect directly to the remote URL This method is discouraged\n - `\"proxy\"` Connect to the remote datasource through the grafana backend",
+            "type": "string",
+            "enum": [
+              "direct",
+              "proxy"
+            ]
+          },
+          "basicAuth": {
+            "type": "boolean"
+          },
+          "basicAuthUser": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "jsonData": {
+            "description": "Generic unstructured configuration settings"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "title": {
+            "description": "The display name (previously saved as the \"name\" property)",
+            "type": "string",
+            "default": ""
+          },
+          "url": {
+            "description": "Server URL",
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "withCredentials": {
+            "type": "boolean"
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.HealthCheckResult": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "code": {
+            "description": "Explicit status code",
+            "type": "integer",
+            "format": "int32"
+          },
+          "details": {
+            "description": "Spec depends on the plugin"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "message": {
+            "description": "Optional description for the data source",
+            "type": "string"
+          },
+          "status": {
+            "description": "The string description",
+            "type": "string"
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryDataRequest": {
+        "description": "Generic query request with shared time across all values Copied from: https://github.com/grafana/grafana/blob/main/pkg/api/dtos/models.go#L62",
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "queries"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "debug": {
+            "description": "Optionally include debug information in the response",
+            "type": "boolean"
+          },
+          "from": {
+            "description": "From is the start time of the query.",
+            "type": "string",
+            "default": ""
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "queries": {
+            "description": "Datasource queries",
+            "type": "array",
+            "items": {}
+          },
+          "to": {
+            "description": "To is the end time of the query.",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryDataResponse": {
+        "description": "Wraps backend.QueryDataResponse, however it includes TypeMeta and implements runtime.Object",
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "results": {
+            "description": "Responses is a map of RefIDs (Unique Query ID) to *DataResponse.",
+            "type": "object",
+            "additionalProperties": {
+              "default": {}
+            }
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryResponseSQLSchemas": {
+        "description": "SQLSchemas returns info about what the Schema for a DS query will be like if the query were to be used an input to SQL expressions. So effectively post SQL expressions input conversion.",
+        "type": "object",
+        "required": [
+          "sqlSchemas"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "sqlSchemas": {
+            "description": "SchemaInfo for each requested query by refID",
+            "type": "object",
+            "additionalProperties": {
+              "default": {}
+            }
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryTypeDefinition": {
+        "description": "Defines a query behavior in a datasource.  This is a similar model to a CRD where the payload describes a valid query",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          },
+          "spec": {
+            "default": {}
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryTypeDefinitionList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {}
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {}
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.SampleRows": {
+        "description": "[][]any",
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "additionalProperties": true
+          }
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.SchemaInfo": {
+        "description": "SchemaInfo provides information and some sample data for data that could be an input to a SQL expression.",
+        "type": "object",
+        "required": [
+          "columns",
+          "sampleRows"
+        ],
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "default": {}
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "error": {
+            "type": "string"
+          },
+          "sampleRows": {}
+        }
+      },
+      "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.UnstructuredSpec": {
+        "type": "object",
+        "required": [
+          "title",
+          "jsonData"
+        ],
+        "properties": {
+          "access": {
+            "description": "Possible enum values:\n - `\"direct\"` The frontend can connect directly to the remote URL This method is discouraged\n - `\"proxy\"` Connect to the remote datasource through the grafana backend",
+            "type": "string",
+            "enum": [
+              "direct",
+              "proxy"
+            ]
+          },
+          "basicAuth": {
+            "type": "boolean"
+          },
+          "basicAuthUser": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "jsonData": {
+            "type": "object",
+            "additionalProperties": true,
+            "x-kubernetes-preserve-unknown-fields": true
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "title": {
+            "description": "The display name (previously saved as the \"name\" property)",
+            "type": "string",
+            "default": ""
+          },
+          "url": {
+            "description": "Server URL",
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "withCredentials": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
         "description": "APIResource specifies the name of a resource and whether it is namespaced.",

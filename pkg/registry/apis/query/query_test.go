@@ -193,23 +193,18 @@ func TestQueryAPI(t *testing.T) {
 				req.Header.Set(key, value)
 			}
 
-			ctx := context.Background()
-			mr := &mockResponder{}
-			qr := newQueryREST(builder)
-
-			handler, err := qr.Connect(ctx, "name", nil, mr)
-			require.NoError(t, err)
 			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
+			builder.QueryDatasources(rr, req)
 
-			require.NoError(t, mr.err, "Should not have error in responder")
-			require.Equal(t, tc.expectedStatus, mr.statusCode, "Should return expected status code")
-			require.NotNil(t, mr.response, "Should have a response object")
+			result := rr.Result()
+			defer result.Body.Close()
+
+			require.Equal(t, tc.expectedStatus, result.StatusCode, "Should return expected status code")
 
 			// Verify the response is the expected type
-			qdr, ok := mr.response.(*queryapi.QueryDataResponse)
-			require.True(t, ok, "Response should be QueryDataResponse type")
-			require.NotNil(t, qdr.Responses, "Should have responses")
+			qdr := &queryapi.QueryDataResponse{}
+			err := json.NewDecoder(result.Body).Decode(qdr)
+			require.NoError(t, err, "Failed to decode response body")
 
 			// Load expected frames from testdata if provided
 			if tc.testdataFile != "" {

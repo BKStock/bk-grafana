@@ -16,6 +16,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	common "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	claims "github.com/grafana/authlib/types"
 	datasourceV0 "github.com/grafana/grafana/pkg/apis/datasource/v0alpha1"
@@ -317,6 +318,14 @@ func (b *QueryAPIBuilder) PostProcessOpenAPI(oas *spec3.OpenAPI) (*spec3.OpenAPI
 	sqlschemas, ok := oas.Paths.Paths[root+"namespaces/{namespace}/query/sqlschemas"]
 	if ok && sqlschemas.Post != nil {
 		sqlschemas.Post.RequestBody = query.Post.RequestBody
+	}
+
+	// Add the core definitions
+	for k, v := range b.GetOpenAPIDefinitions()(func(path string) spec.Ref { return spec.Ref{} }) {
+		switch k {
+		case "com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryDataResponse":
+			oas.Components.Schemas[k] = &v.Schema
+		}
 	}
 
 	// Remove the noop path -- it was only required to make k8s behave normally

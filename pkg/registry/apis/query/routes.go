@@ -17,7 +17,6 @@ import (
 func (b *QueryAPIBuilder) GetAPIRoutes(gv schema.GroupVersion) *builder.APIRoutes {
 	defs := b.GetOpenAPIDefinitions()(func(path string) spec.Ref { return spec.Ref{} })
 	sqlSchema := defs[queryV1.OpenAPIPrefix+"QueryResponseSQLSchemas"].Schema
-	qdrSchema := defs[queryV1.OpenAPIPrefix+"QueryDataResponse"].Schema
 	routes := &builder.APIRoutes{
 		Namespace: []builder.APIRouteHandler{
 			{Path: "query",
@@ -35,7 +34,11 @@ func (b *QueryAPIBuilder) GetAPIRoutes(gv schema.GroupVersion) *builder.APIRoute
 												Content: map[string]*spec3.MediaType{
 													"application/json": {
 														MediaTypeProps: spec3.MediaTypeProps{
-															Schema: &qdrSchema,
+															Schema: &spec.Schema{
+																SchemaProps: spec.SchemaProps{
+																	Ref: spec.MustCreateRef("#/components/schemas/com.github.grafana.grafana.pkg.apis.datasource.v0alpha1.QueryDataResponse"),
+																},
+															},
 														},
 													},
 												},

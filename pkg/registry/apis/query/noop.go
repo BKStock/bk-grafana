@@ -4,9 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
+
+	datasourceV0 "github.com/grafana/grafana/pkg/apis/datasource/v0alpha1"
 )
 
 // Temporary noop storage that lets us map /connections/{name}/query
@@ -21,7 +22,7 @@ var (
 
 // New implements [rest.Storage].
 func (r *noopREST) New() runtime.Object {
-	return &v1.Status{}
+	return &datasourceV0.QueryDataResponse{}
 }
 
 // ConnectMethods implements [rest.Storage].
