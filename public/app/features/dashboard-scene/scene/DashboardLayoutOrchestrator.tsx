@@ -292,8 +292,8 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   }
 
   private _onTabDragPointerUp(evt: PointerEvent) {
-    const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY);
     if (this._lastDropTarget && this._lastDropTarget instanceof TabsLayoutManager) {
+      const tabUnderMouse = this._getTabUnderMouse(evt.clientX, evt.clientY);
       this._targetTabIndex = this._lastDropTarget
         ?.getTabsIncludingRepeats()
         .findIndex((t) => t.state.key === tabUnderMouse);
