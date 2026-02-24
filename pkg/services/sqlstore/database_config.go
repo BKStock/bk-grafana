@@ -107,6 +107,21 @@ func (dbCfg *DatabaseConfig) readConfig(cfg *setting.Cfg) error {
 	dbCfg.MaxIdleConn = sec.Key("max_idle_conn").MustInt(2)
 	dbCfg.ConnMaxLifetime = sec.Key("conn_max_lifetime").MustInt(14400)
 
+	// SQLite-specific connection pool optimization
+	// Reference: https://kerkour.com/sqlite-for-servers
+	if dbCfg.Type == migrator.SQLite {
+		// SQLite with WAL mode supports one writer and multiple concurrent readers.
+		// To avoid SQLITE_BUSY errors, we limit to a single open connection for writes.
+		// This serializes write operations through a single connection, preventing lock contention.
+		if dbCfg.MaxOpenConn == 0 {
+			dbCfg.MaxOpenConn = 1
+		}
+		// For WAL mode, we can have multiple idle connections for concurrent reads
+		if dbCfg.MaxIdleConn == 2 {
+			dbCfg.MaxIdleConn = 4
+		}
+	}
+
 	dbCfg.SslMode = sec.Key("ssl_mode").String()
 	dbCfg.SSLSNI = sec.Key("ssl_sni").String()
 	dbCfg.CaCertPath = sec.Key("ca_cert_path").String()
@@ -205,6 +220,11 @@ func (dbCfg *DatabaseConfig) buildConnectionString(cfg *setting.Cfg, features fe
 		if dbCfg.WALEnabled {
 			cnnstr += "&_journal_mode=WAL"
 		}
+
+		// Add cache_size for better performance
+		// Negative values are in KB (64MB = 64 * 1024KB)
+		// Reference: https://kerkour.com/sqlite-for-servers
+		cnnstr += "&_cache_size=-64000"
 
 		cnnstr += buildExtraConnectionString('&', dbCfg.UrlQueryParams)
 	default:
