@@ -69,7 +69,7 @@ require (
 	github.com/go-openapi/loads v0.23.2 // @grafana/alerting-backend
 	github.com/go-openapi/runtime v0.28.0 // @grafana/alerting-backend
 	github.com/go-openapi/strfmt v0.25.0 // @grafana/alerting-backend
-	github.com/go-redis/redis/v8 v8.11.5 // indirect; @grafana/grafana-backend-group
+	github.com/go-redis/redis/v8 v8.11.5 // @grafana/grafana-backend-group
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // @grafana/grafana-backend-group
 	github.com/go-sql-driver/mysql v1.9.3 // @grafana/grafana-search-and-storage
 	github.com/go-stack/stack v1.8.1 // @grafana/grafana-backend-group
@@ -692,7 +692,7 @@ require (
 	gopkg.in/src-d/go-errors.v1 v1.0.0 // indirect
 	gopkg.in/telebot.v3 v3.3.8 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/kms v0.35.1 // indirect
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
@@ -700,6 +700,15 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
+)
+
+require cloud.google.com/go/spanner v1.87.0
+
+require (
+	github.com/GoogleCloudPlatform/grpc-gcp-go/grpcgcp v1.5.3 // indirect
+	github.com/dolthub/go-icu-regex v0.0.0-20250916051405-78a38d478790 // indirect
+	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	go.opencensus.io v0.24.0 // indirect
 )
 
 replace (
