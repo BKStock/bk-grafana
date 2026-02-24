@@ -16,7 +16,7 @@ import { ExportFormat, DashboardWithAccessInfo } from 'app/features/dashboard-sh
 import { isDashboardV2Spec, isV1ClassicDashboard } from 'app/features/dashboard/api/utils';
 import { K8S_V1_DASHBOARD_API_CONFIG } from 'app/features/dashboard/api/v1';
 import { K8S_V2_DASHBOARD_API_CONFIG } from 'app/features/dashboard/api/v2';
-import { shareDashboardType } from 'app/features/dashboard/components/ShareModal/utils';
+import { shareDashboardType } from 'app/features/dashboard-shared/components/ShareModal/utils';
 import { DashboardModel } from 'app/features/dashboard/state/DashboardModel';
 import { DashboardJson } from 'app/features/manage-dashboards/types';
 import { DashboardDataDTO } from 'app/types/dashboard';

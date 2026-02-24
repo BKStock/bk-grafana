@@ -22,7 +22,7 @@ import { contextSrv } from 'app/core/services/context_srv';
 import { getMessageFromError } from 'app/core/utils/errors';
 import { getCreateAlertInMenuAvailability } from 'app/features/alerting/unified/utils/access-control';
 import { scenesPanelToRuleFormValues } from 'app/features/alerting/unified/utils/rule-form';
-import { getTrackingSource, shareDashboardType } from 'app/features/dashboard/components/ShareModal/utils';
+import { getTrackingSource, shareDashboardType } from 'app/features/dashboard-shared/components/ShareModal/utils';
 import { InspectTab } from 'app/features/inspector/types';
 import { getScenePanelLinksSupplier } from 'app/features/panel/panellinks/linkSuppliers';
 import { createPluginExtensionsGetter } from 'app/features/plugins/extensions/getPluginExtensions';

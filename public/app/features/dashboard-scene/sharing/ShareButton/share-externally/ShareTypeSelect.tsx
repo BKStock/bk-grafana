@@ -12,7 +12,7 @@ import {
 import {
   isEmailSharingEnabled,
   PublicDashboardShareType,
-} from 'app/features/dashboard/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
+} from 'app/features/dashboard-shared/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
 import { DashboardInteractions } from 'app/features/dashboard-scene/utils/interactions';
 import { AccessControlAction } from 'app/types/accessControl';
 

@@ -2,7 +2,7 @@ import { TimeRange } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { SceneComponentProps, sceneGraph, SceneObjectBase, SceneObjectRef, VizPanel } from '@grafana/scenes';
 import { ShareEmbed } from 'app/features/dashboard/components/ShareModal/ShareEmbed';
-import { buildParams, shareDashboardType } from 'app/features/dashboard/components/ShareModal/utils';
+import { buildParams, shareDashboardType } from 'app/features/dashboard-shared/components/ShareModal/utils';
 
 import { DashboardScene } from '../scene/DashboardScene';
 import { PanelTimeRange } from '../scene/panel-timerange/PanelTimeRange';

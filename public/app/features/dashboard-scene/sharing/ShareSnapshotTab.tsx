@@ -8,7 +8,7 @@ import { Dashboard } from '@grafana/schema';
 import { Button, ClipboardButton, Field, Input, Modal, RadioButtonGroup, Stack } from '@grafana/ui';
 import { createSuccessNotification } from 'app/core/copy/appNotification';
 import { notifyApp } from 'app/core/reducers/appNotification';
-import { getTrackingSource, shareDashboardType } from 'app/features/dashboard/components/ShareModal/utils';
+import { getTrackingSource, shareDashboardType } from 'app/features/dashboard-shared/components/ShareModal/utils';
 import { getDashboardSnapshotSrv, SnapshotSharingOptions } from 'app/features/dashboard/services/SnapshotSrv';
 import { dispatch } from 'app/store/store';
 

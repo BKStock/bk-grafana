@@ -9,7 +9,7 @@ import {
   useDeleteRecipientMutation,
   publicDashboardApi,
 } from 'app/features/dashboard/api/publicDashboardApi';
-import { PublicDashboard } from 'app/features/dashboard/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
+import { PublicDashboard } from 'app/features/dashboard-shared/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
 import { DashboardScene } from 'app/features/dashboard-scene/scene/DashboardScene';
 import { DashboardInteractions } from 'app/features/dashboard-scene/utils/interactions';
 

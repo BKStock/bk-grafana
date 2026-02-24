@@ -1,7 +1,7 @@
 import { store } from '@grafana/data';
 import { VizPanel } from '@grafana/scenes';
 import { createAndCopyShareDashboardLink } from 'app/core/utils/shortLinks';
-import { getTrackingSource } from 'app/features/dashboard/components/ShareModal/utils';
+import { getTrackingSource } from 'app/features/dashboard-shared/components/ShareModal/utils';
 
 import { DashboardScene } from '../../scene/DashboardScene';
 import { DashboardInteractions } from '../../utils/interactions';

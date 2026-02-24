@@ -4,7 +4,7 @@ import { selectors as e2eSelectors } from '@grafana/e2e-selectors';
 import { t } from '@grafana/i18n';
 import { config, locationService } from '@grafana/runtime';
 import { IconName, Menu, ModalsContext } from '@grafana/ui';
-import { getTrackingSource, shareDashboardType } from 'app/features/dashboard/components/ShareModal/utils';
+import { getTrackingSource, shareDashboardType } from 'app/features/dashboard-shared/components/ShareModal/utils';
 
 import { DashboardScene } from '../../scene/DashboardScene';
 import { DashboardInteractions } from '../../utils/interactions';

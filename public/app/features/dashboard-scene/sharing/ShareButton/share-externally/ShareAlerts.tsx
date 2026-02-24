@@ -6,7 +6,7 @@ import {
   isEmailSharingEnabled,
   PublicDashboard,
   PublicDashboardShareType,
-} from 'app/features/dashboard/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
+} from 'app/features/dashboard-shared/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
 import { AccessControlAction } from 'app/types/accessControl';
 
 import { NoUpsertPermissionsAlert } from '../../../../dashboard/components/ShareModal/SharePublicDashboard/ModalAlerts/NoUpsertPermissionsAlert';
