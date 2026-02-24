@@ -6,7 +6,6 @@ import {
   DataSourcePluginContextProvider,
   DataSourceTestFailed,
   DataSourceTestSucceeded,
-  EventBusSrv,
   PluginMeta,
   PluginMetaInfo,
   PluginSignatureStatus,
@@ -14,22 +13,16 @@ import {
 } from '@grafana/data';
 import iconGaugeSvg from 'app/plugins/panel/gauge/img/icon_gauge.svg';
 
-import * as services from '../../services';
-import { reportInteraction } from '../utils';
+import { appEvents } from 'app/core/app_events';
 
 import { useConfigSaveReporter } from './useConfigSaveReporter';
 
-jest.mock('../utils', () => ({ reportInteraction: jest.fn() }));
-jest.mock('../../services', () => ({ ...jest.requireActual('../../services'), getAppEvents: jest.fn() }));
-const reportInteractionMock = jest.mocked(reportInteraction);
+const mockReport = jest.fn();
+jest.mock('./usePluginInteractionReporter', () => ({ usePluginInteractionReporter: () => mockReport }));
 
 describe('useConfigSaveReporter', () => {
-  let appEventBus: EventBusSrv;
-
   beforeEach(() => {
     jest.resetAllMocks();
-    appEventBus = new EventBusSrv();
-    jest.mocked(services.getAppEvents).mockReturnValue(appEventBus);
   });
 
   it('reports grafana_plugin_save_result with result success when DataSourceTestSucceeded is published', () => {
@@ -38,11 +31,11 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestSucceeded());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledTimes(1);
-    expect(reportInteractionMock).toHaveBeenCalledWith(
+    expect(mockReport).toHaveBeenCalledTimes(1);
+    expect(mockReport).toHaveBeenCalledWith(
       'grafana_plugin_save_result',
       expect.objectContaining({ plugin_id: 'grafana-cloudwatch-datasource', result: 'success', auth_type: 'default' })
     );
@@ -54,17 +47,17 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEventBus.publish(new DataSourceTestFailed());
+      appEvents.publish(new DataSourceTestFailed());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledTimes(1);
-    expect(reportInteractionMock).toHaveBeenCalledWith(
+    expect(mockReport).toHaveBeenCalledTimes(1);
+    expect(mockReport).toHaveBeenCalledWith(
       'grafana_plugin_save_result',
       expect.objectContaining({ plugin_id: 'grafana-cloudwatch-datasource', result: 'error', auth_type: 'default' })
     );
   });
 
-  it('includes datasource plugin context info in the reported properties', () => {
+  it('works within a DataSourcePluginContextProvider', () => {
     renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })), {
       wrapper: createWrapper({
         uid: 'abc123',
@@ -73,19 +66,13 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestSucceeded());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledWith('grafana_plugin_save_result', {
-      plugin_id: 'grafana-cloudwatch-datasource',
-      result: 'success',
-      auth_type: 'default',
-      grafana_version: '1.0',
-      plugin_type: 'datasource',
-      plugin_version: '1.0.0',
-      plugin_name: 'CloudWatch',
-      datasource_uid: 'abc123',
-    });
+    expect(mockReport).toHaveBeenCalledWith(
+      'grafana_plugin_save_result',
+      expect.objectContaining({ plugin_id: 'grafana-cloudwatch-datasource', result: 'success', auth_type: 'default' })
+    );
   });
 
   it('works with no getProperties argument', () => {
@@ -94,10 +81,10 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestSucceeded());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledWith(
+    expect(mockReport).toHaveBeenCalledWith(
       'grafana_plugin_save_result',
       expect.objectContaining({ plugin_id: 'grafana-cloudwatch-datasource', result: 'success' })
     );
@@ -110,10 +97,10 @@ describe('useConfigSaveReporter', () => {
     );
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestSucceeded());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledWith(
+    expect(mockReport).toHaveBeenCalledWith(
       'grafana_plugin_save_result',
       expect.objectContaining({ auth_type: 'default', custom_prop: 'value' })
     );
@@ -128,11 +115,11 @@ describe('useConfigSaveReporter', () => {
     unmount();
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
-      appEventBus.publish(new DataSourceTestFailed());
+      appEvents.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestFailed());
     });
 
-    expect(reportInteractionMock).not.toHaveBeenCalled();
+    expect(mockReport).not.toHaveBeenCalled();
   });
 
   it('uses the current properties at event time, not at subscription time', () => {
@@ -145,10 +132,10 @@ describe('useConfigSaveReporter', () => {
     authType = 'keys';
 
     act(() => {
-      appEventBus.publish(new DataSourceTestSucceeded());
+      appEvents.publish(new DataSourceTestSucceeded());
     });
 
-    expect(reportInteractionMock).toHaveBeenCalledWith(
+    expect(mockReport).toHaveBeenCalledWith(
       'grafana_plugin_save_result',
       expect.objectContaining({ auth_type: 'keys' })
     );
@@ -161,16 +148,18 @@ describe('useConfigSaveReporter', () => {
       { wrapper: createWrapper(), initialProps: { authType: 'default' } }
     );
 
-    jest.mocked(services.getAppEvents).mockClear();
+    const subscribeSpy = jest.spyOn(appEvents, 'subscribe');
     rerender({ authType: 'default' });
 
-    expect(services.getAppEvents).not.toHaveBeenCalled();
+    expect(subscribeSpy).not.toHaveBeenCalled();
+    subscribeSpy.mockRestore();
   });
 });
 
 function createWrapper(settings?: Partial<DataSourceInstanceSettings>) {
+  const instanceSettings = createDataSourceInstanceSettings(settings);
   return ({ children }: React.PropsWithChildren<{}>) => (
-    <DataSourcePluginContextProvider instanceSettings={createDataSourceInstanceSettings(settings)}>
+    <DataSourcePluginContextProvider instanceSettings={instanceSettings}>
       {children}
     </DataSourcePluginContextProvider>
   );

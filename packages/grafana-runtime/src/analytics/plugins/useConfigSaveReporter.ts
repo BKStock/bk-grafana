@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { DataSourceTestFailed, DataSourceTestSucceeded } from '@grafana/data';
 
-import { getAppEvents } from '../../services';
+import { appEvents } from 'app/core/app_events';
 
 import { usePluginInteractionReporter } from './usePluginInteractionReporter';
 
@@ -22,10 +22,10 @@ export function useConfigSaveReporter(pluginId: string, getProperties?: () => Re
   getPropertiesRef.current = getProperties;
 
   useEffect(() => {
-    const successSubscription = getAppEvents().subscribe<DataSourceTestSucceeded>(DataSourceTestSucceeded, () => {
+    const successSubscription = appEvents.subscribe<DataSourceTestSucceeded>(DataSourceTestSucceeded, () => {
       report('grafana_plugin_save_result', { ...getPropertiesRef.current?.(), plugin_id: pluginId, result: 'success' });
     });
-    const failSubscription = getAppEvents().subscribe<DataSourceTestFailed>(DataSourceTestFailed, () => {
+    const failSubscription = appEvents.subscribe<DataSourceTestFailed>(DataSourceTestFailed, () => {
       report('grafana_plugin_save_result', { ...getPropertiesRef.current?.(), plugin_id: pluginId, result: 'error' });
     });
     return () => {
