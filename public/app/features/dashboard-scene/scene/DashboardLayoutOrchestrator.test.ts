@@ -33,6 +33,7 @@ jest.mock('../edit-pane/shared', () => ({
     }),
   },
   ObjectsReorderedOnCanvasEvent: jest.fn().mockImplementation(() => ({})),
+  DashboardStateChangedEvent: jest.fn().mockImplementation(() => ({})),
 }));
 
 describe('DashboardLayoutOrchestrator', () => {

@@ -16,7 +16,7 @@ import {
 import { useStyles2 } from '@grafana/ui';
 import { getLayoutType } from 'app/features/dashboard/utils/tracking';
 
-import { dashboardEditActions, ObjectsReorderedOnCanvasEvent } from '../edit-pane/shared';
+import { dashboardEditActions, DashboardStateChangedEvent, ObjectsReorderedOnCanvasEvent } from '../edit-pane/shared';
 import { DashboardInteractions } from '../utils/interactions';
 import { getDefaultVizPanel } from '../utils/utils';
 
@@ -275,6 +275,9 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
     this._sourceDropTarget = this._findDropTargetByKey(sourceTabsManagerId);
 
     this._draggedTab = sceneGraph.findByKeyAndType(this._getDashboard(), draggedTabId, TabItem);
+    if (this._sourceDropTarget instanceof TabsLayoutManager) {
+      this._sourceDropTarget.forceSelectTab(draggedTabId);
+    }
 
     // Calculate dimensions of the dragged tab header and cache for cross-manager placeholder sizing
     this._draggedTabWidth = null;
@@ -292,7 +295,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   }
 
   private _onTabDragPointerMove(evt: PointerEvent) {
-    const dropTarget = this._getDropTargetUnderMouse(evt) ?? this._sourceDropTarget;
+    const dropTarget = this._getDropTargetUnderMouse(evt);
 
     if (!(dropTarget instanceof TabsLayoutManager)) {
       this.cleanUpTabDrag();
@@ -430,6 +433,10 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
         // Make sure outline is refreshed in DashboardEditPane
         source.publishEvent(new ObjectsReorderedOnCanvasEvent(source), true);
         destination.publishEvent(new ObjectsReorderedOnCanvasEvent(destination), true);
+
+        // Make sure repeated rows are refreshed - triggers performRowRepeats in RowItemRepeater
+        source.publishEvent(new DashboardStateChangedEvent({ source }), true);
+        destination.publishEvent(new DashboardStateChangedEvent({ source: destination }), true);
       },
       undo: () => {
         // Reverse order for the same parenting reason as in perform().
@@ -440,6 +447,10 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
         // Make sure outline is refreshed in DashboardEditPane
         source.publishEvent(new ObjectsReorderedOnCanvasEvent(source), true);
         destination.publishEvent(new ObjectsReorderedOnCanvasEvent(destination), true);
+
+        // Make sure repeated rows are refreshed - triggers performRowRepeats in RowItemRepeater
+        source.publishEvent(new DashboardStateChangedEvent({ source }), true);
+        destination.publishEvent(new DashboardStateChangedEvent({ source: destination }), true);
       },
     });
   }

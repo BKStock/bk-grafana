@@ -66,8 +66,8 @@ export class TabsLayoutManager
     icon: 'window',
   };
 
-  public serialize(): DashboardV2Spec['layout'] {
-    return serializeTabsLayout(this);
+  public serialize(isSnapshot?: boolean): DashboardV2Spec['layout'] {
+    return serializeTabsLayout(this, isSnapshot);
   }
 
   public readonly descriptor = TabsLayoutManager.descriptor;
