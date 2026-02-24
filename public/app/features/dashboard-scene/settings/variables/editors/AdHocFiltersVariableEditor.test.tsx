@@ -15,7 +15,7 @@ import { selectors } from '@grafana/e2e-selectors';
 import { setRunRequest } from '@grafana/runtime';
 import { AdHocFiltersVariable } from '@grafana/scenes';
 import { mockDataSource } from 'app/features/alerting/unified/mocks';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 import { LegacyVariableQueryEditor } from 'app/features/variables/editor/LegacyVariableQueryEditor';
 
 import { AdHocFiltersVariableEditor, getAdHocFilterOptions } from './AdHocFiltersVariableEditor';

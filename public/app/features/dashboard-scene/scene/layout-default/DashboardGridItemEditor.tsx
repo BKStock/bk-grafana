@@ -5,8 +5,8 @@ import { t, Trans } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
 import { sceneGraph, SceneGridLayout } from '@grafana/scenes';
 import { RadioButtonGroup, Select, TextLink } from '@grafana/ui';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 import { RepeatRowSelect2 } from 'app/features/dashboard/components/RepeatRowSelect/RepeatRowSelect';
 
 import { useConditionalRenderingEditor } from '../../conditional-rendering/hooks/useConditionalRenderingEditor';

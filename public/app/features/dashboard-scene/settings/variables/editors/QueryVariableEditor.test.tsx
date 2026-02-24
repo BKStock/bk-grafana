@@ -16,7 +16,7 @@ import { setRunRequest } from '@grafana/runtime';
 import { QueryVariable, TextBoxVariable } from '@grafana/scenes';
 import { VariableRefresh, VariableSort } from '@grafana/schema';
 import { mockDataSource } from 'app/features/alerting/unified/mocks';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 import { LegacyVariableQueryEditor } from 'app/features/variables/editor/LegacyVariableQueryEditor';
 
 import { QueryVariableEditor, getQueryVariableOptions, Editor } from './QueryVariableEditor';

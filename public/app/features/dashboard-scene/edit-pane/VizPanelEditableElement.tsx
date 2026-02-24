@@ -5,8 +5,8 @@ import { locationService } from '@grafana/runtime';
 import { sceneGraph, VizPanel } from '@grafana/scenes';
 import { Stack, Button } from '@grafana/ui';
 import { appEvents } from 'app/core/app_events';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 import { ShowConfirmModalEvent } from 'app/types/events';
 
 import {

@@ -11,7 +11,7 @@ import {
   VariableValueSingle,
   VizPanel,
 } from '@grafana/scenes';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 
 import { ConditionalRenderingGroup } from '../../conditional-rendering/group/ConditionalRenderingGroup';
 import { DashboardStateChangedEvent, RepeatsUpdatedEvent } from '../../edit-pane/shared';

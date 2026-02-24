@@ -4,8 +4,8 @@ import { t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
 import { MultiValueVariable, SceneVariableValueChangedEvent } from '@grafana/scenes';
 import { Input, Switch } from '@grafana/ui';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 function useVariableHasMultiProps(variable: MultiValueVariable) {
   const state = variable.useState();

@@ -10,7 +10,7 @@ import {
 } from '@grafana/scenes';
 import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { GRID_CELL_VMARGIN } from 'app/core/constants';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { dashboardEditActions, NewObjectAddedToCanvasEvent } from '../../edit-pane/shared';
 import { serializeAutoGridLayout } from '../../serialization/layoutSerializers/AutoGridLayoutSerializer';

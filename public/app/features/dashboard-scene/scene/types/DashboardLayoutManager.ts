@@ -1,6 +1,6 @@
 import { SceneObject, VizPanel } from '@grafana/scenes';
 import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { LayoutRegistryItem } from './LayoutRegistryItem';
 

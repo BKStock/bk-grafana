@@ -21,7 +21,7 @@ import {
   SwitchVariable,
 } from '@grafana/scenes';
 import { VariableHide, VariableType } from '@grafana/schema';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { getIntervalsQueryFromNewIntervalModel } from '../../utils/utils';
 

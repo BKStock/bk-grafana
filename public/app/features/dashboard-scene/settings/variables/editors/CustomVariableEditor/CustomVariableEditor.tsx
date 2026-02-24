@@ -5,7 +5,7 @@ import { CustomVariableModel, shallowCompare } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
 import { CustomVariable, SceneVariable } from '@grafana/scenes';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { CustomVariableForm } from '../../components/CustomVariableForm';
 

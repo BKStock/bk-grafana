@@ -1,5 +1,5 @@
 import { t } from '@grafana/i18n';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 
 import { EditableDashboardElementInfo, EditableDashboardElement } from '../types/EditableDashboardElement';
 

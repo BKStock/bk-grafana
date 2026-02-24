@@ -1,7 +1,7 @@
 import { t } from '@grafana/i18n';
 import { Icon, Stack, Tooltip } from '@grafana/ui';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { ConditionalRenderingGroup } from '../group/ConditionalRenderingGroup';
 import { extractObjectType, getLowerTranslatedObjectType } from '../object';

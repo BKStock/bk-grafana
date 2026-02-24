@@ -4,7 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { t } from '@grafana/i18n';
 import { ConstantVariable, SceneVariable } from '@grafana/scenes';
 import { Input } from '@grafana/ui';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { ConstantVariableForm } from '../components/ConstantVariableForm';
 

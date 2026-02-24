@@ -3,8 +3,8 @@ import { ReactNode, useId, useMemo, useRef } from 'react';
 import { Trans, t } from '@grafana/i18n';
 import { SceneObject } from '@grafana/scenes';
 import { Button, Input, TextArea } from '@grafana/ui';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { DashboardScene } from '../scene/DashboardScene';
 import { useLayoutCategory } from '../scene/layouts-shared/DashboardLayoutSelector';

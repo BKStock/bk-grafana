@@ -15,7 +15,7 @@ import {
   SceneGridRow,
 } from '@grafana/scenes';
 import { GRID_COLUMN_COUNT } from 'app/core/constants';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 
 import { DashboardStateChangedEvent, RepeatsUpdatedEvent } from '../../edit-pane/shared';
 import { getCloneKey, getLocalVariableValueSet } from '../../utils/clone';

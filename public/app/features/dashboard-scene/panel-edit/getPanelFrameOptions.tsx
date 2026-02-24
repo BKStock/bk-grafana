@@ -8,8 +8,8 @@ import { SceneTimeRangeLike, VizPanel } from '@grafana/scenes';
 import { DataLinksInlineEditor, Input, TextArea, Switch } from '@grafana/ui';
 import { GenAIPanelDescriptionButton } from 'app/features/dashboard/components/GenAI/GenAIPanelDescriptionButton';
 import { GenAIPanelTitleButton } from 'app/features/dashboard/components/GenAI/GenAIPanelTitleButton';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 import { getPanelLinksVariableSuggestions } from 'app/features/panel/panellinks/link_srv';
 
 import { dashboardEditActions } from '../edit-pane/shared';

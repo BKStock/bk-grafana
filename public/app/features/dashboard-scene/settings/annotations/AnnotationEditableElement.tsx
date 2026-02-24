@@ -2,8 +2,8 @@ import { useId, useMemo } from 'react';
 
 import { t } from '@grafana/i18n';
 import { dataLayers } from '@grafana/scenes';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { DashboardAnnotationsDataLayer } from '../../scene/DashboardAnnotationsDataLayer';
 import { DashboardDataLayerSet } from '../../scene/DashboardDataLayerSet';

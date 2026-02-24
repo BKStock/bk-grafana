@@ -7,8 +7,8 @@ import { selectors } from '@grafana/e2e-selectors';
 import { t, Trans } from '@grafana/i18n';
 import { SceneVariable, SceneVariableSet } from '@grafana/scenes';
 import { Box, Button, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 import { dashboardEditActions } from '../../edit-pane/shared';
 import { DashboardScene } from '../../scene/DashboardScene';

@@ -1,6 +1,6 @@
 import { SceneVariable, LocalValueVariable } from '@grafana/scenes';
 import { Stack } from '@grafana/ui';
-import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
+import { OptionsPaneItemDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneItemDescriptor';
 
 export function getSystemVariableOptions(variable: SceneVariable): OptionsPaneItemDescriptor[] {
   if (!(variable instanceof LocalValueVariable)) {

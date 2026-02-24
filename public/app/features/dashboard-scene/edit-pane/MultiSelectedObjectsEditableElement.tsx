@@ -1,6 +1,6 @@
 import { t } from '@grafana/i18n';
 import { appEvents } from 'app/core/app_events';
-import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategoryDescriptor';
+import { OptionsPaneCategoryDescriptor } from 'app/features/dashboard-shared/components/PanelEditor/OptionsPaneCategoryDescriptor';
 import { ShowConfirmModalEvent } from 'app/types/events';
 
 import { BulkActionElement } from '../scene/types/BulkActionElement';
