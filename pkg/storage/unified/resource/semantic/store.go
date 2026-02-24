@@ -77,7 +77,7 @@ func (s *Store) initSchema() error {
 		);
 
 		CREATE INDEX IF NOT EXISTS resource_embedding_vector_idx
-			ON resource_embedding USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+			ON resource_embedding USING hnsw (embedding vector_cosine_ops);
 	`, s.dimensions)
 
 	_, err := s.db.Exec(schema)
