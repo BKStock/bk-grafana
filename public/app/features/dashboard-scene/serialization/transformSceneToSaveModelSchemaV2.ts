@@ -17,7 +17,7 @@ import {
 } from '@grafana/scenes';
 import { DataSourceRef } from '@grafana/schema';
 import { sortedDeepCloneWithoutNulls } from 'app/core/utils/object';
-import { getPanelDataFrames } from 'app/features/dashboard/components/HelpWizard/utils';
+import { getPanelDataFrames } from 'app/features/dashboard-shared/utils/panelDataFrames';
 import { GrafanaQueryType } from 'app/plugins/datasource/grafana/types';
 import { MIXED_DATASOURCE_NAME } from 'app/plugins/datasource/mixed/MixedDataSource';
 

@@ -26,7 +26,7 @@ import {
   VariableRefresh,
 } from '@grafana/schema';
 import { sortedDeepCloneWithoutNulls } from 'app/core/utils/object';
-import { getPanelDataFrames } from 'app/features/dashboard/components/HelpWizard/utils';
+import { getPanelDataFrames } from 'app/features/dashboard-shared/utils/panelDataFrames';
 import { DASHBOARD_SCHEMA_VERSION } from 'app/features/dashboard/state/DashboardMigrator';
 import { GrafanaQueryType } from 'app/plugins/datasource/grafana/types';
 

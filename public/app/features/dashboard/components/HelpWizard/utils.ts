@@ -9,7 +9,6 @@ import {
   DataTransformerConfig,
   DataFrameJSON,
   LoadingState,
-  dataFrameToJSON,
   DataTopic,
 } from '@grafana/data';
 import { t } from '@grafana/i18n';
@@ -18,25 +17,7 @@ import { PanelModel } from 'app/features/dashboard/state/PanelModel';
 import { Randomize, randomizeData } from 'app/features/dashboard-scene/inspect/HelpWizard/randomizer';
 import { GrafanaQueryType } from 'app/plugins/datasource/grafana/types';
 
-export function getPanelDataFrames(data?: PanelData): DataFrameJSON[] {
-  const frames: DataFrameJSON[] = [];
-  if (data?.series) {
-    for (const f of data.series) {
-      frames.push(dataFrameToJSON(f));
-    }
-  }
-  if (data?.annotations) {
-    for (const f of data.annotations) {
-      const json = dataFrameToJSON(f);
-      if (!json.schema?.meta) {
-        json.schema!.meta = {};
-      }
-      json.schema!.meta.dataTopic = DataTopic.Annotations;
-      frames.push(json);
-    }
-  }
-  return frames;
-}
+export { getPanelDataFrames } from 'app/features/dashboard-shared/utils/panelDataFrames';
 
 export function getGithubMarkdown(panel: PanelModel, snapshot: string): string {
   const saveModel = panel.getSaveModel();

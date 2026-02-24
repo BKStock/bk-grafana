@@ -20,7 +20,7 @@ import {
 import { LibraryPanel } from '@grafana/schema';
 import { Alert, Button, CodeEditor, Field, Select, useStyles2 } from '@grafana/ui';
 import { isDashboardV2Spec } from 'app/features/dashboard/api/utils';
-import { getPanelDataFrames } from 'app/features/dashboard/components/HelpWizard/utils';
+import { getPanelDataFrames } from 'app/features/dashboard-shared/utils/panelDataFrames';
 import { PanelModel } from 'app/features/dashboard/state/PanelModel';
 import { getPanelInspectorStyles2 } from 'app/features/inspector/styles';
 import { InspectTab } from 'app/features/inspector/types';
