@@ -1,3 +1,4 @@
+import { debounce } from 'lodash';
 import { useState, useMemo, useCallback, useRef, useLayoutEffect, RefObject, CSSProperties, useEffect } from 'react';
 import { Column, DataGridHandle, DataGridProps, SortColumn } from 'react-data-grid';
 
@@ -582,16 +583,18 @@ export function useColumnResize(
 export function useScrollbarWidth(ref: RefObject<DataGridHandle | null>, height: number) {
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
+  const updateScrollbarDimensions = debounce(() => {
+    const el = ref.current?.element;
+    if (el) {
+      setScrollbarWidth(el!.offsetWidth - el!.clientWidth);
+    }
+  }, 150);
+
   useLayoutEffect(() => {
     const el = ref.current?.element;
-
     if (!el || IS_SAFARI_26) {
       return;
     }
-
-    const updateScrollbarDimensions = () => {
-      setScrollbarWidth(el.offsetWidth - el.clientWidth);
-    };
 
     updateScrollbarDimensions();
 
@@ -600,7 +603,7 @@ export function useScrollbarWidth(ref: RefObject<DataGridHandle | null>, height:
     return () => {
       resizeObserver.disconnect();
     };
-  }, [ref, height]);
+  }, [ref, height, updateScrollbarDimensions]);
 
   return scrollbarWidth;
 }

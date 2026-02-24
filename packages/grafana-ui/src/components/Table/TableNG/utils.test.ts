@@ -1607,6 +1607,35 @@ describe('TableNG utils', () => {
       ]);
     });
 
+    it('supports multiple filter columns', () => {
+      const frame = createDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.number,
+            values: [1, 2, 3],
+            display: (v) => ({ text: String(v), numeric: NaN }),
+          },
+          {
+            name: 'value',
+            type: FieldType.number,
+            values: [10, 20, 30],
+            display: (v) => ({ text: String(v), numeric: NaN }),
+          },
+        ],
+      });
+      const filtered = applyFilter(
+        frameToRecords(frame),
+        {
+          time: { filteredSet: new Set(['1', '2']), displayName: 'time' },
+          value: { filteredSet: new Set(['10']), displayName: 'value' },
+        },
+        frame.fields,
+        false
+      );
+      expect(filtered).toMatchObject([{ time: 1, value: 10 }]);
+    });
+
     it('filters the records by the filter columns with a nested frame', () => {
       const frame = createDataFrame({
         fields: [

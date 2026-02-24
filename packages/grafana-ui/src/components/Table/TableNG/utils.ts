@@ -727,11 +727,13 @@ export function applyFilter(
 
   const filterRows = (row: TableRow): boolean => {
     for (const [, value] of filterValues) {
-      if (typeof value.parentIndex === 'number' && row.__parentIndex !== value.parentIndex) {
+      if (value.parentIndex != null && row.__parentIndex !== value.parentIndex) {
         return true;
       }
       const displayedValue = getDisplayedValue(row, value.displayName, fields);
-      return value.filteredSet.has(displayedValue);
+      if (!value.filteredSet.has(displayedValue)) {
+        return false;
+      }
     }
     return true;
   };
