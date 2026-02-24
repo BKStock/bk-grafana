@@ -32,7 +32,7 @@ describe('useConfigSaveReporter', () => {
   });
 
   it('reports grafana_plugin_save_result with result success when DataSourceTestSucceeded is published', () => {
-    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: 'default' }), {
+    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })), {
       wrapper: createWrapper(),
     });
 
@@ -48,7 +48,7 @@ describe('useConfigSaveReporter', () => {
   });
 
   it('reports grafana_plugin_save_result with result error when DataSourceTestFailed is published', () => {
-    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: 'default' }), {
+    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })), {
       wrapper: createWrapper(),
     });
 
@@ -64,7 +64,7 @@ describe('useConfigSaveReporter', () => {
   });
 
   it('includes datasource plugin context info in the reported properties', () => {
-    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: 'default' }), {
+    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })), {
       wrapper: createWrapper({
         uid: 'abc123',
         meta: createPluginMeta({ id: 'grafana-cloudwatch-datasource', name: 'CloudWatch', info: createPluginMetaInfo({ version: '1.0.0' }) }),
@@ -87,7 +87,7 @@ describe('useConfigSaveReporter', () => {
     });
   });
 
-  it('works with no properties argument', () => {
+  it('works with no getProperties argument', () => {
     renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource'), {
       wrapper: createWrapper(),
     });
@@ -104,7 +104,7 @@ describe('useConfigSaveReporter', () => {
 
   it('forwards arbitrary extra properties to the interaction event', () => {
     renderHook(
-      () => useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: 'default', custom_prop: 'value' }),
+      () => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default', custom_prop: 'value' })),
       { wrapper: createWrapper() }
     );
 
@@ -120,7 +120,7 @@ describe('useConfigSaveReporter', () => {
 
   it('stops reporting after unmount', () => {
     const { unmount } = renderHook(
-      () => useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: 'default' }),
+      () => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })),
       { wrapper: createWrapper() }
     );
 
@@ -134,14 +134,14 @@ describe('useConfigSaveReporter', () => {
     expect(reportInteractionMock).not.toHaveBeenCalled();
   });
 
-  it('uses the updated properties after re-render', () => {
-    const { rerender } = renderHook(
-      ({ authType }: { authType: string }) =>
-        useConfigSaveReporter('grafana-cloudwatch-datasource', { auth_type: authType }),
-      { wrapper: createWrapper(), initialProps: { authType: 'default' } }
-    );
+  it('uses the current properties at event time, not at subscription time', () => {
+    let authType = 'default';
 
-    rerender({ authType: 'keys' });
+    renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: authType })), {
+      wrapper: createWrapper(),
+    });
+
+    authType = 'keys';
 
     act(() => {
       appEventBus.publish(new DataSourceTestSucceeded());
@@ -151,6 +151,19 @@ describe('useConfigSaveReporter', () => {
       'grafana_plugin_save_result',
       expect.objectContaining({ auth_type: 'keys' })
     );
+  });
+
+  it('does not recreate subscriptions when re-rendered with a new getProperties function reference', () => {
+    const { rerender } = renderHook(
+      ({ authType }: { authType: string }) =>
+        useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: authType })),
+      { wrapper: createWrapper(), initialProps: { authType: 'default' } }
+    );
+
+    const getAppEventsSpy = jest.spyOn(services, 'getAppEvents');
+    rerender({ authType: 'default' });
+
+    expect(getAppEventsSpy).not.toHaveBeenCalled();
   });
 });
 

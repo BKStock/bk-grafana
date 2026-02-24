@@ -44,7 +44,7 @@ export const ConfigEditor = (props: Props) => {
   });
 
   useEffect(() => setLogGroupFieldState({ invalid: false }), [props.options]);
-  useConfigSaveReporter('cloudwatch', { auth_type: options.jsonData.authType });
+  useConfigSaveReporter('cloudwatch', () => ({ auth_type: options.jsonData.authType }));
   const [externalId, setExternalId] = useState('');
   useEffect(() => {
     if (!externalId && datasource) {
