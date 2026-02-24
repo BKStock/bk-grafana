@@ -8,9 +8,9 @@ import { backendSrv } from 'app/core/services/backend_srv';
 import { DASHBOARD_LIBRARY_ROUTES } from '../types';
 
 import { TemplateDashboardModal } from './TemplateDashboardModal';
-import { TemplateDashboardInteractions } from './interactions';
+import { DashboardLibraryInteractions } from './interactions';
 
-const mockItemClicked = jest.spyOn(TemplateDashboardInteractions, 'itemClicked').mockImplementation();
+const mockItemClicked = jest.spyOn(DashboardLibraryInteractions, 'itemClicked').mockImplementation();
 
 setBackendSrv(backendSrv);
 setupMockServer();

@@ -1,5 +1,4 @@
 import { reportInteraction } from '@grafana/runtime';
-import { getFeatureFlagClient } from '@grafana/runtime/internal';
 
 const SCHEMA_VERSION = 1;
 
@@ -50,26 +49,14 @@ export type SourceEntryPoint = (typeof SOURCE_ENTRY_POINTS)[keyof typeof SOURCE_
 export type DiscoveryMethod = (typeof DISCOVERY_METHODS)[keyof typeof DISCOVERY_METHODS];
 export type CreationOrigin = (typeof CREATION_ORIGINS)[keyof typeof CREATION_ORIGINS];
 
-type LoadedInteractionProperties = {
-  numberOfItems: number;
-  contentKinds: ContentKind[];
-  datasourceTypes: string[];
-  sourceEntryPoint: SourceEntryPoint;
-  eventLocation: EventLocation;
-};
-
-type ItemClickedInteractionProperties = {
-  contentKind: ContentKind;
-  datasourceTypes: string[];
-  libraryItemId: string;
-  libraryItemTitle: string;
-  sourceEntryPoint: SourceEntryPoint;
-  eventLocation: EventLocation;
-  discoveryMethod: DiscoveryMethod;
-};
-
 export const DashboardLibraryInteractions = {
-  loaded: (properties: LoadedInteractionProperties) => {
+  loaded: (properties: {
+    numberOfItems: number;
+    contentKinds: ContentKind[];
+    datasourceTypes: string[];
+    sourceEntryPoint: SourceEntryPoint;
+    eventLocation: EventLocation;
+  }) => {
     reportDashboardLibraryInteraction('loaded', properties);
   },
   searchPerformed: (properties: {
@@ -81,7 +68,17 @@ export const DashboardLibraryInteractions = {
   }) => {
     reportDashboardLibraryInteraction('search_performed', properties);
   },
-  itemClicked: (properties: ItemClickedInteractionProperties) => {
+  itemClicked: (properties: {
+    contentKind: ContentKind;
+    datasourceTypes: string[];
+    libraryItemId: string;
+    libraryItemTitle: string;
+    sourceEntryPoint: SourceEntryPoint;
+    eventLocation: EventLocation;
+    discoveryMethod: DiscoveryMethod;
+    /** Which button was clicked (template modal only): View template vs Customize with Assistant */
+    action?: 'view_template' | 'assistant';
+  }) => {
     reportDashboardLibraryInteraction('item_clicked', properties);
   },
   mappingFormShown: (properties: {
@@ -133,47 +130,6 @@ export const DashboardLibraryInteractions = {
     eventLocation: EventLocation;
   }) => {
     reportDashboardLibraryInteraction('compatibility_check_completed', properties);
-  },
-};
-
-export const TemplateDashboardInteractions = {
-  ...DashboardLibraryInteractions,
-  itemClicked: (
-    properties: ItemClickedInteractionProperties & {
-      /** Which button was clicked (template modal only): View template vs Customize with Assistant */
-      action?: 'view_template' | 'assistant';
-    }
-  ) => {
-    const isDashboardTemplatesAssistantButtonEnabled = getFeatureFlagClient().getBooleanValue(
-      'dashboardTemplatesAssistantButton',
-      false
-    );
-    const isDashboardTemplatesAssistantToolEnabled = getFeatureFlagClient().getBooleanValue(
-      'assistant.frontend.tools.dashboardTemplates',
-      false
-    );
-
-    reportDashboardLibraryInteraction('item_clicked', {
-      ...properties,
-      isDashboardTemplatesAssistantEnabled:
-        isDashboardTemplatesAssistantButtonEnabled && isDashboardTemplatesAssistantToolEnabled,
-    });
-  },
-  loaded: (properties: LoadedInteractionProperties) => {
-    const isDashboardTemplatesAssistantButtonEnabled = getFeatureFlagClient().getBooleanValue(
-      'dashboardTemplatesAssistantButton',
-      false
-    );
-    const isDashboardTemplatesAssistantToolEnabled = getFeatureFlagClient().getBooleanValue(
-      'assistant.frontend.tools.dashboardTemplates',
-      false
-    );
-
-    reportDashboardLibraryInteraction('loaded', {
-      ...properties,
-      isDashboardTemplatesAssistantEnabled:
-        isDashboardTemplatesAssistantButtonEnabled && isDashboardTemplatesAssistantToolEnabled,
-    });
   },
 };
 
