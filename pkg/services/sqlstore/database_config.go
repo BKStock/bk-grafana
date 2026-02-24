@@ -111,10 +111,10 @@ func (dbCfg *DatabaseConfig) readConfig(cfg *setting.Cfg) error {
 	// Reference: https://kerkour.com/sqlite-for-servers
 	if dbCfg.Type == migrator.SQLite {
 		// SQLite with WAL mode supports one writer and multiple concurrent readers.
-		// To avoid SQLITE_BUSY errors, we limit to a single open connection for writes.
-		// This serializes write operations through a single connection, preventing lock contention.
+		// To avoid SQLITE_BUSY errors from unlimited concurrent writes (MaxOpenConn=0),
+		// we set a reasonable limit. Migrations require at least 4 connections.
 		if dbCfg.MaxOpenConn == 0 {
-			dbCfg.MaxOpenConn = 1
+			dbCfg.MaxOpenConn = 10
 		}
 		// For WAL mode, we can have multiple idle connections for concurrent reads
 		if dbCfg.MaxIdleConn == 2 {
@@ -225,6 +225,11 @@ func (dbCfg *DatabaseConfig) buildConnectionString(cfg *setting.Cfg, features fe
 		// Negative values are in KB (64MB = 64 * 1024KB)
 		// Reference: https://kerkour.com/sqlite-for-servers
 		cnnstr += "&_cache_size=-64000"
+
+		// Add busy_timeout to prevent SQLITE_BUSY errors during concurrent writes
+		// 15 seconds should be enough for migrations and concurrent operations
+		// Reference: https://kerkour.com/sqlite-for-servers
+		cnnstr += "&_busy_timeout=15000"
 
 		cnnstr += buildExtraConnectionString('&', dbCfg.UrlQueryParams)
 	default:
