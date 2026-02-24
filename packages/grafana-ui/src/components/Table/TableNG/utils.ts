@@ -31,6 +31,7 @@ import {
 
 import { getTextColorForAlphaBackground } from '../../../utils/colors';
 import { TableCellInspectorMode } from '../TableCellInspector';
+import { RowExpander } from '../TableRT/RowExpander';
 import { TableCellOptions } from '../types';
 
 import { inferPills } from './Cells/PillCell';
@@ -719,14 +720,19 @@ export function applyFilter(
   const filterValues = Object.entries(filter);
 
   const filterRows = (row: TableRow): boolean => {
+    if (row.data) {
+      return true;
+    }
     for (const [, value] of filterValues) {
       if (value.parentIndex != null && row.__parentIndex !== value.parentIndex) {
-        return true;
+        continue;
       }
       const field = fields.find((field) => getDisplayName(field) === value.displayName);
-      const displayedValue =
-        field && field.display ? formattedValueToString(field.display(row[value.displayName])) : null;
-      if (displayedValue != null && !value.filteredSet.has(displayedValue)) {
+      if (!field || !field.display) {
+        continue;
+      }
+      const displayedValue = formattedValueToString(field.display(row[value.displayName]));
+      if (!value.filteredSet.has(displayedValue)) {
         return false;
       }
     }
