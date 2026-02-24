@@ -59,7 +59,7 @@ function getExportLabel(labels?: { [ExportLabel]?: string }): string | undefined
     return undefined;
   }
 
-  return labels?.[ExportLabel];
+  return labels[ExportLabel];
 }
 
 /**
@@ -355,6 +355,11 @@ function replaceAnnotationDatasources(
       return annotation;
     }
 
+    // remove export label
+    if (annotation.spec.query?.labels) {
+      delete annotation.spec.query.labels[ExportLabel];
+    }
+
     return {
       ...annotation,
       spec: {
@@ -362,6 +367,7 @@ function replaceAnnotationDatasources(
         query: {
           ...annotation.spec.query,
           datasource: { name: ds.uid },
+          ...(Object.keys(annotation.spec.query?.labels ?? {}).length > 0 && { labels: annotation.spec.query.labels }),
         },
       },
     };
@@ -383,6 +389,11 @@ function replaceVariableDatasources(
         return variable;
       }
 
+      // remove export label
+      if (variable.spec.query?.labels) {
+        delete variable.spec.query.labels[ExportLabel];
+      }
+
       return {
         ...variable,
         spec: {
@@ -390,6 +401,7 @@ function replaceVariableDatasources(
           query: {
             ...variable.spec.query,
             datasource: { name: ds.uid },
+            ...(Object.keys(variable.spec.query?.labels ?? {}).length > 0 && { labels: variable.spec.query.labels }),
           },
           options: [],
           current: { text: '', value: '' },
@@ -461,6 +473,11 @@ function replaceElementDatasources(
               return query;
             }
 
+            // remove export label
+            if (query.spec.query?.labels) {
+              delete query.spec.query.labels[ExportLabel];
+            }
+
             return {
               ...query,
               spec: {
@@ -468,6 +485,7 @@ function replaceElementDatasources(
                 query: {
                   ...query.spec.query,
                   datasource: { name: ds.uid },
+                  ...(Object.keys(query.spec.query?.labels ?? {}).length > 0 && { labels: query.spec.query.labels }),
                 },
               },
             };
