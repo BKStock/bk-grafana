@@ -1,4 +1,4 @@
-import { SceneObjectState, SceneObjectBase, SceneObject, sceneGraph } from '@grafana/scenes';
+import { SceneObject, SceneObjectBase, SceneObjectState, sceneGraph } from '@grafana/scenes';
 import {
   ElementSelectionContextItem,
   ElementSelectionContextState,
@@ -6,7 +6,7 @@ import {
 } from '@grafana/ui';
 
 import { TabItem } from '../scene/layout-tabs/TabItem';
-import { isRepeatCloneOrChildOf } from '../utils/clone';
+import { getRepeatCloneSourceKey } from '../utils/clone';
 import { getDashboardSceneFor } from '../utils/utils';
 
 import { ElementSelection } from './ElementSelection';
@@ -215,12 +215,11 @@ export class DashboardEditPane extends SceneObjectBase<DashboardEditPaneState> {
   private selectElement(element: ElementSelectionContextItem, options: ElementSelectionOnSelectOptions) {
     let obj = sceneGraph.findByKey(this, element.id);
     if (obj) {
-      // Do not select repeat clones or their children
-      if (isRepeatCloneOrChildOf(obj)) {
-        return;
+      const sourceKey = getRepeatCloneSourceKey(obj);
+      if (sourceKey) {
+        obj = sceneGraph.findByKey(this, sourceKey);
       }
-
-      this.selectObject(obj, element.id, options);
+      this.selectObject(obj, obj.state.key!, options);
     }
   }
 
