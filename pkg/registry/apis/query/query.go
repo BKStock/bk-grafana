@@ -14,7 +14,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	errorsK8s "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	"github.com/grafana/authlib/authn"
@@ -69,11 +68,9 @@ func (mcs *MyCacheService) GetDatasourceByUID(ctx context.Context, datasourceUID
 
 func (b *QueryAPIBuilder) QueryDatasources(w http.ResponseWriter, httpreq *http.Request) {
 	w.Header().Set("X-Ds-Querier", b.instanceProvider.GetMode())
-	connectCtx := httpreq.Context()
 
 	ctx, span := b.tracer.Start(httpreq.Context(), "QueryService.Query")
 	defer span.End()
-	ctx = request.WithNamespace(ctx, request.NamespaceValue(connectCtx))
 	traceId := span.SpanContext().TraceID()
 	connectLogger := b.log.New("traceId", traceId.String(), "rule_uid", httpreq.Header.Get("X-Rule-Uid"))
 
