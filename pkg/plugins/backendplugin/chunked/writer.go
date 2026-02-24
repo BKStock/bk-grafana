@@ -29,10 +29,6 @@ func NewHTTPWriter(w http.ResponseWriter) *rawChunkWriter {
 
 // ReceivedChunk implements [backendplugin.RawChunkReceiver].
 func (r *rawChunkWriter) OnChunk(chunk *pluginv2.QueryChunkedDataResponse) error {
-	if chunk.Format != pluginv2.DataFrameFormat_JSON {
-		return fmt.Errorf("expected json format")
-	}
-
 	// Write directly to the response -- avoiding any additional buffering
 	_, _ = r.w.Write([]byte(`data: {"refId":"`))
 	_, _ = r.w.Write([]byte(chunk.RefId))
@@ -43,6 +39,18 @@ func (r *rawChunkWriter) OnChunk(chunk *pluginv2.QueryChunkedDataResponse) error
 	}
 
 	if chunk.Frame != nil {
+		// Ensure the frame is in JSON, convert it from arrow if necessary
+		if chunk.Format != pluginv2.DataFrameFormat_JSON {
+			tmp, err := data.UnmarshalArrowFrame(chunk.Frame)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal frame: %w", err)
+			}
+			chunk.Frame, err = tmp.MarshalJSON()
+			if err != nil {
+				return fmt.Errorf("failed to marshal frame to JSON: %w", err)
+			}
+		}
+
 		_, _ = r.w.Write([]byte(`,"frame":`))
 		_, _ = r.w.Write(chunk.Frame)
 		_, _ = r.w.Write([]byte(`"`))
