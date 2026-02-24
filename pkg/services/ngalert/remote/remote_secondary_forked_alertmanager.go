@@ -26,7 +26,7 @@ type configStore interface {
 //go:generate mockery --name remoteAlertmanager --structname RemoteAlertmanagerMock --with-expecter --output mock --outpkg alertmanager_mock
 type remoteAlertmanager interface {
 	notifier.Alertmanager
-	CompareAndSendConfiguration(context.Context, *apimodels.PostableUserConfig) (bool, error)
+	CompareAndSendConfiguration(context.Context, alertingNotify.NotificationsConfiguration) (bool, error)
 	GetRemoteState(context.Context) (notifier.ExternalState, error)
 	SendState(context.Context) error
 }
@@ -130,7 +130,7 @@ func newRemoteSecondaryForkedAlertmanager(cfg RemoteSecondaryConfig, internal no
 
 // ApplyConfig will only log errors for the remote Alertmanager and ensure we delegate the call to the internal Alertmanager.
 // We don't care about errors in the remote Alertmanager in remote secondary mode.
-func (fam *RemoteSecondaryForkedAlertmanager) ApplyConfig(ctx context.Context, config *apimodels.PostableUserConfig) (bool, error) {
+func (fam *RemoteSecondaryForkedAlertmanager) ApplyConfig(ctx context.Context, config alertingNotify.NotificationsConfiguration) (bool, error) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	// Figure out if we need to sync the external Alertmanager in another goroutine.
@@ -250,19 +250,6 @@ func (fam *RemoteSecondaryForkedAlertmanager) StopAndWait() {
 	ctx := context.TODO()
 	if err := fam.remote.SendState(ctx); err != nil {
 		fam.log.Error("Error sending state to the remote Alertmanager while stopping", "err", err)
-	}
-
-	dbConfig, err := fam.store.GetLatestAlertmanagerConfiguration(ctx, fam.orgID)
-	if err != nil {
-		fam.log.Error("Error getting latest Alertmanager configuration while stopping", "err", err)
-		return
-	}
-	config, err := notifier.Load([]byte(dbConfig.AlertmanagerConfiguration))
-	if err != nil {
-		fam.log.Error("Error loading Alertmanager configuration while stopping", "err", err)
-	}
-	if _, err := fam.remote.CompareAndSendConfiguration(ctx, config); err != nil {
-		fam.log.Error("Error sending configuration to the remote Alertmanager while stopping", "err", err)
 	}
 }
 

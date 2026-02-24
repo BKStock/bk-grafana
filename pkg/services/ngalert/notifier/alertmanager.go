@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/alerting/models"
 	alertingNotify "github.com/grafana/alerting/notify"
 	"github.com/grafana/alerting/notify/nfstatus"
 	alertingTemplates "github.com/grafana/alerting/templates"
@@ -211,11 +210,11 @@ func (am *alertmanager) StopAndWait() {
 }
 
 // ApplyConfig applies the configuration to the Alertmanager.
-func (am *alertmanager) ApplyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig) (bool, error) {
+func (am *alertmanager) ApplyConfig(_ context.Context, cfg alertingNotify.NotificationsConfiguration) (bool, error) {
 	var configChanged bool
 	var outerErr error
 	am.Base.WithLock(func() {
-		changed, err := am.applyConfig(ctx, cfg)
+		changed, err := am.applyConfig(cfg)
 		if err != nil {
 			outerErr = fmt.Errorf("unable to apply configuration: %w", err)
 			return
@@ -227,20 +226,18 @@ func (am *alertmanager) ApplyConfig(ctx context.Context, cfg *apimodels.Postable
 }
 
 type AggregateMatchersUsage struct {
-	Matchers       int
-	MatchRE        int
-	Match          int
-	ObjectMatchers int
+	Matchers int
+	MatchRE  int
+	Match    int
 }
 
-func (am *alertmanager) updateConfigMetrics(cfg *apimodels.PostableUserConfig, cfgSize int) {
+func (am *alertmanager) updateConfigMetrics(cfg alertingNotify.NotificationsConfiguration, cfgSize int) {
 	var amu AggregateMatchersUsage
-	am.aggregateRouteMatchers(cfg.AlertmanagerConfig.Route, &amu)
-	am.aggregateInhibitMatchers(cfg.AlertmanagerConfig.InhibitRules, &amu)
+	am.aggregateRouteMatchers(cfg.RoutingTree, &amu)
+	am.aggregateInhibitMatchers(cfg.InhibitRules, &amu)
 	am.ConfigMetrics.Matchers.Set(float64(amu.Matchers))
 	am.ConfigMetrics.MatchRE.Set(float64(amu.MatchRE))
 	am.ConfigMetrics.Match.Set(float64(amu.Match))
-	am.ConfigMetrics.ObjectMatchers.Set(float64(amu.ObjectMatchers))
 
 	am.ConfigMetrics.ConfigHash.
 		WithLabelValues(strconv.FormatInt(am.Base.TenantID(), 10)).
@@ -251,11 +248,10 @@ func (am *alertmanager) updateConfigMetrics(cfg *apimodels.PostableUserConfig, c
 		Set(float64(cfgSize))
 }
 
-func (am *alertmanager) aggregateRouteMatchers(r *apimodels.Route, amu *AggregateMatchersUsage) {
+func (am *alertmanager) aggregateRouteMatchers(r *alertingNotify.Route, amu *AggregateMatchersUsage) {
 	amu.Matchers += len(r.Matchers)
 	amu.MatchRE += len(r.MatchRE)
 	amu.Match += len(r.Match)
-	amu.ObjectMatchers += len(r.ObjectMatchers)
 	for _, next := range r.Routes {
 		am.aggregateRouteMatchers(next, amu)
 	}
@@ -275,7 +271,7 @@ func (am *alertmanager) aggregateInhibitMatchers(rules []apimodels.InhibitRule, 
 // applyConfig applies a new configuration by re-initializing all components using the configuration provided.
 // It returns a boolean indicating whether the user config was changed and an error.
 // It is not safe to call concurrently.
-func (am *alertmanager) applyConfig(ctx context.Context, cfg *apimodels.PostableUserConfig) (bool, error) {
+func (am *alertmanager) applyConfig(cfg alertingNotify.NotificationsConfiguration) (bool, error) {
 	// First, let's make sure this config is not already loaded
 	rawConfig, err := json.Marshal(cfg)
 	if err != nil {
@@ -284,82 +280,20 @@ func (am *alertmanager) applyConfig(ctx context.Context, cfg *apimodels.Postable
 	}
 
 	// If configuration hasn't changed, we've got nothing to do.
-	configHash := md5.Sum(rawConfig)
-	if am.Base.ConfigHash() == configHash {
+	cfg.Hash = md5.Sum(rawConfig)
+	if am.Base.ConfigHash() == cfg.Hash {
 		am.logger.Debug("Config hasn't changed, skipping configuration sync.")
 		return false, nil
 	}
 
-	receivers := alertingNotify.PostableAPIReceiversToAPIReceivers(cfg.AlertmanagerConfig.Receivers)
-	for _, recv := range receivers {
-		err = patchNewSecureFields(ctx, recv, alertingNotify.DecodeSecretsFromBase64, am.decryptFn)
-		if err != nil {
-			return false, err
-		}
-	}
-
-	am.logger.Info("Applying new configuration to Alertmanager", "configHash", fmt.Sprintf("%x", configHash))
-	err = am.Base.ApplyConfig(alertingNotify.NotificationsConfiguration{
-		RoutingTree:       cfg.AlertmanagerConfig.Route.AsAMRoute(),
-		InhibitRules:      cfg.AlertmanagerConfig.InhibitRules,
-		MuteTimeIntervals: cfg.AlertmanagerConfig.MuteTimeIntervals,
-		TimeIntervals:     cfg.AlertmanagerConfig.TimeIntervals,
-		Templates:         alertingNotify.PostableAPITemplatesToTemplateDefinitions(cfg.GetMergedTemplateDefinitions()),
-		Receivers:         receivers,
-		Limits:            am.dynamicLimits,
-		Raw:               rawConfig,
-		Hash:              configHash,
-	})
+	am.logger.Info("Applying new configuration to Alertmanager", "configHash", fmt.Sprintf("%x", cfg.Hash))
+	err = am.Base.ApplyConfig(cfg)
 	if err != nil {
 		return false, err
 	}
 
 	am.updateConfigMetrics(cfg, len(rawConfig))
 	return true, nil
-}
-
-func patchNewSecureFields(ctx context.Context, api *alertingNotify.APIReceiver, decode alertingNotify.DecodeSecretsFn, decrypt alertingNotify.GetDecryptedValueFn) error {
-	for _, integration := range api.Integrations {
-		switch integration.Type {
-		case "dingding":
-			err := patchSettingsFromSecureSettings(ctx, integration, "url", decode, decrypt)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func patchSettingsFromSecureSettings(ctx context.Context, integration *models.IntegrationConfig, key string, decode alertingNotify.DecodeSecretsFn, decrypt alertingNotify.GetDecryptedValueFn) error {
-	if _, ok := integration.SecureSettings[key]; !ok {
-		return nil
-	}
-	decoded, err := decode(integration.SecureSettings)
-	if err != nil {
-		return err
-	}
-	settings := map[string]any{}
-	err = json.Unmarshal(integration.Settings, &settings)
-	if err != nil {
-		return err
-	}
-	currentValue, ok := settings[key]
-	currentString := ""
-	if ok {
-		currentString, _ = currentValue.(string)
-	}
-	secretValue := decrypt(ctx, decoded, key, currentString)
-	if secretValue == currentString {
-		return nil
-	}
-	settings[key] = secretValue
-	data, err := json.Marshal(settings)
-	if err != nil {
-		return err
-	}
-	integration.Settings = data
-	return nil
 }
 
 // PutAlerts receives the alerts and then sends them through the corresponding route based on whenever the alert has a receiver embedded or not

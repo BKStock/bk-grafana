@@ -28,7 +28,7 @@ func (_m *RemoteAlertmanagerMock) EXPECT() *RemoteAlertmanagerMock_Expecter {
 }
 
 // ApplyConfig provides a mock function with given fields: _a0, _a1
-func (_m *RemoteAlertmanagerMock) ApplyConfig(_a0 context.Context, _a1 *definitions.PostableUserConfig) (bool, error) {
+func (_m *RemoteAlertmanagerMock) ApplyConfig(_a0 context.Context, _a1 notify.NotificationsConfiguration) (bool, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -37,16 +37,16 @@ func (_m *RemoteAlertmanagerMock) ApplyConfig(_a0 context.Context, _a1 *definiti
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *definitions.PostableUserConfig) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, notify.NotificationsConfiguration) (bool, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *definitions.PostableUserConfig) bool); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, notify.NotificationsConfiguration) bool); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *definitions.PostableUserConfig) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, notify.NotificationsConfiguration) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -62,14 +62,14 @@ type RemoteAlertmanagerMock_ApplyConfig_Call struct {
 
 // ApplyConfig is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 *definitions.PostableUserConfig
+//   - _a1 notify.NotificationsConfiguration
 func (_e *RemoteAlertmanagerMock_Expecter) ApplyConfig(_a0 interface{}, _a1 interface{}) *RemoteAlertmanagerMock_ApplyConfig_Call {
 	return &RemoteAlertmanagerMock_ApplyConfig_Call{Call: _e.mock.On("ApplyConfig", _a0, _a1)}
 }
 
-func (_c *RemoteAlertmanagerMock_ApplyConfig_Call) Run(run func(_a0 context.Context, _a1 *definitions.PostableUserConfig)) *RemoteAlertmanagerMock_ApplyConfig_Call {
+func (_c *RemoteAlertmanagerMock_ApplyConfig_Call) Run(run func(_a0 context.Context, _a1 notify.NotificationsConfiguration)) *RemoteAlertmanagerMock_ApplyConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*definitions.PostableUserConfig))
+		run(args[0].(context.Context), args[1].(notify.NotificationsConfiguration))
 	})
 	return _c
 }
@@ -79,13 +79,13 @@ func (_c *RemoteAlertmanagerMock_ApplyConfig_Call) Return(_a0 bool, _a1 error) *
 	return _c
 }
 
-func (_c *RemoteAlertmanagerMock_ApplyConfig_Call) RunAndReturn(run func(context.Context, *definitions.PostableUserConfig) (bool, error)) *RemoteAlertmanagerMock_ApplyConfig_Call {
+func (_c *RemoteAlertmanagerMock_ApplyConfig_Call) RunAndReturn(run func(context.Context, notify.NotificationsConfiguration) (bool, error)) *RemoteAlertmanagerMock_ApplyConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CompareAndSendConfiguration provides a mock function with given fields: _a0, _a1
-func (_m *RemoteAlertmanagerMock) CompareAndSendConfiguration(_a0 context.Context, _a1 *definitions.PostableUserConfig) (bool, error) {
+func (_m *RemoteAlertmanagerMock) CompareAndSendConfiguration(_a0 context.Context, _a1 notify.NotificationsConfiguration) (bool, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -94,16 +94,16 @@ func (_m *RemoteAlertmanagerMock) CompareAndSendConfiguration(_a0 context.Contex
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *definitions.PostableUserConfig) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, notify.NotificationsConfiguration) (bool, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *definitions.PostableUserConfig) bool); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, notify.NotificationsConfiguration) bool); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *definitions.PostableUserConfig) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, notify.NotificationsConfiguration) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -119,14 +119,14 @@ type RemoteAlertmanagerMock_CompareAndSendConfiguration_Call struct {
 
 // CompareAndSendConfiguration is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 *definitions.PostableUserConfig
+//   - _a1 notify.NotificationsConfiguration
 func (_e *RemoteAlertmanagerMock_Expecter) CompareAndSendConfiguration(_a0 interface{}, _a1 interface{}) *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call {
 	return &RemoteAlertmanagerMock_CompareAndSendConfiguration_Call{Call: _e.mock.On("CompareAndSendConfiguration", _a0, _a1)}
 }
 
-func (_c *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call) Run(run func(_a0 context.Context, _a1 *definitions.PostableUserConfig)) *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call {
+func (_c *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call) Run(run func(_a0 context.Context, _a1 notify.NotificationsConfiguration)) *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*definitions.PostableUserConfig))
+		run(args[0].(context.Context), args[1].(notify.NotificationsConfiguration))
 	})
 	return _c
 }
@@ -136,7 +136,7 @@ func (_c *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call) Return(_a0 bo
 	return _c
 }
 
-func (_c *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call) RunAndReturn(run func(context.Context, *definitions.PostableUserConfig) (bool, error)) *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call {
+func (_c *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call) RunAndReturn(run func(context.Context, notify.NotificationsConfiguration) (bool, error)) *RemoteAlertmanagerMock_CompareAndSendConfiguration_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	alertingNotify "github.com/grafana/alerting/notify"
 	"github.com/prometheus/alertmanager/config"
 	"github.com/prometheus/alertmanager/pkg/labels"
 	"github.com/prometheus/client_golang/prometheus"
@@ -163,8 +164,9 @@ receivers:
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			am := setupAMTest(t)
-
-			changed, err := am.ApplyConfig(context.Background(), tc.config)
+			changed, err := WithMOA(t, tc.config, func(prepared alertingNotify.NotificationsConfiguration) (bool, error) {
+				return am.ApplyConfig(context.Background(), prepared)
+			})
 
 			if tc.expectedError != "" {
 				require.False(t, changed)

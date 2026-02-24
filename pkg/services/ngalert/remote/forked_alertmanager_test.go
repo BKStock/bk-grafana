@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	alertingNotify "github.com/grafana/alerting/notify"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -36,7 +37,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
 			readyCall := remote.EXPECT().Ready().Return(false).Once()
 			remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(readyCall)
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 
@@ -44,7 +45,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			// should result in the forked Alertmanager calling ApplyConfig on the internal Alertmanager.
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
 			remote.EXPECT().Ready().Return(true).Once()
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 		}
@@ -57,10 +58,10 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Twice()
 			remote.EXPECT().Ready().Return(true).Twice()
 			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Twice()
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 		}
@@ -73,10 +74,10 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Twice()
 			remote.EXPECT().Ready().Return(false).Twice()
 			remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Twice()
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 
@@ -85,10 +86,10 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Twice()
 			remote.EXPECT().Ready().Return(true).Twice()
 			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(false, expErr).Twice()
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 		}
@@ -99,7 +100,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Once()
 			readyCall := remote.EXPECT().Ready().Return(false).Once()
 			remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(readyCall)
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.False(tt, applied)
 			require.ErrorIs(tt, err, expErr)
 		}
@@ -117,7 +118,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			remote.EXPECT().Ready().Return(true).Once()
 			remoteStateCall := remote.EXPECT().GetRemoteState(mock.Anything).Return(notifier.ExternalState{}, nil).Once()
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(remoteStateCall)
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 			require.True(tt, internal.mergeStateCalled)
@@ -127,7 +128,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			remote.EXPECT().Ready().Return(true).Once()
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
 			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Once()
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 			require.False(tt, internal.mergeStateCalled)
@@ -139,7 +140,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			readyCall := remote.EXPECT().Ready().Return(false).Once()
 			remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Once().NotBefore(readyCall)
 			remote.EXPECT().Ready().Return(false).Once()
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.False(tt, applied)
 			require.Equal(tt, "remote Alertmanager not ready, can't fetch remote state", err.Error())
 			require.False(tt, internal.mergeStateCalled)
@@ -150,7 +151,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			remote.EXPECT().CompareAndSendConfiguration(ctx, mock.Anything).Return(true, nil).Once()
 			remoteStateCall := remote.EXPECT().GetRemoteState(mock.Anything).Return(notifier.ExternalState{}, nil).Once()
 			internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(remoteStateCall)
-			applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.True(tt, applied)
 			require.NoError(tt, err)
 			require.True(tt, internal.mergeStateCalled)
@@ -161,7 +162,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			// The internal Alertmanager shouldn't be started.
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemotePrimary)
 			remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Once()
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.False(tt, applied)
 			require.ErrorIs(tt, err, expErr)
 			require.False(t, internal.mergeStateCalled)
@@ -178,7 +179,7 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			remote.EXPECT().Ready().Return(true).Once()
 			remote.EXPECT().GetRemoteState(mock.Anything).Return(notifier.ExternalState{}, nil).Once()
 
-			applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+			applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 			require.False(tt, applied)
 			require.ErrorIs(tt, err, expErr)
 			require.True(t, internal.mergeStateCalled)
@@ -389,7 +390,6 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
 			internal.EXPECT().StopAndWait().Once()
 			remote.EXPECT().StopAndWait().Once()
-			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything).Return(true, nil).Once()
 			remote.EXPECT().SendState(mock.Anything).Return(nil).Once()
 			forked.StopAndWait()
 		}
@@ -398,21 +398,6 @@ func TestForkedAlertmanager_ModeRemoteSecondary(t *testing.T) {
 			// An error in the remote Alertmanager should't be a problem.
 			// These errors are caught and logged.
 			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
-			internal.EXPECT().StopAndWait().Once()
-			remote.EXPECT().StopAndWait().Once()
-			remote.EXPECT().CompareAndSendConfiguration(mock.Anything, mock.Anything).Return(false, expErr).Once()
-			remote.EXPECT().SendState(mock.Anything).Return(expErr).Once()
-			forked.StopAndWait()
-		}
-
-		{
-			// An error when retrieving the configuration should cause
-			// CompareAndSendConfiguration not to be called.
-			internal, remote, forked := genTestAlertmanagers(tt, modeRemoteSecondary)
-			secondaryForked, ok := forked.(*RemoteSecondaryForkedAlertmanager)
-			require.True(t, ok)
-			secondaryForked.store = &errConfigStore{}
-
 			internal.EXPECT().StopAndWait().Once()
 			remote.EXPECT().StopAndWait().Once()
 			remote.EXPECT().SendState(mock.Anything).Return(expErr).Once()
@@ -441,14 +426,14 @@ func TestForkedAlertmanager_ModeRemotePrimary(t *testing.T) {
 		internal, remote, forked := genTestAlertmanagers(tt, modeRemotePrimary)
 		remoteCall := remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
 		internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once().NotBefore(remoteCall)
-		applied, err := forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+		applied, err := forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 		require.True(tt, applied)
 		require.NoError(tt, err)
 
 		// An error in the remote Alertmanager should be returned.
 		_, remote, forked = genTestAlertmanagers(tt, modeRemotePrimary)
 		remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Once()
-		applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+		applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 		require.False(tt, applied)
 		require.ErrorIs(tt, err, expErr)
 
@@ -456,7 +441,7 @@ func TestForkedAlertmanager_ModeRemotePrimary(t *testing.T) {
 		internal, remote, forked = genTestAlertmanagers(tt, modeRemotePrimary)
 		remote.EXPECT().ApplyConfig(ctx, mock.Anything).Return(true, nil).Once()
 		internal.EXPECT().ApplyConfig(ctx, mock.Anything).Return(false, expErr).Once()
-		applied, err = forked.ApplyConfig(ctx, &apimodels.PostableUserConfig{})
+		applied, err = forked.ApplyConfig(ctx, alertingNotify.NotificationsConfiguration{})
 		require.True(tt, applied)
 		require.NoError(tt, err)
 	})
