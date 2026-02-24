@@ -184,9 +184,19 @@ To save a query you've created:
 
    {{< figure src="/media/docs/grafana/panels-visualizations/screenshot-save-query-v12.2.png" max-width="750px" alt="Save a query" >}}
 
-1. In the **Saved queries** drawer, enter a title for the query that will make it easy to find later.
+1. In the **Saved queries** drawer, enter a title for the query that makes it easier to find later.
 1. (Optional) Enter a description and relevant tags.
 1. Click **Save**.
+
+#### Variables in saved queries
+
+If a saved query has variables in it, you have the option to replace the variables in the query before you reuse it in your panel.
+This is useful when the query in the variables aren't in your dashboard.
+Updating the variables doesn't change the saved query, but instead just replaces the variables in your dashboard.
+
+
+
+Making the change before you add the saved query to your panel keeps you from generating errors or unintended behaviors by introducing a variable that's not in your dashboard.
 
 #### Known limitations
 
