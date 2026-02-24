@@ -10,22 +10,29 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	claims "github.com/grafana/authlib/types"
+	"github.com/open-feature/go-sdk/openfeature"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"golang.org/x/sync/singleflight"
 
+	iamv0 "github.com/grafana/grafana/apps/iam/pkg/apis/iam/v0alpha1"
 	"github.com/grafana/grafana/pkg/apimachinery/errutil"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/tracing"
+	"github.com/grafana/grafana/pkg/services/apiserver"
 	"github.com/grafana/grafana/pkg/services/apiserver/client"
+	"github.com/grafana/grafana/pkg/services/apiserver/endpoints/request"
 	"github.com/grafana/grafana/pkg/services/authn"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/quota"
 	"github.com/grafana/grafana/pkg/services/scimutil"
+	"github.com/grafana/grafana/pkg/services/search/sort"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/storage/legacysql/dualwrite"
+	"github.com/grafana/grafana/pkg/storage/unified/resource"
 )
 
 var (
@@ -97,7 +104,7 @@ type StaticSCIMConfig struct {
 
 func ProvideUserSync(userService user.Service, userProtectionService login.UserProtectionService, authInfoService login.AuthInfoService,
 	quotaService quota.Service, tracer tracing.Tracer, features featuremgmt.FeatureToggles, cfg *setting.Cfg,
-	k8sClient client.K8sHandler,
+	restConfigProvider apiserver.RestConfigProvider, resourceClient resource.ResourceClient, dualWriteService dualwrite.Service, sortService sort.Service,
 ) *UserSync {
 	scimSection := cfg.Raw.Section("auth.scim")
 	staticConfig := &StaticSCIMConfig{
@@ -105,7 +112,40 @@ func ProvideUserSync(userService user.Service, userProtectionService login.UserP
 		RejectNonProvisionedUsers: scimSection.Key("reject_non_provisioned_users").MustBool(false),
 	}
 
-	userProxy := NewLegacyUserProxy(userService)
+	logger := log.New("user.sync")
+
+	var userProxy UserProxy
+	var k8sHandlerForSCIM client.K8sHandler
+
+	ctx := context.Background()
+	ofClient := openfeature.NewDefaultClient()
+	useK8sUserService := ofClient.Boolean(ctx, featuremgmt.FlagKubernetesUserSync, false, openfeature.TransactionContext(ctx)) &&
+		restConfigProvider != nil && resourceClient != nil && dualWriteService != nil
+
+	if useK8sUserService {
+		iamUserK8sClient := client.NewK8sHandler(
+			dualWriteService,
+			request.GetNamespaceMapper(cfg),
+			iamv0.UserResourceInfo.GroupVersionResource(),
+			restConfigProvider.GetRestConfig,
+			nil,
+			userService,
+			resourceClient,
+			sortService,
+			features,
+		)
+		clientGenerator := apiserver.ProvideClientGenerator(restConfigProvider)
+		iamUserClient, err := iamv0.NewUserClientFromGenerator(clientGenerator)
+		if err != nil {
+			logger.Error("Failed to create user client", "error", err)
+			userProxy = NewLegacyUserProxy(userService)
+		} else {
+			userProxy = NewK8sUserService(iamUserClient, iamUserK8sClient)
+			k8sHandlerForSCIM = iamUserK8sClient
+		}
+	} else {
+		userProxy = NewLegacyUserProxy(userService)
+	}
 
 	return &UserSync{
 		isUserProvisioningEnabled: staticConfig.IsUserProvisioningEnabled,
@@ -114,11 +154,11 @@ func ProvideUserSync(userService user.Service, userProtectionService login.UserP
 		authInfoService:           authInfoService,
 		userProtectionService:     userProtectionService,
 		quotaService:              quotaService,
-		log:                       log.New("user.sync"),
+		log:                       logger,
 		tracer:                    tracer,
 		features:                  features,
 		lastSeenSF:                &singleflight.Group{},
-		scimUtil:                  scimutil.NewSCIMUtil(k8sClient),
+		scimUtil:                  scimutil.NewSCIMUtil(k8sHandlerForSCIM),
 		staticConfig:              staticConfig,
 	}
 }

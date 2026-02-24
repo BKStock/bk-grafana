@@ -25,8 +25,8 @@ type K8sUserService struct {
 
 var _ UserProxy = (*K8sUserService)(nil)
 
-func NewK8sUserService(userClient *iamv0.UserClient) *K8sUserService {
-	return &K8sUserService{userClient: userClient}
+func NewK8sUserService(userClient *iamv0.UserClient, k8sClient client.K8sHandler) *K8sUserService {
+	return &K8sUserService{userClient: userClient, k8sClient: k8sClient}
 }
 
 func (a *K8sUserService) GetByUserAuth(ctx context.Context, userAuth *login.UserAuth, orgID int64) (*user.User, error) {
