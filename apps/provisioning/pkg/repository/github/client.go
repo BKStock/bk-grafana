@@ -89,48 +89,36 @@ type WebhookConfig struct {
 }
 
 // BranchProtection holds the subset of GitHub branch protection rules
-// that are relevant for determining whether direct pushes are allowed.
+// that unambiguously prevent direct pushes to a branch.
 //
 // These fields map to the GitHub "Branch protection" settings documented at:
 // https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
 //
-// Each boolean is true when the corresponding GitHub API field is present (non-nil)
-// in the Protection response. The GitHub API only returns these objects when the
-// setting is actively enabled, so a nil check is sufficient to detect them.
+// Only rules that unconditionally block `git push` are tracked here.
+// Other settings like required status checks, push restrictions, or enforce
+// admins are intentionally omitted: status checks primarily gate PR merges
+// (not pushes), restrictions depend on the identity of the pushing actor,
+// and enforce admins is a modifier of other rules rather than a standalone blocker.
 type BranchProtection struct {
 	// RequiredPullRequestReviews is true when "Require a pull request before merging"
-	// is enabled. This forces all changes to go through a PR with the configured
-	// number of approving reviews. Direct pushes are rejected by GitHub with a 403.
+	// is enabled. All changes must go through a PR — GitHub rejects direct pushes
+	// with a 403.
+	//
+	// Detection: the GitHub API returns a non-nil `required_pull_request_reviews`
+	// object only when this setting is on, so a nil check is sufficient.
 	RequiredPullRequestReviews bool
 
-	// RequiredStatusChecks is true when "Require status checks to pass before merging"
-	// is enabled. While this primarily gates PR merges (not direct pushes), it signals
-	// the branch is intended for a PR-based workflow. A direct push would bypass all
-	// configured CI checks, which is almost certainly not what the repository owner wants.
-	RequiredStatusChecks bool
-
-	// EnforceAdmins is true when "Do not allow bypassing the above settings" is
-	// enabled AND active. This is a modifier: it makes other rules apply to admins
-	// and roles with "bypass branch protections" permission too. It does NOT block
-	// pushes on its own — only strengthens the other rules.
-	EnforceAdmins bool
-
-	// Restrictions is true when "Restrict who can push to matching branches" is enabled.
-	// Only the listed users, teams, or apps may push. Our token-based push will be
-	// rejected unless the authenticated identity is explicitly in the allow list.
-	Restrictions bool
-
 	// LockBranch is true when "Lock branch" is enabled. The branch becomes fully
-	// read-only: no commits can be pushed by anyone, regardless of permissions.
+	// read-only — no commits can be pushed by anyone, regardless of permissions.
+	//
+	// Detection: the API can return a `lock_branch` wrapper with `enabled: false`,
+	// so we check both non-nil AND the enabled flag.
 	LockBranch bool
 }
 
 // BlocksDirectPush returns human-readable reasons why direct pushes would be
-// blocked by branch protection rules. An empty/nil slice means no blocking
-// rules were detected.
-//
-// EnforceAdmins is intentionally excluded: it is a modifier that strengthens
-// other rules, not a standalone reason that blocks pushes.
+// blocked by branch protection rules. A nil slice means no blocking rules were
+// detected.
 func (bp *BranchProtection) BlocksDirectPush() []string {
 	if bp == nil {
 		return nil
@@ -139,12 +127,6 @@ func (bp *BranchProtection) BlocksDirectPush() []string {
 	var reasons []string
 	if bp.RequiredPullRequestReviews {
 		reasons = append(reasons, "required pull request reviews")
-	}
-	if bp.RequiredStatusChecks {
-		reasons = append(reasons, "required status checks")
-	}
-	if bp.Restrictions {
-		reasons = append(reasons, "push restrictions (only specific users/teams/apps can push)")
 	}
 	if bp.LockBranch {
 		reasons = append(reasons, "branch is locked (read-only)")

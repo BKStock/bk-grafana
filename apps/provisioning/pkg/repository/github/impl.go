@@ -45,19 +45,8 @@ func (r *githubClient) GetBranchProtection(ctx context.Context, owner, repositor
 		return nil, fmt.Errorf("failed to get branch protection: %w", err)
 	}
 
-	// Map the GitHub API response to our simplified model.
-	//
-	// Nil checks on pointer fields: the GitHub API only includes these objects
-	// when the corresponding setting is actively enabled. A nil field means
-	// the setting is off.
-	//
-	// LockBranch and EnforceAdmins require an additional .Enabled check because
-	// the API can return the wrapper object with Enabled: false.
 	bp := &BranchProtection{
 		RequiredPullRequestReviews: protection.RequiredPullRequestReviews != nil,
-		RequiredStatusChecks:       protection.RequiredStatusChecks != nil,
-		EnforceAdmins:              protection.EnforceAdmins != nil && protection.EnforceAdmins.Enabled,
-		Restrictions:               protection.Restrictions != nil,
 		LockBranch:                 protection.LockBranch != nil && protection.LockBranch.GetEnabled(),
 	}
 

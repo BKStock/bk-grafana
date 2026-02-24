@@ -1240,39 +1240,14 @@ func TestGitHubRepository_Test_BranchProtection(t *testing.T) {
 			expectBPCall:     true,
 			expectedSuccess:  false,
 			expectedErrField: "spec.workflows",
-			expectedDetail:   "branch is locked",
+			expectedDetail:   "branch is locked (read-only)",
 		},
 		{
-			name:      "protected branch with required status checks and write workflow",
-			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
-			branch:    "main",
-			bpResult: &BranchProtection{
-				RequiredStatusChecks: true,
-			},
-			expectBPCall:     true,
-			expectedSuccess:  false,
-			expectedErrField: "spec.workflows",
-			expectedDetail:   "required status checks",
-		},
-		{
-			name:      "protected branch with push restrictions and write workflow",
-			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
-			branch:    "main",
-			bpResult: &BranchProtection{
-				Restrictions: true,
-			},
-			expectBPCall:     true,
-			expectedSuccess:  false,
-			expectedErrField: "spec.workflows",
-			expectedDetail:   "push restrictions",
-		},
-		{
-			name:      "multiple protection rules reported together",
+			name:      "both protection rules reported together",
 			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
 			branch:    "main",
 			bpResult: &BranchProtection{
 				RequiredPullRequestReviews: true,
-				RequiredStatusChecks:       true,
 				LockBranch:                 true,
 			},
 			expectBPCall:     true,
@@ -1314,12 +1289,10 @@ func TestGitHubRepository_Test_BranchProtection(t *testing.T) {
 			expectedSuccess: true,
 		},
 		{
-			name:      "protection with only enforce admins does not block",
-			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
-			branch:    "main",
-			bpResult: &BranchProtection{
-				EnforceAdmins: true,
-			},
+			name:            "protection with no blocking rules does not block",
+			workflows:       []provisioning.Workflow{provisioning.WriteWorkflow},
+			branch:          "main",
+			bpResult:        &BranchProtection{},
 			expectBPCall:    true,
 			expectedSuccess: true,
 		},
@@ -1392,39 +1365,22 @@ func TestBranchProtection_BlocksDirectPush(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "only enforce admins does not block",
-			bp:       &BranchProtection{EnforceAdmins: true},
-			expected: nil,
-		},
-		{
 			name:     "required PR reviews blocks",
 			bp:       &BranchProtection{RequiredPullRequestReviews: true},
 			expected: []string{"required pull request reviews"},
 		},
 		{
-			name:     "required status checks blocks",
-			bp:       &BranchProtection{RequiredStatusChecks: true},
-			expected: []string{"required status checks"},
-		},
-		{
-			name:     "restrictions blocks",
-			bp:       &BranchProtection{Restrictions: true},
-			expected: []string{"push restrictions"},
-		},
-		{
 			name:     "lock branch blocks",
 			bp:       &BranchProtection{LockBranch: true},
-			expected: []string{"branch is locked"},
+			expected: []string{"branch is locked (read-only)"},
 		},
 		{
-			name: "multiple blocking rules",
+			name: "both blocking rules",
 			bp: &BranchProtection{
 				RequiredPullRequestReviews: true,
-				RequiredStatusChecks:       true,
-				Restrictions:               true,
 				LockBranch:                 true,
 			},
-			expected: []string{"required pull request reviews", "required status checks", "push restrictions", "branch is locked"},
+			expected: []string{"required pull request reviews", "branch is locked (read-only)"},
 		},
 	}
 
