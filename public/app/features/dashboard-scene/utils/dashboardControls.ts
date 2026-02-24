@@ -31,43 +31,47 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
 
   // Default variables
   for (const ds of datasources) {
-    if (ds.getDefaultVariables) {
-      const dsVariables = await ds.getDefaultVariables();
+    try {
+      if (ds.getDefaultVariables) {
+        const dsVariables = await ds.getDefaultVariables();
 
-      if (dsVariables && dsVariables.length) {
-        defaultVariables.push(
-          ...dsVariables.map((v) => {
-            const variable = { ...v };
-            variable.spec = {
-              ...variable.spec,
-              origin: {
-                type: 'datasource' as const,
-                group: ds.type,
-              },
-            };
-            return variable;
-          })
-        );
+        if (dsVariables && dsVariables.length) {
+          defaultVariables.push(
+            ...dsVariables.map((v) => {
+              const variable = { ...v };
+              variable.spec = {
+                ...variable.spec,
+                origin: {
+                  type: 'datasource' as const,
+                  group: ds.type,
+                },
+              };
+              return variable;
+            })
+          );
+        }
       }
-    }
 
-    // Default links
-    if (ds.getDefaultLinks) {
-      const dsLinks = await ds.getDefaultLinks();
+      // Default links
+      if (ds.getDefaultLinks) {
+        const dsLinks = await ds.getDefaultLinks();
 
-      if (dsLinks && dsLinks.length) {
-        defaultLinks.push(
-          ...dsLinks.map((l) => {
-            return {
-              ...l,
-              origin: {
-                type: 'datasource' as const,
-                group: ds.type,
-              },
-            };
-          })
-        );
+        if (dsLinks && dsLinks.length) {
+          defaultLinks.push(
+            ...dsLinks.map((l) => {
+              return {
+                ...l,
+                origin: {
+                  type: 'datasource' as const,
+                  group: ds.type,
+                },
+              };
+            })
+          );
+        }
       }
+    } catch (e) {
+      console.warn('Failed to load default controls from datasource', ds.type, e);
     }
   }
 
