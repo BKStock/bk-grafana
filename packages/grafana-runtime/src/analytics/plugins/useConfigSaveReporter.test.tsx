@@ -20,6 +20,7 @@ import { reportInteraction } from '../utils';
 import { useConfigSaveReporter } from './useConfigSaveReporter';
 
 jest.mock('../utils', () => ({ reportInteraction: jest.fn() }));
+jest.mock('../../services', () => ({ ...jest.requireActual('../../services'), getAppEvents: jest.fn() }));
 const reportInteractionMock = jest.mocked(reportInteraction);
 
 describe('useConfigSaveReporter', () => {
@@ -28,7 +29,7 @@ describe('useConfigSaveReporter', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     appEventBus = new EventBusSrv();
-    jest.spyOn(services, 'getAppEvents').mockReturnValue(appEventBus);
+    jest.mocked(services.getAppEvents).mockReturnValue(appEventBus);
   });
 
   it('reports grafana_plugin_save_result with result success when DataSourceTestSucceeded is published', () => {
@@ -160,10 +161,10 @@ describe('useConfigSaveReporter', () => {
       { wrapper: createWrapper(), initialProps: { authType: 'default' } }
     );
 
-    const getAppEventsSpy = jest.spyOn(services, 'getAppEvents');
+    jest.mocked(services.getAppEvents).mockClear();
     rerender({ authType: 'default' });
 
-    expect(getAppEventsSpy).not.toHaveBeenCalled();
+    expect(services.getAppEvents).not.toHaveBeenCalled();
   });
 });
 
