@@ -133,3 +133,27 @@ Build a specific plugin: `yarn workspace @grafana-plugins/<name> dev`
 - **Config**: Defaults in `conf/defaults.ini`, overrides in `conf/custom.ini`.
 - **Database migrations**: Live in `pkg/services/sqlstore/migrations/`. Test with `make devenv sources=postgres_tests,mysql_tests` then `make test-go-integration-postgres`.
 - **CI sharding**: Backend tests use `SHARD`/`SHARDS` env vars for parallelization.
+
+## Cursor Cloud specific instructions
+
+### Node.js version
+
+The project requires Node.js v24 (see `.nvmrc`). Use `nvm use` or `nvm install $(cat .nvmrc)` if the active version doesn't match. After switching, run `corepack enable` so the bundled Yarn 4.11 is available.
+
+### Running Grafana locally
+
+1. **Backend**: `make run` — compiles the Go backend with hot-reload via `air`, serves on `http://localhost:3000`. Default credentials: `admin`/`admin`. The initial `go build` takes ~2-3 minutes; subsequent hot-reloads are faster.
+2. **Frontend**: `yarn start` — runs webpack in dev mode, compiling assets into `public/build/`. The Go backend serves these assets; there is no separate webpack-dev-server port. The initial build (including plugin workspaces) takes ~90 seconds.
+3. Both must be running for the full UI to work. The backend returns HTTP 500 on `/login` until frontend assets are built.
+
+### Yarn `enableScripts: false`
+
+The `.yarnrc.yml` disables post-install scripts (`enableScripts: false`). Some native packages (e.g. `@swc/core`, `esbuild`) won't have their binaries; Jest and webpack use JS fallbacks. This is intentional — do not change it.
+
+### Database
+
+Grafana defaults to embedded SQLite (`data/grafana.db`). No external database setup is needed for development. Optional: `make devenv sources=postgres` for PostgreSQL (requires Docker).
+
+### Commands reference
+
+All build, test, lint, and code-generation commands are documented in the `## Commands` section above. Use those as the canonical reference.
