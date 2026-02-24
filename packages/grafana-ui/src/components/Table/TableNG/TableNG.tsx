@@ -496,7 +496,7 @@ export function TableNG(props: TableNGProps) {
             <DataGrid<TableRow, TableSummaryRow>
               {...commonDataGridProps}
               className={clsx(styles.grid, styles.gridNested)}
-              headerRowClass={clsx(styles.headerRow, { [styles.displayNone]: !hasNestedHeaders })}
+              headerRowClass={clsx(styles.headerRow, hasNestedHeaders ? '' : styles.displayNone)}
               headerRowHeight={hasNestedHeaders ? TABLE.HEADER_HEIGHT : 0}
               columns={nestedColumns}
               rows={expandedRecords}
@@ -651,7 +651,7 @@ export function TableNG(props: TableNGProps) {
               className={clsx(
                 props.className,
                 cellParentStyles,
-                cellSpecificStyles != null && { [cellSpecificStyles]: maxRowHeight == null }
+                cellSpecificStyles != null && maxRowHeight == null ? cellSpecificStyles : ''
               )}
               style={style}
             />
@@ -937,7 +937,7 @@ export function TableNG(props: TableNGProps) {
         isRowSelectionDisabled={() => initialRowIndex !== undefined}
         selectedRows={selectedRows}
         onSelectedRowsChange={setSelectedRows}
-        headerRowClass={clsx(styles.headerRow, { [styles.displayNone]: noHeader })}
+        headerRowClass={clsx(styles.headerRow, noHeader ? styles.displayNone : '')}
         headerRowHeight={headerHeight}
         onCellClick={onCellClick}
         onCellKeyDown={({ column, row }, event) => {

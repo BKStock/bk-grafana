@@ -65,7 +65,7 @@ export const Filter = memo(({ name, rows, filter, setFilter, field, iconClassNam
         }
       }}
     >
-      <Icon name="filter" className={clsx(iconClassName, filterEnabled ? styles.filterIconEnabled : undefined)} />
+      <Icon name="filter" className={clsx(iconClassName, filterEnabled ? styles.filterIconEnabled : '')} />
       {isPopoverVisible && ref.current && (
         <Popover
           content={
