@@ -3426,7 +3426,15 @@
         "title": "Rule not found"
       },
       "rules-with-firing-instances": "Alert rules with firing instances",
-      "rules-with-pending-instances": "Alert rules with pending instances"
+      "rules-with-pending-instances": "Alert rules with pending instances",
+      "saved-searches": {
+        "predefined": {
+          "firing-only": "Filter: Firing",
+          "folder-evalgroup": "Group by: Folder and Evaluation group",
+          "folder-evalgroup-firing": "Filter: Firing; Group by: Folder and Evaluation group",
+          "folder-firing": "Group by: Folder"
+        }
+      }
     },
     "type-selector-button": {
       "add-expression": "Add expression"
