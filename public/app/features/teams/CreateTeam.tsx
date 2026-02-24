@@ -3,19 +3,7 @@ import { useForm } from 'react-hook-form';
 
 import { locationUtil, NavModelItem } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  Field,
-  FieldSet,
-  Input,
-  Link,
-  LoadingPlaceholder,
-  Stack,
-  Text,
-} from '@grafana/ui';
+import { Button, Checkbox, Field, FieldSet, Input, Stack } from '@grafana/ui';
 import { useCreateFolder } from 'app/api/clients/folder/v1beta1/hooks';
 import { extractErrorMessage } from 'app/api/utils';
 import { Page } from 'app/core/components/Page/Page';
@@ -25,6 +13,13 @@ import { contextSrv } from 'app/core/services/context_srv';
 import { Role } from 'app/types/accessControl';
 import { TeamDTO } from 'app/types/teams';
 
+import {
+  FolderCreationState,
+  getFolderResultCardState,
+  getTeamResultCardState,
+  StepResultCard,
+  TeamCreationState,
+} from './CreateTeamResultCard';
 import { useCreateTeam } from './hooks';
 
 const pageNav: NavModelItem = {
@@ -33,117 +28,6 @@ const pageNav: NavModelItem = {
   text: 'New team',
   subTitle: 'Create a new team. Teams let you grant permissions to a group of users.',
 };
-
-type CreateStepStatus = 'idle' | 'loading' | 'success' | 'error';
-
-interface TeamCreationState {
-  status: CreateStepStatus;
-  uid?: string;
-  error?: string;
-}
-
-interface FolderCreationState {
-  status: CreateStepStatus;
-  url?: string;
-  error?: string;
-}
-
-interface ResultCardLink {
-  href: string;
-  text: string;
-}
-
-type ResultCardState =
-  | { status: 'idle' }
-  | { status: 'loading'; loadingText: string }
-  | { status: 'error'; errorTitle: string; errorMessage: string }
-  | { status: 'success'; successText: string; successLink?: ResultCardLink };
-
-interface StepResultCardProps {
-  heading: string;
-  state: ResultCardState;
-}
-
-function StepResultCard({ heading, state }: StepResultCardProps) {
-  if (state.status === 'idle') {
-    return null;
-  }
-
-  return (
-    <Card noMargin>
-      <Card.Heading>{heading}</Card.Heading>
-      <Card.Description>
-        {state.status === 'loading' && <LoadingPlaceholder text={state.loadingText} />}
-        {state.status === 'error' && (
-          <Alert severity="error" title={state.errorTitle}>
-            {state.errorMessage}
-          </Alert>
-        )}
-        {state.status === 'success' && (
-          <Stack direction="column" gap={0}>
-            <Text>{state.successText}</Text>
-            {state.successLink && <Link href={state.successLink.href}>{state.successLink.text}</Link>}
-          </Stack>
-        )}
-      </Card.Description>
-    </Card>
-  );
-}
-
-function getFolderResultCardState(teamState: TeamCreationState, folderState: FolderCreationState): ResultCardState {
-  if (teamState.status === 'loading') {
-    return {
-      status: 'loading',
-      loadingText: t(
-        'teams.create-team.folder-creation-waiting',
-        'Waiting for team creation before creating folder...'
-      ),
-    };
-  }
-
-  if (teamState.status === 'error') {
-    return {
-      status: 'error',
-      errorTitle: t('teams.create-team.folder-creation-skipped', 'Folder creation skipped'),
-      errorMessage: t(
-        'teams.create-team.folder-creation-skipped-team-failure',
-        'Folder was not created because team creation failed.'
-      ),
-    };
-  }
-
-  if (teamState.status !== 'success') {
-    return { status: 'idle' };
-  }
-
-  if (folderState.status === 'loading') {
-    return {
-      status: 'loading',
-      loadingText: t('teams.create-team.folder-creation-loading', 'Creating folder...'),
-    };
-  }
-
-  if (folderState.status === 'error') {
-    return {
-      status: 'error',
-      errorTitle: t('teams.create-team.folder-create-failed', 'Failed to create folder'),
-      errorMessage: folderState.error ?? t('teams.create-team.folder-create-failed', 'Failed to create folder'),
-    };
-  }
-
-  if (folderState.status === 'success' && folderState.url) {
-    return {
-      status: 'success',
-      successText: t('teams.create-team.folder-creation-success', 'Folder created successfully.'),
-      successLink: {
-        href: folderState.url,
-        text: t('teams.create-team.folder-creation-link', 'Open folder'),
-      },
-    };
-  }
-
-  return { status: 'idle' };
-}
 
 const CreateTeam = (): JSX.Element => {
   const currentOrgId = contextSrv.user.orgId;
@@ -166,28 +50,7 @@ const CreateTeam = (): JSX.Element => {
     teamCreationState.status === 'loading' ||
     teamCreationState.status === 'success' ||
     folderCreationState.status === 'loading';
-  const teamResultCardState: ResultCardState =
-    teamCreationState.status === 'loading'
-      ? {
-          status: 'loading',
-          loadingText: t('teams.create-team.team-creation-loading', 'Creating team...'),
-        }
-      : teamCreationState.status === 'error'
-        ? {
-            status: 'error',
-            errorTitle: t('teams.create-team.failed-to-create', 'Failed to create team'),
-            errorMessage: teamCreationState.error ?? t('teams.create-team.failed-to-create', 'Failed to create team'),
-          }
-        : teamCreationState.status === 'success' && teamCreationState.uid
-          ? {
-              status: 'success',
-              successText: t('teams.create-team.team-creation-success', 'Team created successfully.'),
-              successLink: {
-                href: `/org/teams/edit/${teamCreationState.uid}`,
-                text: t('teams.create-team.team-creation-link', 'Open team details'),
-              },
-            }
-          : { status: 'idle' };
+  const teamResultCardState = getTeamResultCardState(teamCreationState);
   const folderResultCardState = getFolderResultCardState(teamCreationState, folderCreationState);
 
   const createTeam = async (formModel: TeamDTO) => {
