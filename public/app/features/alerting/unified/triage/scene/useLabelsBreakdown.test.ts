@@ -1,8 +1,8 @@
-import { computeTopLabels } from './useLabelsBreakdown';
+import { computeLabelStats } from './useLabelsBreakdown';
 
-describe('computeTopLabels', () => {
+describe('computeLabelStats', () => {
   it('should return empty array for empty series', () => {
-    expect(computeTopLabels([])).toEqual([]);
+    expect(computeLabelStats([])).toEqual([]);
   });
 
   it('should exclude internal labels', () => {
@@ -11,7 +11,7 @@ describe('computeTopLabels', () => {
       { __name__: 'GRAFANA_ALERTS', alertname: 'rule2', alertstate: 'pending', team: 'platform' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result).toHaveLength(1);
     expect(result[0].key).toBe('team');
@@ -26,7 +26,7 @@ describe('computeTopLabels', () => {
       { team: 'e' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result).toHaveLength(6);
     // team appears in all 5
@@ -56,7 +56,7 @@ describe('computeTopLabels', () => {
       { team: 'backend' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('team');
     expect(result[0].count).toBe(6);
@@ -73,13 +73,13 @@ describe('computeTopLabels', () => {
       { __name__: 'GRAFANA_ALERTS', alertname: 'rule2', alertstate: 'pending' },
     ];
 
-    expect(computeTopLabels(series)).toEqual([]);
+    expect(computeLabelStats(series)).toEqual([]);
   });
 
   it('should sort values by frequency', () => {
     const series = Array.from({ length: 15 }, (_, i) => ({ host: `host-${i}` }));
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('host');
     expect(result[0].count).toBe(15);
@@ -95,7 +95,7 @@ describe('computeTopLabels', () => {
       { team: 'e' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result).toHaveLength(6);
     expect(result.map((r) => r.key)).toEqual(['team', 'env', 'region', 'service', 'severity', 'rare']);
@@ -104,7 +104,7 @@ describe('computeTopLabels', () => {
   it('should return all values sorted by frequency', () => {
     const series = Array.from({ length: 15 }, (_, i) => ({ host: `host-${i}` }));
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('host');
     expect(result[0].count).toBe(15);
@@ -119,7 +119,7 @@ describe('computeTopLabels', () => {
       { alertstate: 'pending', team: 'infra', env: 'prod' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     const team = result.find((r) => r.key === 'team')!;
     expect(team.firing).toBe(2);
@@ -142,7 +142,7 @@ describe('computeTopLabels', () => {
       { alertstate: 'pending', team: 'platform' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
     const infra = team.values.find((v) => v.value === 'infra')!;
@@ -162,7 +162,7 @@ describe('computeTopLabels', () => {
       { alertstate: 'firing', team: 'infra' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     const team = result.find((r) => r.key === 'team')!;
     expect(team.firing).toBe(2);
@@ -185,7 +185,7 @@ describe('computeTopLabels', () => {
       },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
 
     expect(result).toHaveLength(1);
     expect(result[0].key).toBe('team');
@@ -198,7 +198,7 @@ describe('computeTopLabels', () => {
       { team: 'infra' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
     expect(team.count).toBe(3);
@@ -214,7 +214,7 @@ describe('computeTopLabels', () => {
       { alertstate: 'inactive', team: 'infra' },
     ];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
     expect(team.count).toBe(4);
@@ -230,7 +230,7 @@ describe('computeTopLabels', () => {
   it('should count empty string as a valid label value', () => {
     const series = [{ team: '' }, { team: '' }, { team: 'infra' }];
 
-    const result = computeTopLabels(series);
+    const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
     expect(team.count).toBe(3);

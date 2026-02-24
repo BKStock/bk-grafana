@@ -10,7 +10,7 @@ import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { AllLabelsDrawer, LabelBadgeCounts, addOrReplaceFilter } from './AllLabelsDrawer';
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
-import { type TopLabel, useLabelsBreakdown } from './useLabelsBreakdown';
+import { type LabelStats, useLabelsBreakdown } from './useLabelsBreakdown';
 import { useQueryFilter } from './utils';
 
 const PREVIEW_LABEL_COUNT = 5;
@@ -113,7 +113,7 @@ function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: C
   );
 }
 
-function LabelTooltipContent({ label }: { label: TopLabel }) {
+function LabelTooltipContent({ label }: { label: LabelStats }) {
   const styles = useStyles2(getTooltipStyles);
 
   return (
@@ -138,8 +138,8 @@ function LabelTooltipContent({ label }: { label: TopLabel }) {
   );
 }
 
-function TopLabelsSection() {
-  const styles = useStyles2(getTopLabelsStyles);
+function LabelStatssSection() {
+  const styles = useStyles2(getLabelStatssStyles);
   const { labels, isLoading } = useLabelsBreakdown();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const sceneContext = useSceneContext();
@@ -256,7 +256,7 @@ function SummaryStatsContent() {
         </div>
       </Box>
       <ErrorBoundaryAlert style="alertbox">
-        <TopLabelsSection />
+        <LabelStatssSection />
       </ErrorBoundaryAlert>
     </Stack>
   );
@@ -308,7 +308,7 @@ const getTooltipStyles = (theme: GrafanaTheme2) => ({
   }),
 });
 
-const getTopLabelsStyles = (theme: GrafanaTheme2) => ({
+const getLabelStatssStyles = (theme: GrafanaTheme2) => ({
   labelBadge: css({
     display: 'inline-flex',
     alignItems: 'center',

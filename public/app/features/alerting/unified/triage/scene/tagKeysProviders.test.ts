@@ -1,4 +1,6 @@
-import { DataSourceApi, MetricFindValue } from '@grafana/data';
+import { of } from 'rxjs';
+
+import { DataSourceApi, FieldType, MetricFindValue, toDataFrame } from '@grafana/data';
 import { getDataSourceSrv } from '@grafana/runtime';
 import {
   AdHocFiltersVariable,
@@ -10,19 +12,47 @@ import {
 
 import { getAdHocTagKeysProvider, getAdHocTagValuesProvider, getGroupByTagKeysProvider } from './tagKeysProviders';
 
-jest.mock('@grafana/runtime', () => ({
-  ...jest.requireActual('@grafana/runtime'),
-  getDataSourceSrv: jest.fn(),
-  // AdHocFiltersVariable constructor calls getTemplateSrv().getAdhocFilters to patch it.
-  // Without this stub it logs "Failed to patch getAdhocFilters".
-  getTemplateSrv: () => ({ getAdhocFilters: jest.fn().mockReturnValue([]) }),
-}));
+jest.mock('@grafana/runtime', () => {
+  // Stub class for instanceof DataSourceWithBackend checks.
+  // Must be defined inside the factory because jest.mock is hoisted above all declarations.
+  class MockDataSourceWithBackend {}
+  return {
+    ...jest.requireActual('@grafana/runtime'),
+    getDataSourceSrv: jest.fn(),
+    DataSourceWithBackend: MockDataSourceWithBackend,
+    // AdHocFiltersVariable constructor calls getTemplateSrv().getAdhocFilters to patch it.
+    // Without this stub it logs "Failed to patch getAdhocFilters".
+    getTemplateSrv: () => ({ getAdhocFilters: jest.fn().mockReturnValue([]) }),
+  };
+});
 
 const getDataSourceSrvMock = jest.mocked(getDataSourceSrv);
 
-function mockGetDataSourceSrv(dsOverrides: Partial<DataSourceApi> & { getResource?: jest.Mock } = {}) {
+/**
+ * Build a DataFrame mimicking an instant-query table result:
+ * one string field per label key, one row per metric series.
+ */
+function buildInstantFrame(metrics: Array<Record<string, string>>) {
+  if (metrics.length === 0) {
+    return toDataFrame({ fields: [] });
+  }
+  const keys = [...new Set(metrics.flatMap((m) => Object.keys(m)))];
+  return toDataFrame({
+    fields: keys.map((key) => ({
+      name: key,
+      type: FieldType.string,
+      values: metrics.map((m) => m[key] ?? ''),
+    })),
+  });
+}
+
+function mockGetDataSourceSrv(dsOverrides: Partial<DataSourceApi> & { query?: jest.Mock } = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { DataSourceWithBackend } = require('@grafana/runtime');
+  // Make the mock pass instanceof DataSourceWithBackend checks
+  const ds = Object.assign(Object.create(DataSourceWithBackend.prototype), dsOverrides);
   getDataSourceSrvMock.mockReturnValue({
-    get: async () => dsOverrides as DataSourceApi,
+    get: async () => ds as DataSourceApi,
   } as ReturnType<typeof getDataSourceSrv>);
 }
 
@@ -46,13 +76,17 @@ describe('tagKeysProviders', () => {
           { text: 'team', value: 'team' },
           { text: 'region', value: 'region' },
         ] satisfies MetricFindValue[]),
-        getResource: jest.fn().mockResolvedValue({
-          data: [
-            { __name__: 'GRAFANA_ALERTS', alertname: 'r1', team: 'platform', severity: 'critical' },
-            { __name__: 'GRAFANA_ALERTS', alertname: 'r2', team: 'infra', region: 'eu' },
-            { __name__: 'GRAFANA_ALERTS', alertname: 'r3', team: 'platform' },
-          ],
-        }),
+        query: jest.fn().mockReturnValue(
+          of({
+            data: [
+              buildInstantFrame([
+                { __name__: 'GRAFANA_ALERTS', alertname: 'r1', team: 'platform', severity: 'critical' },
+                { __name__: 'GRAFANA_ALERTS', alertname: 'r2', team: 'infra', region: 'eu' },
+                { __name__: 'GRAFANA_ALERTS', alertname: 'r3', team: 'platform' },
+              ]),
+            ],
+          })
+        ),
       });
 
       const variable = new GroupByVariable({ name: 'groupBy', datasource: { uid: 'test' } });
@@ -73,7 +107,7 @@ describe('tagKeysProviders', () => {
     it('should return only promoted labels when DS returns no extra keys', async () => {
       mockGetDataSourceSrv({
         getTagKeys: jest.fn().mockResolvedValue([] satisfies MetricFindValue[]),
-        getResource: jest.fn().mockResolvedValue({ data: [] }),
+        query: jest.fn().mockReturnValue(of({ data: [buildInstantFrame([])] })),
       });
 
       const variable = new GroupByVariable({ name: 'groupBy', datasource: { uid: 'test' } });
@@ -97,19 +131,34 @@ describe('tagKeysProviders', () => {
           { text: 'team', value: 'team' },
           { text: 'env', value: 'env' },
         ] satisfies MetricFindValue[]),
-        getResource: jest.fn().mockResolvedValue({
-          data: [
-            {
-              __name__: 'GRAFANA_ALERTS',
-              alertname: 'r1',
-              alertstate: 'firing',
-              team: 'platform',
-              severity: 'critical',
-            },
-            { __name__: 'GRAFANA_ALERTS', alertname: 'r2', alertstate: 'firing', team: 'infra', env: 'prod' },
-            { __name__: 'GRAFANA_ALERTS', alertname: 'r3', alertstate: 'pending', team: 'platform' },
-          ],
-        }),
+        query: jest.fn().mockReturnValue(
+          of({
+            data: [
+              buildInstantFrame([
+                {
+                  __name__: 'GRAFANA_ALERTS',
+                  alertname: 'r1',
+                  alertstate: 'firing',
+                  team: 'platform',
+                  severity: 'critical',
+                },
+                {
+                  __name__: 'GRAFANA_ALERTS',
+                  alertname: 'r2',
+                  alertstate: 'firing',
+                  team: 'infra',
+                  env: 'prod',
+                },
+                {
+                  __name__: 'GRAFANA_ALERTS',
+                  alertname: 'r3',
+                  alertstate: 'pending',
+                  team: 'platform',
+                },
+              ]),
+            ],
+          })
+        ),
       });
 
       const variable = new AdHocFiltersVariable({ name: 'filters', datasource: { uid: 'test' } });
@@ -136,9 +185,11 @@ describe('tagKeysProviders', () => {
           { text: 'team', value: 'team' },
         ] satisfies MetricFindValue[]),
         // alertstate is promoted AND would be frequent, but INTERNAL_LABELS excludes it from counting
-        getResource: jest.fn().mockResolvedValue({
-          data: [{ __name__: 'GRAFANA_ALERTS', alertstate: 'firing', team: 'platform' }],
-        }),
+        query: jest.fn().mockReturnValue(
+          of({
+            data: [buildInstantFrame([{ __name__: 'GRAFANA_ALERTS', alertstate: 'firing', team: 'platform' }])],
+          })
+        ),
       });
 
       const variable = new AdHocFiltersVariable({ name: 'filters', datasource: { uid: 'test' } });
@@ -169,7 +220,7 @@ describe('tagKeysProviders', () => {
   });
 
   describe('edge cases', () => {
-    it('should return promoted labels only when DS lacks getTagKeys and getResource', async () => {
+    it('should return promoted labels only when DS lacks getTagKeys', async () => {
       mockGetDataSourceSrv({});
 
       const variable = new GroupByVariable({ name: 'groupBy', datasource: { uid: 'test' } });
@@ -180,10 +231,12 @@ describe('tagKeysProviders', () => {
       expect(result.values).toEqual([{ value: 'grafana_folder', text: 'Folder', group: 'Common' }]);
     });
 
-    it('should skip Frequent group when getResource is unavailable', async () => {
+    it('should skip Frequent group when fetching alert instances fails', async () => {
       mockGetDataSourceSrv({
         getTagKeys: jest.fn().mockResolvedValue([{ text: 'team', value: 'team' }] satisfies MetricFindValue[]),
-        // no getResource
+        query: jest.fn().mockImplementation(() => {
+          throw new Error('query failed');
+        }),
       });
 
       const variable = new GroupByVariable({ name: 'groupBy', datasource: { uid: 'test' } });

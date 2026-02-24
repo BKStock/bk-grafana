@@ -1,9 +1,15 @@
-import { MetricFindValue, TimeRange } from '@grafana/data';
+import { lastValueFrom } from 'rxjs';
+
+import { CoreApp, MetricFindValue, TimeRange } from '@grafana/data';
 import { PromQuery } from '@grafana/prometheus';
-import { getDataSourceSrv } from '@grafana/runtime';
+import { DataSourceWithBackend, getDataSourceSrv } from '@grafana/runtime';
 import { AdHocFilterWithLabels, AdHocFiltersVariable, GroupByVariable, sceneGraph } from '@grafana/scenes';
 
 import { DATASOURCE_UID, METRIC_NAME } from '../constants';
+
+import { dataFrameToLabelMaps } from './fetchSeries';
+import { alertInstancesExpr } from './queries';
+import { computeLabelStats } from './useLabelsBreakdown';
 
 const COMMON_GROUP = 'Common';
 const FREQUENT_GROUP = 'Frequent';
@@ -23,19 +29,6 @@ const FILTER_PROMOTED: MetricFindValue[] = [
 
 /** Labels that should never appear in dropdowns */
 const EXCLUDED = new Set(['__name__']);
-
-/** Internal/structural labels to exclude from frequency counting */
-export const INTERNAL_LABELS = new Set([
-  '__name__',
-  'alertname',
-  'alertstate',
-  'folderUID',
-  'from',
-  'grafana_alertstate',
-  'grafana_folder',
-  'grafana_rule_uid',
-  'orgID',
-]);
 
 /** Query used to scope label lookups to the alerting metric */
 const metricQuery: PromQuery = { refId: 'keys', expr: METRIC_NAME };
@@ -74,37 +67,38 @@ async function fetchTagValues(timeRange: TimeRange, key: string): Promise<Metric
 }
 
 /**
- * Fetch series for GRAFANA_ALERTS and return the top N label keys
+ * Fetch deduplicated series for GRAFANA_ALERTS and return the top N label keys
  * ordered by how many instances carry each label.
  */
 async function fetchTopLabelKeys(timeRange: TimeRange): Promise<string[]> {
   const ds = await getDataSourceSrv().get({ uid: DATASOURCE_UID });
 
-  if (!('getResource' in ds) || typeof ds.getResource !== 'function') {
+  if (!(ds instanceof DataSourceWithBackend)) {
     return [];
   }
 
-  const response = await ds.getResource('api/v1/series', {
-    'match[]': METRIC_NAME,
-    start: String(timeRange.from.unix()),
-    end: String(timeRange.to.unix()),
-  });
+  const response = await lastValueFrom(
+    ds.query({
+      requestId: 'fetchTopLabelKeys',
+      interval: '',
+      intervalMs: 0,
+      range: timeRange,
+      scopedVars: {},
+      targets: [{ refId: 'A', expr: alertInstancesExpr(''), instant: true, range: false }],
+      timezone: 'browser',
+      app: CoreApp.UnifiedAlerting,
+      startTime: Date.now(),
+    })
+  );
 
-  const series: Array<Record<string, string>> = response?.data ?? [];
-  const counts = new Map<string, number>();
-
-  for (const s of series) {
-    for (const key of Object.keys(s)) {
-      if (!INTERNAL_LABELS.has(key)) {
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-      }
-    }
+  const frame = response.data?.at(0);
+  if (!frame) {
+    return [];
   }
 
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return computeLabelStats(dataFrameToLabelMaps(frame))
     .slice(0, MAX_FREQUENT_LABELS)
-    .map(([key]) => key);
+    .map((label) => label.key);
 }
 
 /**
@@ -115,7 +109,7 @@ async function buildTagKeysResult(
   timeRange: TimeRange,
   promoted: MetricFindValue[]
 ): Promise<{ replace: boolean; values: MetricFindValue[] }> {
-  const [dsKeys, topKeys] = await Promise.all([fetchTagKeys(timeRange), fetchTopLabelKeys(timeRange)]);
+  const [dsKeys, topKeys] = await Promise.all([fetchTagKeys(timeRange), fetchTopLabelKeys(timeRange).catch(() => [])]);
 
   const promotedValues = new Set(promoted.map((p) => String(p.value)));
   const topKeysSet = new Set(topKeys);

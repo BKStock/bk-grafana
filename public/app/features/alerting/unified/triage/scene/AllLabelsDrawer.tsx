@@ -9,12 +9,12 @@ import { Button, Drawer, Icon, Stack, Text, useStyles2 } from '@grafana/ui';
 
 import { VARIABLES } from '../constants';
 
-import { type LabelValueCount, type TopLabel } from './useLabelsBreakdown';
+import { type LabelStats, type LabelValueCount } from './useLabelsBreakdown';
 
 // --- Public API ---
 
 interface AllLabelsDrawerProps {
-  allLabels: TopLabel[];
+  allLabels: LabelStats[];
   onClose: () => void;
 }
 

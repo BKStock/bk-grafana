@@ -66,20 +66,29 @@ export function alertRuleInstancesQuery(ruleUID: string, filter: string): SceneD
 }
 
 /**
- * Builds a PromQL expression that counts deduplicated alert instances over the selected time range.
+ * Raw PromQL expression that returns one deduplicated series per active alert instance.
  * Uses last_over_time to capture all instances active during the range, and `unless` to
  * remove pending instances that also had a corresponding firing series.
  * Firing takes priority over pending — instances that transitioned between states are
  * counted only once in their firing state.
  */
-function getAlertsSummariesQuery(countBy: string, filter: string): string {
+export function alertInstancesExpr(filter: string): string {
   const firingFilter = filter ? `alertstate="firing",${filter}` : 'alertstate="firing"';
   const pendingFilter = filter ? `alertstate="pending",${filter}` : 'alertstate="pending"';
   return (
-    `count by (${countBy}) (` +
     `last_over_time(${METRIC_NAME}{${firingFilter}}[$__range]) or ` +
     `(last_over_time(${METRIC_NAME}{${pendingFilter}}[$__range]) ` +
     `unless ignoring(alertstate, grafana_alertstate) ` +
-    `last_over_time(${METRIC_NAME}{${firingFilter}}[$__range])))`
+    `last_over_time(${METRIC_NAME}{${firingFilter}}[$__range]))`
   );
+}
+
+/** Wraps alertInstancesExpr in a count-by aggregation */
+function getAlertsSummariesQuery(countBy: string, filter: string): string {
+  return `count by (${countBy}) (${alertInstancesExpr(filter)})`;
+}
+
+/** Instant table query returning one row per deduplicated alert instance (for label breakdown) */
+export function alertInstancesQuery(filter: string): SceneDataQuery {
+  return getDataQuery(alertInstancesExpr(filter), { instant: true, range: false, format: 'table' });
 }

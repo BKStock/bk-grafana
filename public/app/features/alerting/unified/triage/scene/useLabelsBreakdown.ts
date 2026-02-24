@@ -1,13 +1,11 @@
-import { useAsync } from 'react-use';
+import { useMemo } from 'react';
 
-import { TimeRange } from '@grafana/data';
-import { getDataSourceSrv } from '@grafana/runtime';
-import { useTimeRange } from '@grafana/scenes-react';
+import { useQueryRunner } from '@grafana/scenes-react';
 
-import { logError } from '../../Analytics';
-import { DATASOURCE_UID, METRIC_NAME } from '../constants';
+import { INTERNAL_LABELS } from '../constants';
 
-import { INTERNAL_LABELS } from './tagKeysProviders';
+import { dataFrameToLabelMaps } from './fetchSeries';
+import { alertInstancesQuery } from './queries';
 import { useQueryFilter } from './utils';
 
 export interface LabelValueCount {
@@ -17,7 +15,7 @@ export interface LabelValueCount {
   pending: number;
 }
 
-export interface TopLabel {
+export interface LabelStats {
   key: string;
   count: number;
   firing: number;
@@ -26,30 +24,29 @@ export interface TopLabel {
 }
 
 export function useLabelsBreakdown(): {
-  labels: TopLabel[];
+  labels: LabelStats[];
   isLoading: boolean;
-  error: Error | undefined;
 } {
-  const [timeRange] = useTimeRange();
   const filter = useQueryFilter();
+  const dataProvider = useQueryRunner({ queries: [alertInstancesQuery(filter)] });
+  const { data } = dataProvider.useState();
+  const frame = data?.series?.at(0);
 
-  const { loading, error, value } = useAsync(async () => {
-    const series = await fetchSeries(timeRange, filter);
-    return computeTopLabels(series);
-  }, [timeRange, filter]);
+  const labels = useMemo(() => {
+    if (!frame) {
+      return [];
+    }
+    return computeLabelStats(dataFrameToLabelMaps(frame));
+  }, [frame]);
 
-  if (error) {
-    logError(error, { context: 'useLabelsBreakdown' });
-  }
-
-  return { labels: value ?? [], isLoading: loading, error };
+  return { labels, isLoading: !dataProvider.isDataReadyToDisplay() };
 }
 
 /**
  * Given an array of series (label maps), compute label keys sorted by frequency,
  * along with value distributions for each key.
  */
-export function computeTopLabels(series: Array<Record<string, string>>): TopLabel[] {
+export function computeLabelStats(series: Array<Record<string, string>>): LabelStats[] {
   const keyStats = new Map<string, LabelKeyStats>();
 
   for (const s of series) {
@@ -126,47 +123,4 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, factory: () => V): V {
     map.set(key, val);
   }
   return val;
-}
-
-/**
- * Build a PromQL dedup expression that returns one series per active alert instance.
- *
- * The query has two halves joined by `or`:
- *   1. All firing instances in the range (take the last sample).
- *   2. All pending instances in the range, MINUS any that also fired
- *      (`unless ignoring(alertstate, grafana_alertstate)`).
- *
- * This ensures each instance is counted exactly once, with firing taking
- * priority over pending when an instance transitioned between states.
- * Matches the logic in queries.ts getAlertsSummariesQuery.
- */
-function buildDedupExpr(filter: string, range: string): string {
-  const firingFilter = filter ? `alertstate="firing",${filter}` : 'alertstate="firing"';
-  const pendingFilter = filter ? `alertstate="pending",${filter}` : 'alertstate="pending"';
-  return (
-    `last_over_time(${METRIC_NAME}{${firingFilter}}[${range}]) or ` +
-    `(last_over_time(${METRIC_NAME}{${pendingFilter}}[${range}]) ` +
-    `unless ignoring(alertstate, grafana_alertstate) ` +
-    `last_over_time(${METRIC_NAME}{${firingFilter}}[${range}]))`
-  );
-}
-
-async function fetchSeries(timeRange: TimeRange, filter: string): Promise<Array<Record<string, string>>> {
-  const ds = await getDataSourceSrv().get({ uid: DATASOURCE_UID });
-
-  if (!('getResource' in ds) || typeof ds.getResource !== 'function') {
-    return [];
-  }
-
-  const rangeSecs = timeRange.to.unix() - timeRange.from.unix();
-  const query = buildDedupExpr(filter, `${rangeSecs}s`);
-
-  const response = await ds.getResource('api/v1/query', {
-    query,
-    time: String(timeRange.to.unix()),
-  });
-
-  // Instant query returns { data: { result: [{ metric: {...}, value: [...] }] } }
-  const results: Array<{ metric: Record<string, string> }> = response?.data?.result ?? [];
-  return results.map((r) => r.metric);
 }
