@@ -113,9 +113,8 @@ func TestRenderErrorImage(t *testing.T) {
 
 func TestRenderUnavailableError(t *testing.T) {
 	rs := RenderingService{
-		Cfg:                   &setting.Cfg{},
-		log:                   log.New("test"),
-		RendererPluginManager: &dummyPluginManager{},
+		Cfg: &setting.Cfg{},
+		log: log.New("test"),
 	}
 	opts := Opts{ErrorOpts: ErrorOpts{ErrorRenderUnavailable: true}}
 	result, err := rs.Render(context.Background(), RenderPNG, opts, nil)
@@ -273,7 +272,7 @@ func TestProvideService(t *testing.T) {
 	cfg.PDFsDir = filepath.Join(t.TempDir(), "pdfs")
 
 	t.Run("Default configuration values", func(t *testing.T) {
-		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, "", rs.Cfg.RendererServerUrl)
@@ -285,7 +284,7 @@ func TestProvideService(t *testing.T) {
 		cfg.RendererServerUrl = "http://custom-renderer:8081"
 		cfg.RendererCallbackUrl = ""
 
-		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, "http://custom-renderer:8081", rs.Cfg.RendererServerUrl)
@@ -297,7 +296,7 @@ func TestProvideService(t *testing.T) {
 		cfg.RendererServerUrl = "http://custom-renderer:8081"
 		cfg.RendererCallbackUrl = "http://public-grafana.com/"
 
-		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, "http://custom-renderer:8081", rs.Cfg.RendererServerUrl)
@@ -309,7 +308,7 @@ func TestProvideService(t *testing.T) {
 		cfg.RendererServerUrl = ""
 		cfg.RendererCallbackUrl = "https://public-grafana.com/"
 
-		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, "", rs.Cfg.RendererServerUrl)
@@ -321,7 +320,7 @@ func TestProvideService(t *testing.T) {
 		cfg.RendererServerUrl = ""
 		cfg.RendererCallbackUrl = "https://public-grafana.com"
 
-		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		rs, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, "", rs.Cfg.RendererServerUrl)
@@ -333,7 +332,7 @@ func TestProvideService(t *testing.T) {
 		cfg.RendererServerUrl = ""
 		cfg.RendererCallbackUrl = "http://public{grafana"
 
-		_, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil, &dummyPluginManager{})
+		_, err := ProvideService(cfg, featuremgmt.WithFeatures(), nil)
 		require.Error(t, err)
 	})
 }
