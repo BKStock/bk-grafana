@@ -702,6 +702,8 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
+require software.sslmate.com/src/go-pkcs12 v0.7.0 // indirect
+
 replace (
 	// Use fork of crewjam/saml with fixes for some issues until changes get merged into upstream
 	github.com/crewjam/saml => github.com/grafana/saml v0.4.15-0.20240917091248-ae3bbdad8a56
