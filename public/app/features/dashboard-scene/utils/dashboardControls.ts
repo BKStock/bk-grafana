@@ -1,39 +1,43 @@
-import { getDataSourceSrv } from '@grafana/runtime';
+import { nanoid } from 'nanoid';
+
+import { getDataSourceSrv, reportInteraction } from '@grafana/runtime';
 import { SceneVariable } from '@grafana/scenes';
 import { DashboardLink, DataSourceRef } from '@grafana/schema';
 import { Spec as DashboardV2Spec, VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
+import { reportPerformance } from 'app/core/services/echo/EchoSrv';
 import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
 import { DashboardDTO } from 'app/types/dashboard';
 
 import { getRuntimePanelDataSource } from '../serialization/layoutSerializers/utils';
 
-export const loadDatasources = (refs: DataSourceRef[]) => {
-  return Promise.all(refs.map((ref) => getDataSourceSrv().get(ref)));
-};
+export function loadDefaultControlsFromDatasources(refs: DataSourceRef[]) {
+  const traceId = nanoid(8);
 
-// Deduplicates datasource refs by type, keeping only one ref per datasource plugin type
-export const deduplicateDatasourceRefsByType = (refs: Array<DataSourceRef | null | undefined>): DataSourceRef[] => {
-  const dsByType: Record<string, DataSourceRef> = {};
+  return invokeAndTrack(() => loadDefaultControlsByRefs(refs, traceId), {
+    traceId,
+    phase: 'total',
+  });
+}
 
-  for (const ref of refs) {
-    if (ref && ref.type && !dsByType[ref.type]) {
-      dsByType[ref.type] = ref;
-    }
-  }
+async function loadDefaultControlsByRefs(refs: DataSourceRef[], traceId: string) {
+  const totalStart = performance.now();
 
-  return Object.values(dsByType);
-};
+  const datasources = await invokeAndTrack(() => loadDatasources(refs), {
+    traceId,
+    phase: 'load_datasources',
+  });
 
-export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) => {
-  const datasources = await loadDatasources(refs);
   const defaultVariables: VariableKind[] = [];
   const defaultLinks: DashboardLink[] = [];
 
-  // Default variables
   for (const ds of datasources) {
     try {
       if (ds.getDefaultVariables) {
-        const dsVariables = await ds.getDefaultVariables();
+        const dsVariables = await invokeAndTrack(ds.getDefaultVariables, {
+          traceId,
+          phase: 'default_variables',
+          datasourceType: ds.type,
+        });
 
         if (dsVariables && dsVariables.length) {
           defaultVariables.push(
@@ -52,9 +56,12 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
         }
       }
 
-      // Default links
       if (ds.getDefaultLinks) {
-        const dsLinks = await ds.getDefaultLinks();
+        const dsLinks = await invokeAndTrack(ds.getDefaultLinks, {
+          traceId,
+          phase: 'default_links',
+          datasourceType: ds.type,
+        });
 
         if (dsLinks && dsLinks.length) {
           defaultLinks.push(
@@ -75,8 +82,43 @@ export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) 
     }
   }
 
+  const totalDurationMs = performance.now() - totalStart;
+  reportPerformance('dashboards_default_controls_load_total_ms', totalDurationMs);
+
   return { defaultVariables, defaultLinks };
+}
+
+const loadDatasources = async (refs: DataSourceRef[]) => {
+  return Promise.all(refs.map((ref) => getDataSourceSrv().get(ref)));
 };
+
+// Deduplicates datasource refs by type, keeping only one ref per datasource plugin type
+export const deduplicateDatasourceRefsByType = (refs: Array<DataSourceRef | null | undefined>): DataSourceRef[] => {
+  const dsByType: Record<string, DataSourceRef> = {};
+
+  for (const ref of refs) {
+    if (ref && ref.type && !dsByType[ref.type]) {
+      dsByType[ref.type] = ref;
+    }
+  }
+
+  return Object.values(dsByType);
+};
+
+type LoadDefaultControlsPhase = 'total' | 'load_datasources' | 'default_variables' | 'default_links';
+type InvokeAndTrackOptions = { traceId: string; phase: LoadDefaultControlsPhase; datasourceType?: string };
+
+async function invokeAndTrack<T>(action: () => Promise<T>, options: InvokeAndTrackOptions): Promise<T> {
+  const start = performance.now();
+  const result = await action();
+
+  reportInteraction('dashboards_load_default_controls', {
+    ...options,
+    duration_ms: Math.round(performance.now() - start),
+  });
+
+  return result;
+}
 
 function getDatasourceRefFromPanel(panel: {
   datasource?: DataSourceRef | null;
