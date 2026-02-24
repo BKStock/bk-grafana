@@ -7119,6 +7119,13 @@
     "use-save-dashboard": {
       "message-dashboard-saved": "Dashboard saved"
     },
+    "use-variables-category": {
+      "category": {
+        "title": {
+          "variables": "Variables"
+        }
+      }
+    },
     "variable-check-indicator": {
       "aria-label-variable-referenced-dashboard": "This variable is not referenced by any variable or dashboard.",
       "aria-label-variable-referenced-other-variables-dashboard": "This variable is referenced by other variables or dashboard.",
@@ -7212,6 +7219,20 @@
       "preview-of-values_one": "Preview of values ({{count}})",
       "preview-of-values_other": "Preview of values ({{count}})",
       "show-more": "Show more"
+    },
+    "variables-list": {
+      "add-variable": "Add variable",
+      "create-drag-end-handler": {
+        "description": {
+          "reorder-variables-list": "Reorder variables list"
+        }
+      },
+      "title-above-dashboard": "Above dashboard",
+      "title-controls-menu": "Controls menu",
+      "title-hidden": "Hidden"
+    },
+    "variables-section": {
+      "content-drag-to-reorder": "Drag to reorder"
     },
     "version-history": {
       "comparison": {
