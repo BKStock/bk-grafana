@@ -116,13 +116,6 @@ function checkEnabledTeams(): void {
   const codeownersEntries = parseCodeowners();
   const matchedTeams: string[] = [];
 
-  if (codeownersEntries.length === 0) {
-    console.log('No CODEOWNERS entries loaded, using area label routing only');
-  }
-  if (areaLabels.length === 0) {
-    console.log('No area labels on PR, using CODEOWNERS routing only');
-  }
-
   for (const team of config.teams) {
     if (!(team.enabled?.pr_notify ?? false)) continue;
 
@@ -133,25 +126,32 @@ function checkEnabledTeams(): void {
 
     let teamMatched = false;
 
-    if (team.codeowners_teams?.length && files.length > 0) {
+    if (team.codeowners_teams?.length && files.length > 0 && codeownersEntries.length > 0) {
+      console.log(`Trying CODEOWNERS routing for team '${team.name}'...`);
       const result = matchFilesToCodeownersTeams(files, codeownersEntries, team.codeowners_teams);
       if (result.matched) {
-        console.log(`✅ Team '${team.name}' matches via CODEOWNERS: ${result.owner} owns ${result.file}`);
+        console.log(`✅ Team '${team.name}' matched via CODEOWNERS: ${result.owner} owns ${result.file}`);
         teamMatched = true;
+      } else {
+        console.log(`No CODEOWNERS match for team '${team.name}'`);
       }
     }
 
     if (!teamMatched && areaLabels.length > 0) {
+      console.log(`Trying area label routing for team '${team.name}'...`);
       const teamLabels = team.area_labels ?? [];
       for (const prLabel of areaLabels) {
         for (const configLabel of teamLabels) {
           if (prLabel.startsWith(configLabel)) {
-            console.log(`✅ Team '${team.name}' matches via area label: ${prLabel}`);
+            console.log(`✅ Team '${team.name}' matched via area label: ${prLabel}`);
             teamMatched = true;
             break;
           }
         }
         if (teamMatched) break;
+      }
+      if (!teamMatched) {
+        console.log(`No area label match for team '${team.name}'`);
       }
     }
 
@@ -266,13 +266,6 @@ async function sendNotifications(): Promise<void> {
   const matchedTeamNames: string[] = [];
   let notificationSent = false;
 
-  if (codeownersEntries.length === 0) {
-    console.log('No CODEOWNERS entries loaded, using area label routing only');
-  }
-  if (areaLabels.length === 0) {
-    console.log('No area labels on PR, using CODEOWNERS routing only');
-  }
-
   for (const team of config.teams) {
     if (!(team.enabled?.pr_notify ?? false)) {
       console.log(`Skipping team ${team.name} (PR notifications disabled)`);
@@ -287,15 +280,19 @@ async function sendNotifications(): Promise<void> {
     let matchFound = false;
     let matchReason = '';
 
-    if (team.codeowners_teams?.length && allPrFiles.length > 0) {
+    if (team.codeowners_teams?.length && allPrFiles.length > 0 && codeownersEntries.length > 0) {
+      console.log(`Trying CODEOWNERS routing for team '${team.name}'...`);
       const result = matchFilesToCodeownersTeams(allPrFiles, codeownersEntries, team.codeowners_teams);
       if (result.matched) {
         matchFound = true;
         matchReason = `CODEOWNERS: ${result.owner} owns ${result.file}`;
+      } else {
+        console.log(`No CODEOWNERS match for team '${team.name}'`);
       }
     }
 
     if (!matchFound && areaLabels.length > 0) {
+      console.log(`Trying area label routing for team '${team.name}'...`);
       const teamLabels = team.area_labels ?? [];
       for (const prLabel of areaLabels) {
         for (const configLabel of teamLabels) {
@@ -306,6 +303,9 @@ async function sendNotifications(): Promise<void> {
           }
         }
         if (matchFound) break;
+      }
+      if (!matchFound) {
+        console.log(`No area label match for team '${team.name}'`);
       }
     }
 
