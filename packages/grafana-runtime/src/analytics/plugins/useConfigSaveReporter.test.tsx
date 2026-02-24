@@ -6,6 +6,7 @@ import {
   DataSourcePluginContextProvider,
   DataSourceTestFailed,
   DataSourceTestSucceeded,
+  EventBusSrv,
   PluginMeta,
   PluginMetaInfo,
   PluginSignatureStatus,
@@ -13,12 +14,13 @@ import {
 } from '@grafana/data';
 import iconGaugeSvg from 'app/plugins/panel/gauge/img/icon_gauge.svg';
 
-import { appEvents } from 'app/core/app_events';
-
 import { useConfigSaveReporter } from './useConfigSaveReporter';
+
+const testEventBus = new EventBusSrv();
 
 const mockReport = jest.fn();
 jest.mock('./usePluginInteractionReporter', () => ({ usePluginInteractionReporter: () => mockReport }));
+jest.mock('../../services', () => ({ ...jest.requireActual('../../services'), getAppEvents: () => testEventBus }));
 
 describe('useConfigSaveReporter', () => {
   beforeEach(() => {
@@ -31,7 +33,7 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestSucceeded());
     });
 
     expect(mockReport).toHaveBeenCalledTimes(1);
@@ -47,7 +49,7 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEvents.publish(new DataSourceTestFailed());
+      testEventBus.publish(new DataSourceTestFailed());
     });
 
     expect(mockReport).toHaveBeenCalledTimes(1);
@@ -70,7 +72,7 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestSucceeded());
     });
 
     expect(mockReport).toHaveBeenCalledWith(
@@ -85,7 +87,7 @@ describe('useConfigSaveReporter', () => {
     });
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestSucceeded());
     });
 
     expect(mockReport).toHaveBeenCalledWith(
@@ -102,7 +104,7 @@ describe('useConfigSaveReporter', () => {
     );
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestSucceeded());
     });
 
     expect(mockReport).toHaveBeenCalledWith(
@@ -120,8 +122,8 @@ describe('useConfigSaveReporter', () => {
     unmount();
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
-      appEvents.publish(new DataSourceTestFailed());
+      testEventBus.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestFailed());
     });
 
     expect(mockReport).not.toHaveBeenCalled();
@@ -137,7 +139,7 @@ describe('useConfigSaveReporter', () => {
     authType = 'keys';
 
     act(() => {
-      appEvents.publish(new DataSourceTestSucceeded());
+      testEventBus.publish(new DataSourceTestSucceeded());
     });
 
     expect(mockReport).toHaveBeenCalledWith(
@@ -153,7 +155,7 @@ describe('useConfigSaveReporter', () => {
       { wrapper: createWrapper(), initialProps: { authType: 'default' } }
     );
 
-    const subscribeSpy = jest.spyOn(appEvents, 'subscribe');
+    const subscribeSpy = jest.spyOn(testEventBus, 'subscribe');
     rerender({ authType: 'default' });
 
     expect(subscribeSpy).not.toHaveBeenCalled();
