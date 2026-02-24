@@ -10,10 +10,6 @@ import {
 
 const quoteLiteral = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-// ---------------------------------------------------------------------------
-// Helpers for building mock scene objects
-// ---------------------------------------------------------------------------
-
 function createMockSceneObject(name: string, state: Record<string, unknown> = {}, parent?: SceneObject): SceneObject {
   const obj = {
     state: { ...state },
@@ -32,8 +28,7 @@ function createMockVizPanel(
   parentState: Partial<{ variableName?: string; repeatDirection?: 'v' | 'h'; repeatedPanels?: unknown[] }> = {}
 ): SceneObject {
   const gridItem = createMockSceneObject('DashboardGridItem', parentState);
-  const panel = createMockSceneObject('VizPanel', state, gridItem);
-  return panel;
+  return createMockSceneObject('VizPanel', state, gridItem);
 }
 
 function createNestedSceneObject(
@@ -41,13 +36,8 @@ function createNestedSceneObject(
   parentState: Partial<{ variableName?: string; repeatDirection?: 'v' | 'h'; repeatedPanels?: unknown[] }> = {}
 ): SceneObject {
   const vizPanel = createMockVizPanel(vizPanelState, parentState);
-  const child = createMockSceneObject('SceneQueryRunner', {}, vizPanel);
-  return child;
+  return createMockSceneObject('SceneQueryRunner', {}, vizPanel);
 }
-
-// ---------------------------------------------------------------------------
-// isVariableQuotedInQuery
-// ---------------------------------------------------------------------------
 
 describe('isVariableQuotedInQuery', () => {
   it('should detect $var wrapped in single quotes', () => {
@@ -87,10 +77,6 @@ describe('isVariableQuotedInQuery', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// stripOuterQuotes
-// ---------------------------------------------------------------------------
-
 describe('stripOuterQuotes', () => {
   it('should strip outer single quotes', () => {
     expect(stripOuterQuotes("'value'")).toBe('value');
@@ -120,10 +106,6 @@ describe('stripOuterQuotes', () => {
     expect(stripOuterQuotes("value'")).toBe("value'");
   });
 });
-
-// ---------------------------------------------------------------------------
-// getRepeatInfo
-// ---------------------------------------------------------------------------
 
 describe('getRepeatInfo', () => {
   it('should return undefined when no scene object is provided', () => {
@@ -165,10 +147,6 @@ describe('getRepeatInfo', () => {
     expect(info.variableName).toBeUndefined();
   });
 });
-
-// ---------------------------------------------------------------------------
-// migrateInterpolation
-// ---------------------------------------------------------------------------
 
 describe('migrateInterpolation', () => {
   describe('without scene context (no migration applied)', () => {
