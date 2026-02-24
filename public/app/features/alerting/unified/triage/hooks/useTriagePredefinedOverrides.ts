@@ -5,18 +5,24 @@ import { UserStorage } from '@grafana/runtime/internal';
 const STORAGE_NAMESPACE = 'alerting';
 const KEY_NAME_OVERRIDES = 'triagePredefinedNameOverrides';
 const KEY_DISMISSED = 'triagePredefinedDismissed';
+/** Storage key for default search ID (used by loadDefaultTriageSavedSearch to resolve predefined or user default). */
+export const TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY = 'triageDefaultSearchId';
 
 export interface UseTriagePredefinedOverridesResult {
   /** Custom names for predefined search IDs */
   nameOverrides: Record<string, string>;
   /** Predefined search IDs the user has dismissed (hidden from list) */
   dismissedIds: string[];
+  /** ID of the saved search set as default (predefined or user-created), or null */
+  defaultSearchId: string | null;
   /** Whether the initial load from storage is complete */
   isLoading: boolean;
   /** Set a custom name for a predefined search */
   setNameOverride: (id: string, name: string) => Promise<void>;
   /** Dismiss (hide) a predefined search from the list */
   dismissId: (id: string) => Promise<void>;
+  /** Set or clear the default search ID (persisted so predefined or user default works the same) */
+  setDefaultSearchId: (id: string | null) => Promise<void>;
 }
 
 function isRecordOfStrings(value: unknown): value is Record<string, string> {
@@ -54,6 +60,18 @@ function parseJsonStringArray(raw: string | null): string[] {
   }
 }
 
+function parseDefaultSearchId(raw: string | null): string | null {
+  if (raw == null || raw === '') {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === 'string' && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Hook for persisting user customisations to predefined triage saved searches:
  * custom names (rename) and dismissed IDs (delete = hide from list).
@@ -61,6 +79,7 @@ function parseJsonStringArray(raw: string | null): string[] {
 export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResult {
   const [nameOverrides, setNameOverridesState] = useState<Record<string, string>>({});
   const [dismissedIds, setDismissedIdsState] = useState<string[]>([]);
+  const [defaultSearchId, setDefaultSearchIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const userStorage = useMemo(() => new UserStorage(STORAGE_NAMESPACE), []);
@@ -74,12 +93,14 @@ export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResu
 
     const load = async () => {
       try {
-        const [overridesRaw, dismissedRaw] = await Promise.all([
+        const [overridesRaw, dismissedRaw, defaultIdRaw] = await Promise.all([
           userStorage.getItem(KEY_NAME_OVERRIDES),
           userStorage.getItem(KEY_DISMISSED),
+          userStorage.getItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY),
         ]);
         setNameOverridesState(parseJsonRecord(overridesRaw));
         setDismissedIdsState(parseJsonStringArray(dismissedRaw));
+        setDefaultSearchIdState(parseDefaultSearchId(defaultIdRaw));
       } finally {
         setIsLoading(false);
       }
@@ -120,11 +141,21 @@ export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResu
     [dismissedIds, persistDismissed]
   );
 
+  const setDefaultSearchId = useCallback(
+    async (id: string | null) => {
+      setDefaultSearchIdState(id);
+      await userStorage.setItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY, JSON.stringify(id));
+    },
+    [userStorage]
+  );
+
   return {
     nameOverrides,
     dismissedIds,
+    defaultSearchId,
     isLoading,
     setNameOverride,
     dismissId,
+    setDefaultSearchId,
   };
 }

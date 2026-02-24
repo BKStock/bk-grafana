@@ -56,8 +56,10 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
   const {
     nameOverrides,
     dismissedIds,
+    defaultSearchId,
     setNameOverride,
     dismissId,
+    setDefaultSearchId,
     isLoading: predefinedOverridesLoading,
   } = useTriagePredefinedOverrides();
 
@@ -98,7 +100,10 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
     return generateTriageUrl(search.query);
   }, []);
 
-  // Predefined list: exclude dismissed, apply custom names
+  // Effective default: explicit default ID (predefined or user) or legacy isDefault from saved list
+  const effectiveDefaultId = defaultSearchId ?? savedSearches.find((s) => s.isDefault)?.id ?? null;
+
+  // Predefined list: exclude dismissed, apply custom names and effective isDefault
   const predefinedList = useMemo(
     () =>
       getTriagePredefinedSearches()
@@ -106,11 +111,31 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
         .map((s) => ({
           ...s,
           name: nameOverrides[s.id] ?? s.name,
+          isDefault: s.id === effectiveDefaultId,
         })),
-    [dismissedIds, nameOverrides]
+    [dismissedIds, nameOverrides, effectiveDefaultId]
   );
 
-  const mergedSavedSearches = useMemo(() => [...predefinedList, ...savedSearches], [predefinedList, savedSearches]);
+  // User list: apply effective isDefault (so one default shows in UI whether predefined or user)
+  const savedSearchesWithDefault = useMemo(
+    () =>
+      savedSearches.map((s) => ({
+        ...s,
+        isDefault: s.id === effectiveDefaultId,
+      })),
+    [savedSearches, effectiveDefaultId]
+  );
+
+  // Default search first, then predefined, then user (so default is always at top)
+  const mergedSavedSearches = useMemo(() => {
+    const merged = [...predefinedList, ...savedSearchesWithDefault];
+    const defaultIndex = merged.findIndex((s) => s.id === effectiveDefaultId);
+    if (defaultIndex <= 0) {
+      return merged;
+    }
+    const defaultItem = merged[defaultIndex];
+    return [defaultItem, ...merged.slice(0, defaultIndex), ...merged.slice(defaultIndex + 1)];
+  }, [predefinedList, savedSearchesWithDefault, effectiveDefaultId]);
 
   const handleRename = useCallback(
     async (id: string, newName: string) => {
@@ -134,6 +159,16 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
     [dismissId, deleteSearch]
   );
 
+  /** Set or clear default: persist default ID for any search (predefined or user), and keep generic hook in sync for user list. */
+  const handleSetDefault = useCallback(
+    async (id: string | null) => {
+      await setDefaultSearchId(id);
+      // Keep isDefault in user saved list in sync (generic hook only knows user list)
+      await setDefaultSearch(id != null && !isTriagePredefinedSearchId(id) ? id : null);
+    },
+    [setDefaultSearchId, setDefaultSearch]
+  );
+
   // Don't render if feature is not enabled
   if (!isEnabled) {
     return null;
@@ -147,7 +182,7 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
       onRename={handleRename}
       onDelete={handleDelete}
       onApply={handleApplySearch}
-      onSetDefault={setDefaultSearch}
+      onSetDefault={handleSetDefault}
       isLoading={isLoading || predefinedOverridesLoading}
       getHref={getHref}
     />

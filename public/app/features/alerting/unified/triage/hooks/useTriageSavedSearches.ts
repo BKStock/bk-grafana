@@ -1,12 +1,23 @@
+import { UserStorage } from '@grafana/runtime/internal';
+
+import { SavedSearch } from '../../components/saved-searches/savedSearchesSchema';
 import {
   UseGenericSavedSearchesResult,
   createAppliedTracker,
   createAutoApplyTracker,
-  createDefaultLoader,
+  createStorageLoader,
   useGenericSavedSearches,
 } from '../../hooks/useGenericSavedSearches';
+import { getTriagePredefinedSearches } from '../triagePredefinedSearches';
+
+import { TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY } from './useTriagePredefinedOverrides';
 
 export const TRIAGE_SAVED_SEARCHES_STORAGE_KEY = 'triageSavedSearches';
+
+const TRIAGE_CONFIG = {
+  storageKey: TRIAGE_SAVED_SEARCHES_STORAGE_KEY,
+  trackingContext: { page: 'triage' as const },
+};
 
 export interface UseTriageSavedSearchesResult extends UseGenericSavedSearchesResult {}
 
@@ -24,10 +35,36 @@ export function useTriageSavedSearches(): UseTriageSavedSearchesResult {
  * Load the default triage saved search from storage.
  * Used by auto-apply hooks to load default search on first visit.
  */
-export const loadDefaultTriageSavedSearch = createDefaultLoader({
-  storageKey: TRIAGE_SAVED_SEARCHES_STORAGE_KEY,
-  trackingContext: { page: 'triage' },
-});
+export async function loadDefaultTriageSavedSearch(): Promise<SavedSearch | null> {
+  const userStorage = new UserStorage('alerting');
+  const defaultIdRaw = await userStorage.getItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY);
+
+  let defaultId: string | null = null;
+  if (defaultIdRaw != null && defaultIdRaw !== '') {
+    try {
+      const parsed: unknown = JSON.parse(defaultIdRaw);
+      defaultId = typeof parsed === 'string' && parsed.length > 0 ? parsed : null;
+    } catch {
+      defaultId = null;
+    }
+  }
+
+  const loadSavedSearches = createStorageLoader(TRIAGE_CONFIG);
+
+  if (defaultId != null) {
+    const predefined = getTriagePredefinedSearches();
+    const fromPredefined = predefined.find((s) => s.id === defaultId);
+    if (fromPredefined) {
+      return fromPredefined;
+    }
+    const savedSearches = await loadSavedSearches();
+    const fromSaved = savedSearches.find((s) => s.id === defaultId);
+    return fromSaved ?? null;
+  }
+
+  const savedSearches = await loadSavedSearches();
+  return savedSearches.find((s) => s.isDefault) ?? null;
+}
 
 export const trackTriageSavedSearchApplied = createAppliedTracker({ page: 'triage' });
 export const trackTriageSavedSearchAutoApply = createAutoApplyTracker({ page: 'triage' });
