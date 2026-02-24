@@ -15,7 +15,14 @@ import {
 } from '@grafana/data';
 import { getPanelPlugin } from '@grafana/data/test';
 import { setPluginImportUtils } from '@grafana/runtime';
-import { MultiValueVariable, sceneGraph, SceneGridLayout, SceneGridRow, VizPanel } from '@grafana/scenes';
+import {
+  CustomVariable,
+  MultiValueVariable,
+  sceneGraph,
+  SceneGridLayout,
+  SceneGridRow,
+  VizPanel,
+} from '@grafana/scenes';
 import { Dashboard, LoadingState, Panel, RowPanel, VariableRefresh } from '@grafana/schema';
 import { PanelModel } from 'app/features/dashboard/state/PanelModel';
 import { getTimeRange } from 'app/features/dashboard/utils/timeRange';
@@ -211,6 +218,10 @@ describe('transformSceneToSaveModel', () => {
       });
       const saveModel = transformSceneToSaveModel(scene);
 
+      // Links with origin (datasource-registered) must not be persisted
+      expect(saveModel.links).toHaveLength(1);
+      expect(saveModel.links![0].title).toBe('Link 1');
+      expect(saveModel.links![0]).not.toHaveProperty('origin');
       expect(saveModel).toMatchSnapshot();
     });
   });
@@ -279,6 +290,30 @@ describe('transformSceneToSaveModel', () => {
       const saveModel = transformSceneToSaveModel(scene);
 
       expect(saveModel).toMatchSnapshot();
+    });
+
+    it('Should omit variables with origin when serializing to save model', () => {
+      const scene = transformSaveModelToScene({ dashboard: dashboard_to_load1 as DashboardDataDTO, meta: {} });
+      const variablesSet = scene.state.$variables!;
+      const variables = variablesSet.state.variables;
+      const persistedVar = variables[0];
+      const dsVar = new CustomVariable({
+        name: 'fromDatasource',
+        label: 'From DS',
+        query: 'x,y',
+        value: 'x',
+        text: 'x',
+        skipUrlSync: false,
+        hide: 0,
+        origin: { type: 'datasource', group: 'loki' },
+      });
+      variablesSet.setState({ variables: [persistedVar, dsVar] });
+
+      const saveModel = transformSceneToSaveModel(scene);
+
+      expect(saveModel.templating?.list?.length).toBe(1);
+      expect(saveModel.templating?.list?.[0].name).toBe(persistedVar.state.name);
+      expect(saveModel.templating?.list?.[0]).not.toHaveProperty('origin');
     });
   });
 
