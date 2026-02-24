@@ -157,7 +157,7 @@ describe('TableNG hooks', () => {
     it('should correctly set up the table with an initial sort', () => {
       const { fields, rows } = setupData();
       const { result } = renderHook(() =>
-        useSortedRows(rows, fields, {
+        useSortedRows(rows, fields, [], {
           initialSortBy: [{ displayName: 'age', desc: false }],
           hasNestedFrames: false,
         })
@@ -171,7 +171,7 @@ describe('TableNG hooks', () => {
     it('should change the sort on setSortColumns', () => {
       const { fields, rows } = setupData();
       const { result } = renderHook(() =>
-        useSortedRows(rows, fields, {
+        useSortedRows(rows, fields, [], {
           initialSortBy: [{ displayName: 'age', desc: false }],
           hasNestedFrames: false,
         })
@@ -192,7 +192,41 @@ describe('TableNG hooks', () => {
       expect(result.current.rows[0].name).toBe('Alice');
     });
 
-    it.todo('should handle nested frames');
+    it('should allow initial sort by nested fields', () => {
+      const { fields } = setupData();
+      const frame = createDataFrame({
+        fields: [
+          { name: 'id', type: FieldType.number, values: [1, 3, 2], config: {} },
+          {
+            name: 'nested',
+            type: FieldType.nestedFrames,
+            values: [[createDataFrame({ fields })], [createDataFrame({ fields })], [createDataFrame({ fields })]],
+            config: {},
+          },
+        ],
+      });
+      const rows = frameToRecords(frame, 'nested');
+      const { result } = renderHook(() =>
+        useSortedRows(rows, frame.fields, fields, {
+          initialSortBy: [
+            { displayName: 'id', desc: false },
+            { displayName: 'age', desc: false },
+            { displayName: 'some-fake-name', desc: false },
+          ],
+          hasNestedFrames: true,
+        })
+      );
+      expect(result.current.rows[0].id).toBe(1);
+      expect(result.current.rows[2].id).toBe(2);
+      expect(result.current.rows[4].id).toBe(3);
+
+      // sort for the nested rows is handled elsewhere, and tested elsewhere. the most important thing is that the sort columns are set correctly
+      // and that `age` is permitted as a sort column since it's from a nested field, and that `some-fake-name` is not permitted and is ignored.
+      expect(result.current.sortColumns).toEqual([
+        { columnKey: 'id', direction: 'ASC' },
+        { columnKey: 'age', direction: 'ASC' },
+      ]);
+    });
   });
 
   describe('usePaginatedRows', () => {

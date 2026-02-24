@@ -69,7 +69,7 @@ const populateFieldTypeCounts = (data: DataFrame[], counts: Map<FieldType, numbe
   for (const frame of data) {
     for (const field of frame.fields) {
       const key = field.type || FieldType.other;
-      if (key === FieldType.nestedFrames && Boolean(field.values[0])) {
+      if (key === FieldType.nestedFrames && field.values[0] != null) {
         // walk through the nested frame's fields in the first row, since
         // each row should have the same fields.
         populateFieldTypeCounts(field.values[0], counts);

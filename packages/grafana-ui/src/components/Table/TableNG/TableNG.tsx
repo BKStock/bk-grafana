@@ -184,7 +184,13 @@ export function TableNG(props: TableNGProps) {
     return getDisplayName(firstNestedField);
   }, [data, hasNestedFrames]);
   const rows = useMemo(() => frameToRecords(data, nestedFramesFieldName), [data, nestedFramesFieldName]);
-  const getTextColorForBackground = useMemo(() => memoize(_getTextColorForBackground, { maxSize: 1000 }), []);
+
+  const firstRowNestedData = useMemo(
+    () => (hasNestedFrames ? rows.find((r) => r.data)?.data : undefined),
+    [hasNestedFrames, rows]
+  );
+  const nestedFields = useMemo(() => firstRowNestedData?.fields ?? [], [firstRowNestedData]);
+  const nestedVisibleFields = useMemo(() => getVisibleFields(nestedFields), [nestedFields]);
 
   const { rows: filteredRows, filter, setFilter } = useFilteredRows(rows, data.fields, hasNestedFrames);
 
@@ -192,7 +198,7 @@ export function TableNG(props: TableNGProps) {
     rows: sortedRows,
     sortColumns,
     setSortColumns,
-  } = useSortedRows(filteredRows, data.fields, { hasNestedFrames, initialSortBy: sortBy });
+  } = useSortedRows(filteredRows, data.fields, nestedFields, { hasNestedFrames, initialSortBy: sortBy });
 
   useManagedSort({ sortByBehavior, setSortColumns, sortBy });
 
@@ -246,6 +252,8 @@ export function TableNG(props: TableNGProps) {
     () => getApplyToRowBgFn(data.fields, getCellColorInlineStyles) ?? undefined,
     [data.fields, getCellColorInlineStyles]
   );
+  const getTextColorForBackground = useMemo(() => memoize(_getTextColorForBackground, { maxSize: 1000 }), []);
+
   const typographyCtx = useMemo(
     () =>
       createTypographyContext(
@@ -273,16 +281,6 @@ export function TableNG(props: TableNGProps) {
     [nestedRows, expandedRows]
   );
 
-  // set up the first row's nested data and the nest field widths using useColWidths to avoid
-  // unnecessary re-renders on re-size.
-  const firstRowNestedData = useMemo(
-    () => (hasNestedFrames ? rows.find((r) => r.data)?.data : undefined),
-    [hasNestedFrames, rows]
-  );
-  const nestedVisibleFields = useMemo(
-    () => (firstRowNestedData ? getVisibleFields(firstRowNestedData.fields) : []),
-    [firstRowNestedData]
-  );
   const [nestedFieldWidths] = useColWidths(nestedVisibleFields, availableWidth);
   const defaultRowHeight = useMemo(
     () => getDefaultRowHeight(theme, visibleFields, cellHeight),
@@ -441,6 +439,7 @@ export function TableNG(props: TableNGProps) {
     ): TableColumn => ({
       key: EXPANDED_COLUMN_KEY,
       sortable: false,
+      resizable: false,
       name: t('grafana-ui.table.nested-table.expander-column-name', 'Expand nested rows'),
       field: {
         name: '',

@@ -75,12 +75,14 @@ export function useManagedSort({ sortByBehavior, setSortColumns, sortBy }: Manag
 export function useSortedRows(
   rows: TableRow[],
   fields: Field[],
+  nestedFields: Field[],
   { initialSortBy, hasNestedFrames }: SortedRowsOptions
 ): SortedRowsResult {
+  const allFields = useMemo(() => [...fields, ...nestedFields], [fields, nestedFields]);
   const initialSortColumns = useMemo<SortColumn[]>(
     () =>
       initialSortBy?.flatMap(({ displayName, desc }) => {
-        if (!fields.some((f) => getDisplayName(f) === displayName)) {
+        if (!allFields.some((f) => getDisplayName(f) === displayName)) {
           return [];
         }
         return [
