@@ -12,7 +12,7 @@ import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.
 import { Button, ClipboardButton, CodeEditor, Field, Modal, Stack, Switch } from '@grafana/ui';
 import { ObjectMeta } from 'app/features/apiserver/types';
 import { transformDashboardV2SpecToV1 } from 'app/features/dashboard/api/ResponseTransformers';
-import { ExportFormat, DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { ExportFormat, DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import { isDashboardV2Spec, isV1ClassicDashboard } from 'app/features/dashboard/api/utils';
 import { K8S_V1_DASHBOARD_API_CONFIG } from 'app/features/dashboard/api/v1';
 import { K8S_V2_DASHBOARD_API_CONFIG } from 'app/features/dashboard/api/v2';

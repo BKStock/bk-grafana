@@ -6,7 +6,7 @@ import {
   Spec as DashboardV2Spec,
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { Dashboard, Panel, VariableModel } from '@grafana/schema/dist/esm/veneer/dashboard.types';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 
 import { DashboardInputs, ImportDashboardDTO, ImportFormDataV2, InputType } from '../../types';
 

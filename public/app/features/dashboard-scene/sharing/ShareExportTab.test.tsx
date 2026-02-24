@@ -7,7 +7,7 @@ import {
   defaultVizConfigSpec,
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import * as ResponseTransformers from 'app/features/dashboard/api/ResponseTransformers';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 import { DashboardJson } from 'app/features/manage-dashboards/types';
 import { DashboardDataDTO } from 'app/types/dashboard';
 

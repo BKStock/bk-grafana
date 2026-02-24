@@ -12,7 +12,7 @@ import {
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { provisioningAPIv0alpha1 } from 'app/api/clients/provisioning/v0alpha1';
 import { getDashboardAPI } from 'app/features/dashboard/api/dashboard_api';
-import { DashboardVersionError, DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { DashboardVersionError, DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import {
   DashboardLoaderSrv,
   DashboardLoaderSrvV2,

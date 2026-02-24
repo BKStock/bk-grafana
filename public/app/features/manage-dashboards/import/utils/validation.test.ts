@@ -4,7 +4,7 @@ import {
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { AnnoKeyFolder, AnnoKeyFolderTitle } from 'app/features/apiserver/types';
 import { setDashboardAPI } from 'app/features/dashboard/api/dashboard_api';
-import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import { DashboardDTO } from 'app/types/dashboard';
 
 import { validateUid } from './validation';

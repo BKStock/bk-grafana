@@ -6,7 +6,7 @@ import { Dashboard } from '@grafana/schema';
 import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { Alert, Icon, Label, RadioButtonGroup, Stack, Switch, Box, Tooltip } from '@grafana/ui';
 import { QueryOperationRow } from 'app/core/components/QueryOperationRow/QueryOperationRow';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 import { DashboardJson } from 'app/features/manage-dashboards/types';
 
 import { ExportableResource } from '../ShareExportTab';

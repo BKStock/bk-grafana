@@ -7,7 +7,7 @@ import { Spinner, Stack } from '@grafana/ui';
 import { appEvents } from 'app/core/app_events';
 import { Page } from 'app/core/components/Page/Page';
 import { GrafanaRouteComponentProps } from 'app/core/navigation/types';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 import { isDashboardV1Resource, isDashboardV2Resource } from 'app/features/dashboard/api/utils';
 
 import { DashboardInputs, DashboardSource } from '../../types';

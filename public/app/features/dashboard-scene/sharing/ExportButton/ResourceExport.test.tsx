@@ -5,7 +5,7 @@ import { AsyncState } from 'react-use/lib/useAsync';
 import { selectors as e2eSelectors } from '@grafana/e2e-selectors';
 import { Dashboard } from '@grafana/schema';
 import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 
 import { ResourceExport } from './ResourceExport';
 

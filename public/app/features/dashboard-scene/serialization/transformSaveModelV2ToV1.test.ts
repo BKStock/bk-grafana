@@ -3,7 +3,7 @@ import path from 'path';
 
 import { Dashboard } from '@grafana/schema';
 import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
-import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import { DashboardDataDTO } from 'app/types/dashboard';
 
 import { getSceneCreationOptions } from '../pages/DashboardScenePageStateManager';

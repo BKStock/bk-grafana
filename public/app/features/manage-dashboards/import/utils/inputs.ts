@@ -4,7 +4,7 @@ import { AnnotationQueryKind, Spec as DashboardV2Spec } from '@grafana/schema/ap
 import { Panel } from '@grafana/schema/dist/esm/raw/dashboard/x/Dashboard_types.gen';
 import { AnnotationQuery, Dashboard } from '@grafana/schema/dist/esm/veneer/dashboard.types';
 import { isRecord } from 'app/core/utils/isRecord';
-import { ExportFormat } from 'app/features/dashboard/api/types';
+import { ExportFormat } from 'app/features/dashboard-shared/api/types';
 import { isDashboardV1Resource, isDashboardV2Resource, isDashboardV2Spec } from 'app/features/dashboard/api/utils';
 
 import { LibraryElementExport } from '../../../dashboard/components/DashExportModal/DashboardExporter';

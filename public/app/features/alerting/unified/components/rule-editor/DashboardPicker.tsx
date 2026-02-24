@@ -20,7 +20,7 @@ import {
   useStyles2,
 } from '@grafana/ui';
 import { AnnoKeyFolderTitle } from 'app/features/apiserver/types';
-import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import { isDashboardV2Resource } from 'app/features/dashboard/api/utils';
 import { getGrafanaSearcher } from 'app/features/search/service/searcher';
 import { DashboardDTO } from 'app/types/dashboard';

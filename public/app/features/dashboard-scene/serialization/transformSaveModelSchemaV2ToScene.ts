@@ -55,7 +55,7 @@ import {
   AnnoKeyDashboardIsSnapshot,
   AnnoKeyEmbedded,
 } from 'app/features/apiserver/types';
-import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
+import { DashboardWithAccessInfo } from 'app/features/dashboard-shared/api/types';
 import {
   getDashboardSceneProfilerWithMetadata,
   enablePanelProfilingForDashboard,
