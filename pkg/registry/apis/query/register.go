@@ -185,6 +185,7 @@ func addKnownTypes(scheme *apiruntime.Scheme, gv schema.GroupVersion) {
 		&datasourceV0.QueryTypeDefinition{},
 		&datasourceV0.QueryTypeDefinitionList{},
 		&datasourceV0.QueryResponseSQLSchemas{},
+		&metav1.Status{},
 	)
 }
 
@@ -204,7 +205,9 @@ func (b *QueryAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *genericapiserver.APIG
 
 	storage := map[string]rest.Storage{}
 
-	// The query endpoint is added explicitly
+	// k8s needs a real storage registered -- we add this, but hide it for now
+	// because connections and queries are handled directly
+	storage["noop"] = &noopREST{}
 
 	// Register the expressions query schemas
 	err := queryschema.RegisterQueryTypes(b.queryTypes, storage)
@@ -308,17 +311,15 @@ func (b *QueryAPIBuilder) PostProcessOpenAPI(oas *spec3.OpenAPI) (*spec3.OpenAPI
 	if !ok || query.Post == nil || query.Post.RequestBody == nil {
 		return nil, fmt.Errorf("could not find query path")
 	}
-	if len(query.Parameters) != 2 && query.Parameters[0].Name != "name" {
-		return nil, fmt.Errorf("expected name parameter in query service")
-	}
-	query.Parameters = []*spec3.Parameter{query.Parameters[1]}
 	query.Post.OperationId = "queryDatasources"
 	query.Post.Tags = []string{"Query"}
 
-	sqlschemas, ok := oas.Paths.Paths[root+"namespaces/{namespace}/sqlschemas"]
+	sqlschemas, ok := oas.Paths.Paths[root+"namespaces/{namespace}/query/sqlschemas"]
 	if ok && sqlschemas.Post != nil {
 		sqlschemas.Post.RequestBody = query.Post.RequestBody
 	}
 
+	// Remove the noop path -- it was only required to make k8s behave normally
+	delete(oas.Paths.Paths, root+"noop/{name}")
 	return oas, nil
 }
