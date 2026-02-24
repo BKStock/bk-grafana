@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"strings"
-
 	"github.com/grafana/grafana/pkg/build/daggerbuild/containers"
 )
 
@@ -76,7 +74,6 @@ func GoBuildEnv(opts *GoBuildOpts) []containers.Env {
 		env = append(env, containers.EnvVar("GOARM", string(opts.GoARM)))
 	}
 
-	env = append(env, containers.EnvVar("GOEXPERIMENT", "noregabi"))
 	env = append(env, containers.EnvVar("GODEBUG", "asyncpreemptoff=1"))
 
 	if opts.CGOEnabled {
@@ -96,9 +93,10 @@ func GoBuildEnv(opts *GoBuildOpts) []containers.Env {
 		env = append(env, containers.EnvVar("CGO_ENABLED", "0"))
 	}
 
-	if opts.ExperimentalFlags != nil {
-		env = append(env, containers.EnvVar("GOEXPERIMENT", strings.Join(opts.ExperimentalFlags, ",")))
-	}
+	// if opts.ExperimentalFlags != nil {
+	// 	env = append(env, containers.EnvVar("GOEXPERIMENT", strings.Join(opts.ExperimentalFlags, ",")))
+	// }
+	env = append(env, containers.EnvVar("GOEXPERIMENT", "noregabi"))
 
 	return env
 }
@@ -130,9 +128,11 @@ func ViceroyEnv(opts *GoBuildOpts) []containers.Env {
 		env = append(env, containers.EnvVar("CGO_ENABLED", "0"))
 	}
 
-	if opts.ExperimentalFlags != nil {
-		env = append(env, containers.EnvVar("GOEXPERIMENT", strings.Join(opts.ExperimentalFlags, ",")))
-	}
+	// if opts.ExperimentalFlags != nil {
+	// 	env = append(env, containers.EnvVar("GOEXPERIMENT", strings.Join(opts.ExperimentalFlags, ",")))
+	// }
+	env = append(env, containers.EnvVar("GOEXPERIMENT", "noregabi"))
+	env = append(env, containers.EnvVar("GODEBUG", "asyncpreemptoff=1"))
 
 	if opts.CC != "" {
 		env = append(env, containers.EnvVar("CC", "viceroycc"))
