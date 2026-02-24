@@ -75,6 +75,8 @@ export const useCorrelationsK8s = (limit = 100, page: number) => {
   const startIdx = limit * (page - 1);
   const pagedData = currentData?.items.slice(startIdx, startIdx + limit) ?? [];
 
+  //console.log('k8 hook', JSON.stringify(currentData));
+
   const enrichedCorrelations =
     currentData !== undefined
       ? pagedData

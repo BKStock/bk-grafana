@@ -2,6 +2,27 @@ import { HttpResponse, http } from 'msw';
 
 import { CorrelationSpec } from '../../../../types/correlations';
 
+const generateCorrMetadata = (correlation: CorrelationSpec) => {
+  let labels: any = {
+    'correlations.grafana.app/sourceDS-ref': `${correlation.source.group}.${correlation.source.name}`,
+  };
+
+  if (correlation.target?.group !== undefined && correlation.target?.name !== undefined) {
+    labels['correlations.grafana.app/targetDS-ref'] = `${correlation.target?.group}.${correlation.target?.name}`;
+  }
+
+  return {
+    kind: 'Correlation',
+    apiVersion: 'correlations.grafana.app/v0alpha1',
+    metadata: {
+      name: Math.floor(Math.random() * 1000),
+      namespace: 'default',
+      labels: labels,
+    },
+    spec: correlation,
+  };
+};
+
 const fakeCorrelations: CorrelationSpec[] = [
   {
     source: { group: 'loki', name: 'lokiUID' },
@@ -58,11 +79,11 @@ const getCorrelationsHandler = () =>
     }
 
     return HttpResponse.json({
-      kind: 'correlationsasdasd',
-      apiVersion: 'v1',
+      kind: 'CorrelationList',
+      apiVersion: 'orrelations.grafana.app/v0alpha1',
       metadata: {},
       code: 200,
-      items: returnCorr,
+      items: returnCorr.map((rc) => generateCorrMetadata(rc)),
     });
   });
 
