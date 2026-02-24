@@ -1,13 +1,11 @@
 import { css, cx } from '@emotion/css';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { useMeasure } from 'react-use';
 
-import { GrafanaTheme2 } from '@grafana/data';
+import { DrilldownsApplicability, GrafanaTheme2 } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
 import { AdHocFiltersVariable, GroupByVariable, SceneQueryRunner } from '@grafana/scenes';
 import { Tooltip, measureText, useStyles2, useTheme2 } from '@grafana/ui';
-
-import { getDrilldownApplicability } from '../utils/drilldownUtils';
 
 const GAP_SIZE = 8;
 const FONT_SIZE = 12;
@@ -23,84 +21,60 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
   const theme = useTheme2();
   const [sizeRef, { width: containerWidth }] = useMeasure<HTMLDivElement>();
 
-  // Subscribe to state changes (this triggers re-renders when state changes)
   const filtersState = filtersVar?.useState();
   const groupByState = groupByVar?.useState();
+  // Re-render when query data changes (applicability is resolved before each query)
+  queryRunner.useState();
 
-  const [nonApplicable, setNonApplicable] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(0);
 
-  // Create stable string representations to detect actual changes
-  const filterKey = useMemo(() => {
+  const nonApplicable = useMemo(() => {
+    const applicability: DrilldownsApplicability[] | undefined = queryRunner.getNonApplicableFilters();
+    if (!applicability) {
+      return [];
+    }
+
+    const labels: string[] = [];
+
     const filters = filtersState?.filters ?? [];
     const originFilters = filtersState?.originFilters ?? [];
     const filterValues = [...filters, ...originFilters];
-    return JSON.stringify(
-      filterValues.map((f) => `${f.key}${f.operator}${f.values?.join(',') ?? f.value}${f.origin ?? ''}`)
-    );
-  }, [filtersState?.filters, filtersState?.originFilters]);
 
-  const groupByKey = useMemo(() => {
+    if (filterValues.length) {
+      const nonApplicableFilters = filterValues.filter((filter) => {
+        const result = applicability.find((entry) => entry.key === filter.key && entry.origin === filter.origin);
+        return result && !result.applicable;
+      });
+      labels.push(
+        ...nonApplicableFilters.map((filter) => {
+          const displayValue = filter.values?.length ? filter.values.join(', ') : filter.value;
+          return `${filter.key} ${filter.operator} ${displayValue}`;
+        })
+      );
+    }
+
     const value = groupByState?.value ?? [];
     const groupByValues = Array.isArray(value) ? value : value ? [value] : [];
-    // Include keysApplicability in the key so we re-fetch when it changes
-    const keysApplicabilityKey = JSON.stringify(groupByState?.keysApplicability?.map((keyApp) => keyApp.key) ?? []);
-    return JSON.stringify(groupByValues) + keysApplicabilityKey;
-  }, [groupByState?.value, groupByState?.keysApplicability]);
 
-  useEffect(() => {
-    const fetchApplicability = async () => {
-      const filters = filtersState?.filters ?? [];
-      const originFilters = filtersState?.originFilters ?? [];
-      const value = groupByState?.value ?? [];
+    if (groupByValues.length) {
+      const groupByApplicability = groupByState?.keysApplicability;
 
-      const filterValues = [...filters, ...originFilters];
-      const groupByValues = Array.isArray(value) ? value : value ? [value] : [];
+      const nonApplicableKeys = groupByValues
+        .filter((groupByKey) => {
+          const apiResult = applicability.find((entry) => entry.key === groupByKey);
+          if (apiResult) {
+            return !apiResult.applicable;
+          }
+          const stateResult = groupByApplicability?.find((entry) => entry.key === groupByKey);
+          return stateResult && !stateResult.applicable;
+        })
+        .map((key) => String(key));
 
-      const labels: string[] = [];
+      labels.push(...nonApplicableKeys);
+    }
 
-      const applicability = await getDrilldownApplicability(queryRunner, filtersVar, groupByVar);
-      if (filterValues.length) {
-        const nonApplicableFilters = filterValues.filter((filter) => {
-          const result = applicability?.find((entry) => entry.key === filter.key && entry.origin === filter.origin);
-          return result && !result.applicable;
-        });
-        labels.push(
-          ...nonApplicableFilters.map((filter) => {
-            // Use values array for multi-value operators, fall back to value for single-value
-            const displayValue = filter.values?.length ? filter.values.join(', ') : filter.value;
-            return `${filter.key} ${filter.operator} ${displayValue}`;
-          })
-        );
-      }
-
-      if (groupByValues.length) {
-        // Use keysApplicability from groupByVar state as fallback if API call didn't include groupBy
-        // (this can happen if groupByVar's datasource doesn't match queryRunner's datasource)
-        const groupByApplicability = groupByState?.keysApplicability;
-
-        const nonApplicableKeys = groupByValues
-          .filter((groupByKey) => {
-            // First check API result, then fall back to variable's keysApplicability state
-            const apiResult = applicability?.find((entry) => entry.key === groupByKey);
-            if (apiResult) {
-              return !apiResult.applicable;
-            }
-            // Fallback to keysApplicability from the variable's state
-            const stateResult = groupByApplicability?.find((entry) => entry.key === groupByKey);
-            return stateResult && !stateResult.applicable;
-          })
-          .map((key) => String(key));
-
-        labels.push(...nonApplicableKeys);
-      }
-
-      setNonApplicable(labels);
-    };
-
-    fetchApplicability();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, groupByKey, filtersVar, groupByVar, queryRunner]);
+    return labels;
+  }, [filtersState, groupByState, queryRunner]);
 
   useLayoutEffect(() => {
     if (!nonApplicable.length) {
