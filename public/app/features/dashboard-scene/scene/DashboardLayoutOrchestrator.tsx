@@ -280,6 +280,7 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
   }
 
   private _onTabDragPointerMove(evt: PointerEvent) {
+    // Note this will never be the same as source - _getDropTargetUnderMouse prevents it.
     const dropTarget = this._getDropTargetUnderMouse(evt);
 
     // Tabs can be dropped only to TabsLayoutManager
@@ -314,33 +315,29 @@ export class DashboardLayoutOrchestrator extends SceneObjectBase<DashboardLayout
       return;
     }
 
-    if (this._lastDropTarget === null || !(this._lastDropTarget instanceof TabsLayoutManager)) {
-      return;
-    }
-
-    const sourceManager = this._sourceDropTarget;
-    const destinationManager = this._lastDropTarget;
-    targetIndex = targetIndex ?? this._targetTabIndex ?? destinationManager.getTabsIncludingRepeats().length;
-
     const tab = this._draggedTab;
-
-    if (!tab) {
-      return;
-    }
-
+    const sourceManager = this._sourceDropTarget;
     const sourceIndex = sourceManager.getTabsIncludingRepeats().findIndex((t) => t === tab);
-    this._draggedTab = undefined;
 
-    // moving within the same TabsLayoutManager
-    if (sourceManager === destinationManager) {
+    // targetIndex !== undefined => dropped in the same manager, target index provided by hello-pangea
+    if (targetIndex !== undefined) {
       if (sourceIndex === targetIndex) {
         return;
       }
       sourceManager.moveTab(sourceIndex, targetIndex);
       return;
     }
-    // moving to a different TabsLayoutManager
-    else {
+
+    // dropped in a different manager => handled by the orchestrator
+    if (this._lastDropTarget instanceof TabsLayoutManager) {
+      const destinationManager = this._lastDropTarget;
+      targetIndex = targetIndex ?? this._targetTabIndex ?? destinationManager.getTabsIncludingRepeats().length;
+
+      if (!tab) {
+        return;
+      }
+
+      this._draggedTab = undefined;
       const realDestinationIndex = destinationManager.mapTabInsertIndex(targetIndex);
       // When moving a tab into a new tab group, make it the active tab.
       this._moveTabBetweenManagers(tab, sourceManager, destinationManager, realDestinationIndex);
