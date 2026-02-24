@@ -1,7 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo } from 'react';
 
-import { useCreateFolder } from 'app/api/clients/folder/v1beta1/hooks';
 import {
   CreateTeamCommand,
   UpdateTeamCommand,
@@ -128,9 +127,8 @@ export const useDeleteTeam = () => {
 export const useCreateTeam = () => {
   const [createTeam, response] = useCreateTeamMutation();
   const [setTeamRoles] = useSetTeamRolesMutation();
-  const [createFolder] = useCreateFolder();
 
-  const trigger = async (team: CreateTeamCommand, pendingRoles?: Role[], createTeamFolder?: boolean) => {
+  const trigger = async (team: CreateTeamCommand, pendingRoles?: Role[]) => {
     const mutationResult = await createTeam({
       createTeamCommand: team,
     });
@@ -148,13 +146,6 @@ export const useCreateTeam = () => {
           },
         });
       }
-    }
-
-    if (data && data.uid && createTeamFolder) {
-      await createFolder({
-        title: team.name,
-        teamOwnerReferences: [{ uid: data.uid, name: team.name }],
-      });
     }
 
     return mutationResult;
