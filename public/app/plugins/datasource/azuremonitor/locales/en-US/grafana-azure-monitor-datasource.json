@@ -71,7 +71,7 @@
     },
     "azure-credentials-form": {
       "description-authentication": "Choose the type of authentication to Azure services",
-      "label-authentication": "Authentication",
+      "label-authentication": "Authentication type",
       "title-authentication": "Authentication"
     },
     "basic-logs-toggle": {

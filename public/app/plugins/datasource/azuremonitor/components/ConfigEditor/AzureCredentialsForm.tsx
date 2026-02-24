@@ -107,7 +107,7 @@ export const AzureCredentialsForm = (props: Props) => {
       <Stack direction="column" gap={1.5}>
         {authTypeOptions.length > 1 && (
           <Field
-            label={t('components.azure-credentials-form.label-authentication', 'Authentication')}
+            label={t('components.azure-credentials-form.label-authentication', 'Authentication type')}
             description={t(
               'components.azure-credentials-form.description-authentication',
               'Choose the type of authentication to Azure services'
