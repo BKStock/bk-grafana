@@ -61,7 +61,11 @@ describe('useConfigSaveReporter', () => {
     renderHook(() => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default' })), {
       wrapper: createWrapper({
         uid: 'abc123',
-        meta: createPluginMeta({ id: 'grafana-cloudwatch-datasource', name: 'CloudWatch', info: createPluginMetaInfo({ version: '1.0.0' }) }),
+        meta: createPluginMeta({
+          id: 'grafana-cloudwatch-datasource',
+          name: 'CloudWatch',
+          info: createPluginMetaInfo({ version: '1.0.0' }),
+        }),
       }),
     });
 
@@ -92,7 +96,8 @@ describe('useConfigSaveReporter', () => {
 
   it('forwards arbitrary extra properties to the interaction event', () => {
     renderHook(
-      () => useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default', custom_prop: 'value' })),
+      () =>
+        useConfigSaveReporter('grafana-cloudwatch-datasource', () => ({ auth_type: 'default', custom_prop: 'value' })),
       { wrapper: createWrapper() }
     );
 
@@ -159,13 +164,13 @@ describe('useConfigSaveReporter', () => {
 function createWrapper(settings?: Partial<DataSourceInstanceSettings>) {
   const instanceSettings = createDataSourceInstanceSettings(settings);
   return ({ children }: React.PropsWithChildren<{}>) => (
-    <DataSourcePluginContextProvider instanceSettings={instanceSettings}>
-      {children}
-    </DataSourcePluginContextProvider>
+    <DataSourcePluginContextProvider instanceSettings={instanceSettings}>{children}</DataSourcePluginContextProvider>
   );
 }
 
-function createDataSourceInstanceSettings(settings: Partial<DataSourceInstanceSettings> = {}): DataSourceInstanceSettings {
+function createDataSourceInstanceSettings(
+  settings: Partial<DataSourceInstanceSettings> = {}
+): DataSourceInstanceSettings {
   const { meta, ...rest } = settings;
   return {
     uid: '',
