@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { DataQuery } from '@grafana/schema';
 
 import { QueryEditorType } from '../../constants';
-import { renderWithQueryEditorProvider, ds1SettingsMock } from '../testUtils';
+import { ds1SettingsMock, renderWithQueryEditorProvider } from '../testUtils';
 import { Transformation } from '../types';
 
 import { QueryCard } from './QueryCard';
@@ -25,6 +25,7 @@ interface RenderSidebarCardProps {
   addQuery?: jest.Mock;
   setSelectedQuery?: jest.Mock;
   setPendingExpression?: jest.Mock;
+  isHidden?: boolean;
 }
 
 function renderSidebarCard({
@@ -34,12 +35,13 @@ function renderSidebarCard({
   addQuery = jest.fn().mockReturnValue('B'),
   setSelectedQuery = jest.fn(),
   setPendingExpression = jest.fn(),
+  isHidden = false,
 }: RenderSidebarCardProps = {}) {
   const queries: DataQuery[] = [{ refId: id, datasource: { type: 'test', uid: 'test' } }];
   const item = {
     name: id,
     type: QueryEditorType.Query,
-    isHidden: false,
+    isHidden,
   };
 
   const result = renderWithQueryEditorProvider(
@@ -173,6 +175,19 @@ describe('SidebarCard', () => {
       await user.click(screen.getByRole('menuitem', { name: /add expression/i }));
 
       expect(setPendingExpression).toHaveBeenCalledWith({ insertAfter: 'A' });
+    });
+  });
+
+  describe('hidden icon', () => {
+    it('renders the hidden icon when the card is hidden', () => {
+      renderSidebarCard({ id: 'A', isHidden: true });
+      const icons = screen.getAllByTestId('icon-eye-slash');
+      expect(icons.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('does not render the hidden icon when the card is visible', () => {
+      renderSidebarCard({ id: 'A', isHidden: false });
+      expect(screen.queryByTestId('icon-eye-slash')).not.toBeInTheDocument();
     });
   });
 });
