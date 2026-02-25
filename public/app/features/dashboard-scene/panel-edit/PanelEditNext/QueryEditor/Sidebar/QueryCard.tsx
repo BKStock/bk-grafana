@@ -1,14 +1,40 @@
+import { DataSourceInstanceSettings } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 import { Icon } from '@grafana/ui';
 import { DataSourceLogo } from 'app/features/datasources/components/picker/DataSourceLogo';
 import { useDatasource } from 'app/features/datasources/hooks';
 
-import { QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from '../../constants';
+import { QUERY_EDITOR_COLORS, QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from '../../constants';
 import { useActionsContext, useQueryEditorUIContext, useQueryRunnerContext } from '../QueryEditorContext';
 import { getEditorType } from '../utils';
 
 import { CardTitle } from './CardTitle';
 import { SidebarCard } from './SidebarCard';
+
+// Only queries and expressions can error so we only need this in QueryCard
+const QueryCardIcon = ({
+  isError,
+  editorType,
+  queryDsSettings,
+}: {
+  isError: boolean;
+  editorType: QueryEditorType;
+  queryDsSettings: DataSourceInstanceSettings | undefined;
+}) => {
+  if (isError) {
+    return <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />;
+  }
+  if (editorType === QueryEditorType.Query) {
+    return <DataSourceLogo dataSource={queryDsSettings} size={14} />;
+  }
+  return (
+    <Icon
+      name={QUERY_EDITOR_TYPE_CONFIG[editorType].icon}
+      color={QUERY_EDITOR_TYPE_CONFIG[editorType].color}
+      size="sm"
+    />
+  );
+};
 
 export const QueryCard = ({ query }: { query: DataQuery }) => {
   const editorType = getEditorType(query);
@@ -38,15 +64,8 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
       onDuplicate={() => duplicateQuery(query.refId)}
       onToggleHide={() => toggleQueryHide(query.refId)}
     >
-      {editorType === QueryEditorType.Query && <DataSourceLogo dataSource={queryDsSettings} size={14} />}
-      {editorType === QueryEditorType.Expression && (
-        <Icon
-          name={QUERY_EDITOR_TYPE_CONFIG[editorType].icon}
-          color={QUERY_EDITOR_TYPE_CONFIG[editorType].color}
-          size="sm"
-        />
-      )}
-      <CardTitle title={query.refId} isHidden={isHidden} isError={isError} />
+      <QueryCardIcon isError={isError} editorType={editorType} queryDsSettings={queryDsSettings} />
+      <CardTitle title={query.refId} isHidden={isHidden} />
     </SidebarCard>
   );
 };
