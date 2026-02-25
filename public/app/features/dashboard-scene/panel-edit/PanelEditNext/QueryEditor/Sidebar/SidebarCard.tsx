@@ -95,9 +95,10 @@ export const SidebarCard = ({
         aria-pressed={isSelected}
       >
         <div className={cx(styles.cardContent, { [styles.hidden]: item.isHidden })}>{children}</div>
-        <div>
-          {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" className={styles.hiddenIcon} />}
-          {hasActions && (
+        {/** Alerts don't have actions and cannot be hidden so we don't need to show the hidden icon or hover actions. hasActions is basically indicating if this is an alert card or a query/transformation card. */}
+        {hasActions && (
+          <div>
+            {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" className={styles.hiddenIcon} />}
             <div className={cx(styles.hoverActions, { [styles.hoverActionsVisible]: hasFocusWithin })}>
               <Actions
                 handleResetFocus={handleResetFocus}
@@ -107,8 +108,8 @@ export const SidebarCard = ({
                 onToggleHide={onToggleHide}
               />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       <AddCardButton variant={addVariant} afterId={id} />
     </div>
