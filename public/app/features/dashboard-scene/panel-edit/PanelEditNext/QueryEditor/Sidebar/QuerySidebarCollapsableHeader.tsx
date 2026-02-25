@@ -21,7 +21,7 @@ export const QuerySidebarCollapsableHeader = ({
   return (
     <CollapsableSection
       label={
-        <Stack direction="row" alignItems="center" gap={0.5}>
+        <Stack direction="row" alignItems="center" gap={1}>
           <Text color="maxContrast" variant="bodySmall" weight="light">
             {label}
           </Text>

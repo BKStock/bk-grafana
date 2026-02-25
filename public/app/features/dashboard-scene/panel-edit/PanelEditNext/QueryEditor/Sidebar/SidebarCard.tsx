@@ -226,7 +226,7 @@ function getStyles(
       borderRadius: theme.shape.radius.default,
       overflow: 'hidden',
 
-      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${item.isError ? `${QUERY_EDITOR_COLORS.error} 50%` : `${theme.colors.border.weak} 75%`}, transparent)`}`,
+      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${theme.colors.border.weak} 75%, transparent)`}`,
       boxShadow: isSelected ? `0 0 4px 0 color-mix(in srgb, ${borderColor} 40%, transparent)` : 'none',
 
       '&::before': {
