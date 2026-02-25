@@ -11,7 +11,7 @@ import { useWorkbenchContext } from '../WorkbenchContext';
 import { GenericRow } from '../rows/GenericRow';
 import { InstanceRow } from '../rows/InstanceRow';
 
-import { alertRuleInstancesQuery } from './queries';
+import { alertRuleTimeseriesQuery } from './queries';
 import { useQueryFilter } from './utils';
 
 function extractInstancesFromData(series: DataFrame[] | undefined) {
@@ -49,7 +49,7 @@ export function AlertRuleInstances({ ruleUID, depth = 0 }: AlertRuleInstancesPro
   const [timeRange] = useTimeRange();
   const { filter: queryFilter, alertStateFilter } = useQueryFilter();
 
-  const queryRunner = useQueryRunner({ queries: [alertRuleInstancesQuery(ruleUID, queryFilter, alertStateFilter)] });
+  const queryRunner = useQueryRunner({ queries: [alertRuleTimeseriesQuery(ruleUID, queryFilter, alertStateFilter)] });
 
   const isLoading = !queryRunner.isDataReadyToDisplay();
   const { data } = queryRunner.useState();

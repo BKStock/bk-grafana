@@ -1,18 +1,18 @@
-# GRAFANA_ALERTS Metric Analysis
+# GRAFANA_ALERTS Metric
 
-Reference documentation for the `GRAFANA_ALERTS` Prometheus metric shape, based on a live Grafana instance analysis.
+Reference documentation for the `GRAFANA_ALERTS` Prometheus metric used by the alerting triage view.
 
 ## Metric Overview
 
 - **Source**: Grafana's built-in Prometheus datasource (configured via `unifiedAlerting.stateHistory`)
 - **Shape**: One series per alert instance (unique combination of labels)
-- **Example**: 102 series total — 98 firing, 4 pending, across 55 alert rules in 15 folders
+- **Values**: `alertstate` is either `firing` or `pending`; each series carries a set of internal + user-defined labels
 
 ## Label Categories
 
 ### Internal Labels (6)
 
-Always present on every series. Excluded from user-facing dropdowns:
+Always present on every series. Managed by `INTERNAL_LABELS` in `constants.ts` and excluded from user-facing dropdowns:
 
 | Label                | Description                           |
 | -------------------- | ------------------------------------- |
@@ -25,32 +25,28 @@ Always present on every series. Excluded from user-facing dropdowns:
 
 ### User-Defined Labels
 
-Applied by alert rule authors. Coverage varies widely across instances:
+Applied by alert rule authors via the alert rule editor. Coverage varies widely across instances. Typical examples include `team`, `severity`, `service_name`, `group`.
 
-- **High coverage** (~20%+): Commonly `team`, `service_name`
-- **Medium coverage** (~10-20%): `severity`, `orgID`, `group`
-- **Low coverage** (<10%): Domain-specific labels
-
-The "Frequent" group in the filter dropdown dynamically surfaces the top 5 most popular user-defined labels.
+The "Frequent" group in the filter/group-by dropdowns dynamically surfaces the top 5 most popular user-defined labels (see `tagKeysProviders.ts`).
 
 ## Query Patterns
 
-### Fetching series (used by `fetchTopLabelKeys`)
+The triage view builds all its queries in `scene/queries.ts`. See the module-level JSDoc there for the full list. The two core PromQL expression builders are:
 
-```
-GET /api/v1/series?match[]=GRAFANA_ALERTS&start=<unix>&end=<unix>
-```
+- **`alertSeriesExpr`** — selects matching alert series (one per label combo per time step). Used in range aggregations for charts and timelines.
+- **`uniqueAlertInstancesExpr`** — produces one row per unique alert instance, deduplicated over `$__range` using `last_over_time` + `unless`. Used in instant aggregations for counts, tables, and label breakdowns.
 
-Returns all series with their full label sets. Used to count label key frequency.
+### Datasource lookups (in `tagKeysProviders.ts`)
 
-### Fetching label keys (used by `fetchTagKeys`)
-
-Uses the datasource `getTagKeys` method scoped to the metric via a PromQL query.
-
-### Fetching label values (used by `fetchTagValues`)
-
-Uses the datasource `getTagValues` method scoped to the metric.
+| Function            | What it does                                                             |
+| ------------------- | ------------------------------------------------------------------------ |
+| `fetchTagKeys`      | Calls `getTagKeys` scoped to the metric — populates filter/group-by keys |
+| `fetchTagValues`    | Calls `getTagValues` scoped to the metric — populates filter value lists |
+| `fetchTopLabelKeys` | Queries unique instances and ranks label keys by frequency               |
 
 ## Deduplication
 
-The triage view uses `by (alertname, grafana_folder)` to deduplicate series — collapsing multiple instances of the same rule into a single row.
+A single alert rule can produce many series (one per unique label set per `alertstate`). The triage view deduplicates in two ways:
+
+1. **Tree rows**: grouped `by (alertname, grafana_folder, grafana_rule_uid, ...)` so each rule appears once
+2. **Instance counts**: `uniqueAlertInstancesExpr` uses `last_over_time` to collapse the time dimension, then `unless ignoring(alertstate, grafana_alertstate)` to pick firing over pending when both exist for the same instance

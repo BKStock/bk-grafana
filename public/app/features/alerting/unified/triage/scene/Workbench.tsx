@@ -8,7 +8,7 @@ import { Workbench } from '../Workbench';
 import { DEFAULT_FIELDS, VARIABLES } from '../constants';
 
 import { convertToWorkbenchRows } from './dataTransform';
-import { getWorkbenchQueries } from './queries';
+import { workbenchQueries } from './queries';
 import { convertTimeRangeToDomain, useQueryFilter } from './utils';
 
 export class WorkbenchSceneObject extends SceneObjectBase<SceneObjectState> {
@@ -24,7 +24,7 @@ export function WorkbenchRenderer() {
   const { filter: queryFilter, alertStateFilter, hasActiveFilters: hasFiltersApplied } = useQueryFilter();
 
   const runner = useQueryRunner({
-    queries: getWorkbenchQueries(countBy, queryFilter, alertStateFilter),
+    queries: workbenchQueries(countBy, queryFilter, alertStateFilter),
   });
   const { data } = runner.useState();
 
