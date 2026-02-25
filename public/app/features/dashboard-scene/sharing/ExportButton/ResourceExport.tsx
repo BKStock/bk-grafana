@@ -59,10 +59,6 @@ export function ResourceExport({
       value: ExportFormat.Classic,
     },
     {
-      label: t('dashboard-scene.resource-export.label.v1-resource', 'V1 Resource'),
-      value: ExportFormat.V1Resource,
-    },
-    {
       label: t('dashboard-scene.resource-export.label.v2-resource', 'V2 Resource'),
       value: ExportFormat.V2Resource,
     },
@@ -106,9 +102,7 @@ export function ResourceExport({
         </Box>
       </QueryOperationRow>
 
-      {(isV2Dashboard ||
-        exportFormat === ExportFormat.Classic ||
-        (initialSaveModelVersion === 'v2' && exportFormat === ExportFormat.V1Resource)) && (
+      {(isV2Dashboard || exportFormat === ExportFormat.Classic) && (
         <Stack gap={1} alignItems="start">
           <Label>
             <Stack gap={0.5} alignItems="center">
