@@ -23,10 +23,6 @@ func registerMigrations(ctx context.Context,
 	registry *MigrationRegistry,
 ) error {
 	for _, def := range registry.All() {
-		if cfg.DisableLegacyTableRename {
-			def.RenameTables = nil
-		}
-
 		if shouldAutoMigrate(ctx, def, cfg, sqlStore) {
 			registerMigration(mg, migrator, tableLocker, tableRenamer, cfg, client, def, WithAutoMigrate())
 			continue

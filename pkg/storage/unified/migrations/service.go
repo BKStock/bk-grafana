@@ -110,13 +110,16 @@ func RegisterMigrations(
 	db := mg.DBEngine.DB().DB
 	maxOpenConns := db.Stats().MaxOpenConnections
 	maxConcurrentRenameConns := 0
-	for _, m := range registry.All() {
-		maxConcurrentRenameConns = max(maxConcurrentRenameConns, len(m.RenameTables))
+	if mg.Dialect.DriverName() == sqlstoremigrator.MySQL {
+		for _, m := range registry.All() {
+			maxConcurrentRenameConns = max(maxConcurrentRenameConns, len(m.RenameTables))
+		}
 	}
 	// Migrations require multiple concurrent connections:
-	// 1 for migration session, 1 for gRPC connections, 1 for READ lock (MySQL)
-	// and 1 for per-table RENAME connections on MySQL
-	neededConns := 3 + maxConcurrentRenameConns
+	// 1 for advisory lock session, 1 for migration session,
+	// 1 for READ lock (MySQL), 1 for legacy table reads (migrators),
+	// and 1 per concurrent RENAME connection on MySQL
+	neededConns := 4 + maxConcurrentRenameConns
 	if maxOpenConns < neededConns {
 		db.SetMaxOpenConns(neededConns)
 		defer db.SetMaxOpenConns(maxOpenConns)

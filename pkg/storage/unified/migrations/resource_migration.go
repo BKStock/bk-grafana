@@ -78,13 +78,6 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 
 	r.log.Info("Starting migration for all organizations", "org_count", len(orgs), "resources", r.resources)
 
-	// Handle run failure after renaming some tables but before writing the log,
-	if len(r.definition.RenameTables) > 0 && opts.DriverName == migrator.MySQL {
-		if err := r.recoverPartialRename(mg); err != nil {
-			return fmt.Errorf("failed to recover partial rename: %w", err)
-		}
-	}
-
 	if opts.DriverName == migrator.SQLite {
 		// reuse transaction in SQLite to avoid "database is locked" errors
 		tx, err := sess.Tx()
@@ -107,8 +100,11 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 		r.log.Info("Stored migrator transaction in context for bulk operations (SQLite compatibility)")
 	}
 
+	r.tableRenamer.Init(sess, mg)
+	if err := r.tableRenamer.RecoverRenamedTables(r.definition.RenameTables); err != nil {
+		return fmt.Errorf("failed to recover partial rename: %w", err)
+	}
 	lockTables := r.definition.GetLockTables()
-	hasRename := len(r.definition.RenameTables) > 0
 	unlocked := false
 
 	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, lockTables)
@@ -137,8 +133,8 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 		}
 	}
 
-	if hasRename {
-		if err := r.tableRenamer.RenameTables(ctx, sess, mg, r.definition.RenameTables, doUnlock); err != nil {
+	if !r.cfg.DisableLegacyTableRename {
+		if err := r.tableRenamer.RenameTables(ctx, r.definition.RenameTables, doUnlock); err != nil {
 			return err
 		}
 	}
@@ -152,41 +148,6 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 	}
 
 	r.log.Info("Migration completed successfully for all organizations", "org_count", len(orgs))
-
-	return nil
-}
-
-// recoverPartialRename restores partially renamed tables after a crash so the migration can re-run.
-func (r *MigrationRunner) recoverPartialRename(mg *migrator.Migrator) error {
-	pairs, err := buildRenamePairs(r.log, mg, r.definition.RenameTables)
-	if err != nil {
-		return err
-	}
-
-	// Normal first run
-	if len(pairs) == len(r.definition.RenameTables) {
-		return nil
-	}
-
-	// Rename _legacy tables back to original names so the migration can re-run.
-	alreadyRenamed := len(r.definition.RenameTables) - len(pairs)
-	r.log.Warn("Detected partial rename from previous crash, restoring tables for re-migration",
-		"already_renamed", alreadyRenamed, "total", len(r.definition.RenameTables))
-	for _, table := range r.definition.RenameTables {
-		legacyName := table + legacySuffix
-		legacyExists, err := mg.DBEngine.IsTableExist(legacyName)
-		if err != nil {
-			return fmt.Errorf("failed to check if table %q exists: %w", legacyName, err)
-		}
-		if !legacyExists {
-			continue
-		}
-		restoreSQL := fmt.Sprintf("RENAME TABLE %s TO %s", mg.Dialect.Quote(legacyName), mg.Dialect.Quote(table))
-		r.log.Info("Restoring renamed table", "from", legacyName, "to", table)
-		if _, err := mg.DBEngine.Exec(restoreSQL); err != nil {
-			return fmt.Errorf("failed to restore table %q to %q: %w", legacyName, table, err)
-		}
-	}
 
 	return nil
 }
@@ -236,7 +197,7 @@ func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, en
 	// On MySQL with rename, use a separate session so validator SELECTs don't hold
 	// shared MDL on sess's transaction (would deadlock with RENAME's exclusive MDL).
 	validationSess := sess
-	if opts.DriverName == migrator.MySQL && len(r.definition.RenameTables) > 0 {
+	if opts.DriverName == migrator.MySQL && len(r.definition.RenameTables) > 0 && !r.cfg.DisableLegacyTableRename {
 		validationSess = engine.NewSession()
 		defer validationSess.Close()
 	}
