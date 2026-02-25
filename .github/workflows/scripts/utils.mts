@@ -148,10 +148,24 @@ export function stripMarkdown(text: string): string {
 }
 
 export function teamChannelEnv(teamName: string, type: 'pr' | 'fr'): string {
-  const key = `SLACK_${teamName.toUpperCase()}_${type.toUpperCase()}`;
-  const value = process.env[key] ?? '';
-  if (!value) return '';
-  if (!/^C[A-Z0-9]+$/.test(value)) return '';
+  const raw = process.env.SLACK_CHANNELS ?? '';
+  if (!raw) return '';
+
+  let map: unknown;
+  try {
+    map = JSON.parse(raw);
+  } catch {
+    return '';
+  }
+
+  if (typeof map !== 'object' || map === null || Array.isArray(map)) return '';
+
+  const team = (map as Record<string, unknown>)[teamName];
+  if (typeof team !== 'object' || team === null || Array.isArray(team)) return '';
+
+  const value = (team as Record<string, unknown>)[type];
+  if (typeof value !== 'string' || !/^C[A-Z0-9]+$/.test(value)) return '';
+
   return value;
 }
 
