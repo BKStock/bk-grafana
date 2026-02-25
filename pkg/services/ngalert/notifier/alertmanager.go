@@ -9,7 +9,6 @@ import (
 
 	alertingNotify "github.com/grafana/alerting/notify"
 	"github.com/grafana/alerting/notify/nfstatus"
-	alertingTemplates "github.com/grafana/alerting/templates"
 	amv2 "github.com/prometheus/alertmanager/api/v2/models"
 
 	"github.com/grafana/grafana/pkg/infra/log"
@@ -170,16 +169,6 @@ func NewAlertmanager(ctx context.Context, orgID int64, cfg *setting.Cfg, store A
 		return nil, err
 	}
 
-	limits := alertingNotify.DynamicLimits{
-		Dispatcher: nilLimits{},
-		Templates: alertingTemplates.Limits{
-			MaxTemplateOutputSize: cfg.UnifiedAlerting.AlertmanagerMaxTemplateOutputSize,
-		},
-	}
-	if err := limits.Templates.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid template limits: %w", err)
-	}
-
 	am := &alertmanager{
 		Base:                 gam,
 		ConfigMetrics:        m.AlertmanagerConfigMetrics,
@@ -190,7 +179,6 @@ func NewAlertmanager(ctx context.Context, orgID int64, cfg *setting.Cfg, store A
 		decryptFn:            decryptFn,
 		crypto:               crypto,
 		features:             featureToggles,
-		dynamicLimits:        limits,
 	}
 
 	return am, nil

@@ -11,7 +11,6 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/grafana/alerting/definition"
 	alertingNotify "github.com/grafana/alerting/notify"
-	alertingTemplates "github.com/grafana/alerting/templates"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/grafana/grafana/pkg/apimachinery/errutil"
@@ -108,17 +107,7 @@ func (moa *MultiOrgAlertmanager) prepareApplyConfig(ctx context.Context, orgID i
 
 	prepared.AlertmanagerConfig = preparedConfig
 
-	limits := alertingNotify.DynamicLimits{ // TODO Extract to MOA.
-		Dispatcher: nilLimits{},
-		Templates: alertingTemplates.Limits{
-			MaxTemplateOutputSize: moa.settings.UnifiedAlerting.AlertmanagerMaxTemplateOutputSize,
-		},
-	}
-	if err := limits.Templates.Validate(); err != nil {
-		return alertingNotify.NotificationsConfiguration{}, fmt.Errorf("invalid template limits: %w", err)
-	}
-
-	return PostableAPIConfigToNotificationsConfiguration(prepared, limits)
+	return PostableAPIConfigToNotificationsConfiguration(prepared, moa.limits)
 }
 
 func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, orgId int64) error {

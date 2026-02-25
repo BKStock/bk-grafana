@@ -10,6 +10,7 @@ import (
 
 	alertingModels "github.com/grafana/alerting/models"
 	"github.com/grafana/alerting/notify/nfstatus"
+	alertingTemplates "github.com/grafana/alerting/templates"
 	"github.com/prometheus/client_golang/prometheus"
 
 	alertingCluster "github.com/grafana/alerting/cluster"
@@ -101,6 +102,7 @@ type MultiOrgAlertmanager struct {
 	settings       *setting.Cfg
 	featureManager featuremgmt.FeatureToggles
 	logger         log.Logger
+	limits         alertingNotify.DynamicLimits
 
 	// clusterPeer represents the clustering peers of Alertmanagers between Grafana instances.
 	peer                   alertingNotify.ClusterPeer
@@ -169,6 +171,16 @@ func NewMultiOrgAlertmanager(
 	}
 
 	moa.initAlertBroadcast()
+
+	moa.limits = alertingNotify.DynamicLimits{
+		Dispatcher: nilLimits{},
+		Templates: alertingTemplates.Limits{
+			MaxTemplateOutputSize: moa.settings.UnifiedAlerting.AlertmanagerMaxTemplateOutputSize,
+		},
+	}
+	if err := moa.limits.Templates.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid template limits: %w", err)
+	}
 
 	// Set up the default per tenant Alertmanager factory.
 	moa.factory = func(ctx context.Context, orgID int64) (Alertmanager, error) {
