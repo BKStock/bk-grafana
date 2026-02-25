@@ -133,3 +133,25 @@ Build a specific plugin: `yarn workspace @grafana-plugins/<name> dev`
 - **Config**: Defaults in `conf/defaults.ini`, overrides in `conf/custom.ini`.
 - **Database migrations**: Live in `pkg/services/sqlstore/migrations/`. Test with `make devenv sources=postgres_tests,mysql_tests` then `make test-go-integration-postgres`.
 - **CI sharding**: Backend tests use `SHARD`/`SHARDS` env vars for parallelization.
+
+## Cursor Cloud specific instructions
+
+### Services overview
+
+Grafana requires two services for development: the **Go backend** and the **frontend webpack dev server**. No external databases or Docker containers are needed -- SQLite3 is embedded and used by default.
+
+### Starting services
+
+1. **Backend**: `./bin/linux-amd64/grafana server --homepath . --config conf/defaults.ini` (after `make build-backend`). Serves on `localhost:3000`, default credentials `admin`/`admin`.
+2. **Frontend**: `yarn start` (runs webpack dev server with watch mode). Requires `yarn install --immutable` first. Plugin workspaces are built automatically as NX dependencies.
+
+### Node.js version
+
+The required Node.js version is specified in `.nvmrc`. Use `nvm install` and `nvm use` from the workspace root, then `corepack enable` to activate yarn 4.
+
+### Caveats
+
+- `make lint-go` (golangci-lint) requires significant memory and may be killed (OOM) in constrained cloud environments. For targeted Go linting, run golangci-lint on specific packages instead.
+- `yarn.lock` uses Yarn 4 (PnP-compatible but configured with `nodeLinker: node-modules`). The `.yarnrc.yml` has `enableScripts: false`, so native addons (like `@swc/core`, `esbuild`) may need manual build if their postinstall was skipped. In practice, the dev server and tests work without these.
+- Frontend tests use Jest. Always pass `--no-watch` when running from a non-interactive terminal (e.g., `yarn jest --no-watch`).
+- Pre-commit hooks are opt-in via lefthook (`make lefthook-install`), not required for commits.
