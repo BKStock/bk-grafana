@@ -1228,11 +1228,6 @@ export interface FeatureToggles {
   */
   preferLibraryPanelTitle?: boolean;
   /**
-  * Use fixed-width numbers globally in the UI
-  * @default false
-  */
-  tabularNumbers?: boolean;
-  /**
   * Enables new design for the InfluxDB data source configuration page
   * @default false
   */
@@ -1567,4 +1562,9 @@ export interface FeatureToggles {
   * @default false
   */
   managedPluginsV2?: boolean;
+  /**
+  * Remember the last viewed organization for users using SSO
+  * @default true
+  */
+  rememberUserOrgForSso?: boolean;
 }
