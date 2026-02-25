@@ -2168,6 +2168,7 @@
       "empty-filtered": "No notifications match the current filters for the last {{days}} days",
       "enrichment-explore": "View in Explore",
       "enrichment-no-logs": "No log lines",
+      "enrichment-type-logs": "logs",
       "enrichments": "Enrichments:",
       "error": {
         "default": "Unable to fetch notification history",
@@ -2282,9 +2283,6 @@
     "notifications-scene": {
       "annotations": "Annotations:",
       "description": "Description:",
-      "enrichment-explore": "View in Explore",
-      "enrichment-no-logs": "No log lines",
-      "enrichments": "Enrichments:",
       "filter": {
         "clear": "Clear filters"
       },
