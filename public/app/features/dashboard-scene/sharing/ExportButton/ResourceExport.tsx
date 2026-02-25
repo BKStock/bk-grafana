@@ -120,6 +120,15 @@ export function ResourceExport({
         </Stack>
       )}
 
+      {dashboardJson.value?.initialSaveModelVersion === 'v2' && exportFormat === ExportFormat.Classic && (
+        <Alert title="" severity="warning" topSpacing={2}>
+          <Trans i18nKey="dashboard-scene.resource-export.classic-v2-warning">
+            This dashboard uses the V2 schema. Features like tabs and conditional rendering cannot be represented in the
+            classic format and may be lost.
+          </Trans>
+        </Alert>
+      )}
+
       {showV2LibPanelAlert && (
         <Alert
           title={t(
