@@ -40,7 +40,6 @@ export const FIELD_NAMES = {
   grafanaRuleUID: 'grafana_rule_uid',
   value: 'Value',
   valuePrefix: 'Value #',
-  time: 'Time',
 } as const;
 
 export const DEFAULT_FIELDS = [

@@ -83,6 +83,28 @@ export function normalizeFrame(frame: DataFrame): DataFrame {
   };
 }
 
+interface RequiredFields {
+  alertname: DataFrame['fields'][number]['values'];
+  folder: DataFrame['fields'][number]['values'];
+  ruleUID: DataFrame['fields'][number]['values'];
+}
+
+function extractRequiredFields(frame: DataFrame, fieldIndex: Map<string, number>): RequiredFields | null {
+  if (
+    !fieldIndex.has(FIELD_NAMES.alertname) ||
+    !fieldIndex.has(FIELD_NAMES.grafanaFolder) ||
+    !fieldIndex.has(FIELD_NAMES.grafanaRuleUID)
+  ) {
+    return null;
+  }
+
+  return {
+    alertname: frame.fields[fieldIndex.get(FIELD_NAMES.alertname)!].values,
+    folder: frame.fields[fieldIndex.get(FIELD_NAMES.grafanaFolder)!].values,
+    ruleUID: frame.fields[fieldIndex.get(FIELD_NAMES.grafanaRuleUID)!].values,
+  };
+}
+
 // Builds tree structure in one pass through data, avoiding intermediate row objects
 export function convertToWorkbenchRows(series: DataFrame[], groupBy: string[] = []): WorkbenchRow[] {
   if (!series.at(0)?.fields.length) {
@@ -91,37 +113,17 @@ export function convertToWorkbenchRows(series: DataFrame[], groupBy: string[] = 
 
   const frame = normalizeFrame(series[0]);
 
-  // Build field index map
   const fieldIndex = new Map<string, number>();
   for (let i = 0; i < frame.fields.length; i++) {
-    const name = frame.fields[i].name;
-    fieldIndex.set(name, i);
+    fieldIndex.set(frame.fields[i].name, i);
   }
 
-  // Validate required fields exist
-  if (
-    !fieldIndex.has(FIELD_NAMES.time) ||
-    !fieldIndex.has(FIELD_NAMES.alertname) ||
-    !fieldIndex.has(FIELD_NAMES.grafanaFolder) ||
-    !fieldIndex.has(FIELD_NAMES.grafanaRuleUID) ||
-    !fieldIndex.has(FIELD_NAMES.alertstate)
-  ) {
+  const fields = extractRequiredFields(frame, fieldIndex);
+  if (!fields) {
     return [];
   }
 
-  // Get required field value arrays (direct columnar access)
-  const alertnameIndex = fieldIndex.get(FIELD_NAMES.alertname);
-  const folderIndex = fieldIndex.get(FIELD_NAMES.grafanaFolder);
-  const ruleUIDIndex = fieldIndex.get(FIELD_NAMES.grafanaRuleUID);
-
-  // These should always exist due to validation above, but handle gracefully
-  if (alertnameIndex === undefined || folderIndex === undefined || ruleUIDIndex === undefined) {
-    return [];
-  }
-
-  const alertnameValues = frame.fields[alertnameIndex].values;
-  const folderValues = frame.fields[folderIndex].values;
-  const ruleUIDValues = frame.fields[ruleUIDIndex].values;
+  const { alertname: alertnameValues, folder: folderValues, ruleUID: ruleUIDValues } = fields;
 
   // Pre-compute instance counts per rule
   const ruleCountsMap = buildRuleCountsMap(frame, fieldIndex, ruleUIDValues);
