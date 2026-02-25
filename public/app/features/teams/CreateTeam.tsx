@@ -50,19 +50,12 @@ const CreateTeam = (): JSX.Element => {
   const createTeam = async (formModel: TeamDTO) => {
     setTeamCreationCardProps(getTeamCardProps({ type: 'loading' }));
 
-    let teamData, teamError;
-    try {
-      const result = await createTeamTrigger({ email: formModel.email || '', name: formModel.name }, pendingRoles, {
-        // We are showing status inline so don't need this
-        showSuccessAlert: false,
-      });
-      teamData = result.data;
-      teamError = result.error;
-    } catch (e) {
-      setTeamCreationCardProps(getTeamCardProps({ type: 'error', error: e }));
-      console.error(e);
-      return;
-    }
+    const { data: teamData, error: teamError } = await createTeamTrigger(
+      { email: formModel.email || '', name: formModel.name },
+      pendingRoles,
+      // We are showing status inline so don't need this
+      { showSuccessAlert: false }
+    );
 
     if (teamError || !teamData?.uid) {
       setTeamCreationCardProps(getTeamCardProps({ type: 'error', error: teamError }));
@@ -77,19 +70,10 @@ const CreateTeam = (): JSX.Element => {
 
     setFolderCreationCardProps(getFolderCardProps({ type: 'loading' }));
 
-    let folderData, folderError;
-    try {
-      const result = await createFolderTrigger({
-        title: formModel.name,
-        teamOwnerReferences: [{ uid: teamData.uid, name: formModel.name }],
-      });
-      folderData = result.data;
-      folderError = result.error;
-    } catch (e) {
-      setFolderCreationCardProps(getFolderCardProps({ type: 'error', error: e }));
-      console.error(e);
-      return;
-    }
+    const { data: folderData, error: folderError } = await createFolderTrigger({
+      title: formModel.name,
+      teamOwnerReferences: [{ uid: teamData.uid, name: formModel.name }],
+    });
 
     if (folderError || !folderData?.url) {
       setFolderCreationCardProps(getFolderCardProps({ type: 'error', error: folderError }));
