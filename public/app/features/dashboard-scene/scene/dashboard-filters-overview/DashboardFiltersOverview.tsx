@@ -34,10 +34,10 @@ export const DashboardFiltersOverview = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters } = useFiltersOverviewState({
-      adhocFilters,
-      groupByVariable,
-      searchQuery,
-    });
+    adhocFilters,
+    groupByVariable,
+    searchQuery,
+  });
 
   const virtualizer = useVirtualizer({
     count: listItems.length,
