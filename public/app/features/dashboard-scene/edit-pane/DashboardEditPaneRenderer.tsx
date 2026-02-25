@@ -55,6 +55,7 @@ export function DashboardEditPaneRenderer({ editPane, dashboard }: Props) {
   const { variables } = sceneGraph.getVariables(dashboard)?.useState() ?? { variables: [] };
   const adHocVar = variables.find((v) => sceneUtils.isAdHocVariable(v));
   const groupByVar = variables.find((v) => sceneUtils.isGroupByVariable(v));
+  const hasFilters = Boolean(adHocVar || groupByVar);
 
   const onSetLayoutElement = useCallback(
     (obj: SceneObject<SceneObjectState> | undefined) => {
@@ -178,7 +179,7 @@ export function DashboardEditPaneRenderer({ editPane, dashboard }: Props) {
           data-testid={selectors.pages.Dashboard.Sidebar.outlineButton}
           active={openPane === 'outline'}
         ></Sidebar.Button>
-        {config.featureToggles.dashboardNewLayouts && config.featureToggles.dashboardFiltersOverview && adHocVar && (
+        {config.featureToggles.dashboardNewLayouts && config.featureToggles.dashboardFiltersOverview && hasFilters && (
           <Sidebar.Button
             icon="filter"
             onClick={() => editPane.openPane('filters')}

@@ -18,9 +18,9 @@ export function DashboardFiltersOverviewPaneToggle({ dashboard }: Props) {
     dashboard.showModal(new DashboardFiltersOverviewDrawer({}));
   };
 
-  const adHocVar = variables.find((v) => sceneUtils.isAdHocVariable(v));
+  const hasFilters = variables.some((v) => sceneUtils.isAdHocVariable(v) || sceneUtils.isGroupByVariable(v));
 
-  if (!adHocVar) {
+  if (!hasFilters) {
     return null;
   }
 
