@@ -52,13 +52,10 @@ const CreateTeam = (): JSX.Element => {
 
     let teamData, teamError;
     try {
-      const result = await createTeamTrigger(
-        {
-          email: formModel.email || '',
-          name: formModel.name,
-        },
-        pendingRoles
-      );
+      const result = await createTeamTrigger({ email: formModel.email || '', name: formModel.name }, pendingRoles, {
+        // We are showing status inline so don't need this
+        showSuccessAlert: false,
+      });
       teamData = result.data;
       teamError = result.error;
     } catch (e) {

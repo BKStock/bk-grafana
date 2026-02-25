@@ -2,6 +2,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo } from 'react';
 
 import {
+  CreateTeamApiArg,
   CreateTeamCommand,
   UpdateTeamCommand,
   useCreateTeamMutation,
@@ -128,10 +129,18 @@ export const useCreateTeam = () => {
   const [createTeam, response] = useCreateTeamMutation();
   const [setTeamRoles] = useSetTeamRolesMutation();
 
-  const trigger = async (team: CreateTeamCommand, pendingRoles?: Role[]) => {
-    const mutationResult = await createTeam({
+  const trigger = async (
+    team: CreateTeamCommand,
+    pendingRoles?: Role[],
+    options?: {
+      showSuccessAlert?: boolean;
+    }
+  ) => {
+    const mutationArg: CreateTeamApiArg & { showSuccessAlert?: boolean } = {
       createTeamCommand: team,
-    });
+      showSuccessAlert: options?.showSuccessAlert,
+    };
+    const mutationResult = await createTeam(mutationArg);
 
     const { data } = mutationResult;
 
