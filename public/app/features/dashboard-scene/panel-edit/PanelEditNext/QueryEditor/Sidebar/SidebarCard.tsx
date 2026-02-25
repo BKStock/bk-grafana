@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { useStyles2 } from '@grafana/ui';
+import { Icon, useStyles2 } from '@grafana/ui';
 
 import { ActionItem, Actions } from '../../Actions';
 import { QUERY_EDITOR_COLORS, QueryEditorType, SIDEBAR_CARD_HEIGHT, SIDEBAR_CARD_INDENT } from '../../constants';
@@ -96,6 +96,7 @@ export const SidebarCard = ({
       >
         <div className={cx(styles.cardContent, { [styles.hidden]: item.isHidden })}>{children}</div>
         <div>
+          {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" className={styles.hiddenIcon} />}
           {hasActions && (
             <div className={cx(styles.hoverActions, { [styles.hoverActionsVisible]: hasFocusWithin })}>
               <Actions
@@ -207,11 +208,11 @@ function getStyles(
       alignItems: 'center',
       justifyContent: 'space-between',
       width: '100%',
-      background: isSelected ? selectedBg : 'none',
+      background: isSelected ? selectedBg : 'transparent',
       borderLeft: `${isSelected ? 3 : 1}px solid ${borderColor}`,
       cursor: 'pointer',
 
-      // This transitions the background color of the card when it is hovered.
+      // This transitions the background color of the card when it is hovered or selected.
       [theme.transitions.handleMotion('no-preference', 'reduce')]: {
         transition: theme.transitions.create(['background-color'], {
           duration: theme.transitions.duration.standard,
@@ -252,6 +253,10 @@ function getStyles(
 
     hidden: css({
       opacity: 0.7,
+    }),
+
+    hiddenIcon: css({
+      marginRight: theme.spacing(2),
     }),
 
     ghostCard: css({
