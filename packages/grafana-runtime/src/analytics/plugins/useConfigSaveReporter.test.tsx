@@ -14,7 +14,7 @@ import {
 } from '@grafana/data';
 import iconGaugeSvg from 'app/plugins/panel/gauge/img/icon_gauge.svg';
 
-import { useConfigSaveReporter } from './useConfigSaveReporter';
+import { ConfigSaveReporterProperties, useConfigSaveReporter } from './useConfigSaveReporter';
 
 const testEventBus = new EventBusSrv();
 
@@ -160,6 +160,56 @@ describe('useConfigSaveReporter', () => {
 
     expect(subscribeSpy).not.toHaveBeenCalled();
     subscribeSpy.mockRestore();
+  });
+});
+
+describe('ConfigSaveReporterProperties', () => {
+  it('accepts string values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      auth_type: 'keys',
+      region: 'us-east-1',
+    };
+    expect(properties).toBeDefined();
+  });
+
+  it('rejects number values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      // @ts-expect-error number values are not allowed
+      retry_count: 3,
+    };
+    expect(properties).toBeDefined();
+  });
+
+  it('rejects boolean values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      // @ts-expect-error boolean values are not allowed
+      tls_enabled: true,
+    };
+    expect(properties).toBeDefined();
+  });
+
+  it('rejects object values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      // @ts-expect-error object values are not allowed — they may contain nested sensitive data
+      credentials: { key: 'secret' },
+    };
+    expect(properties).toBeDefined();
+  });
+
+  it('rejects array values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      // @ts-expect-error array values are not allowed
+      regions: ['us-east-1', 'eu-west-1'],
+    };
+    expect(properties).toBeDefined();
+  });
+
+  it('rejects null values', () => {
+    const properties: ConfigSaveReporterProperties = {
+      // @ts-expect-error null is not allowed
+      auth_type: null,
+    };
+    expect(properties).toBeDefined();
   });
 });
 
