@@ -142,6 +142,15 @@ export function setOutputMultiline(key: string, value: string): void {
 // =============================================================================
 // INPUT VALIDATION
 // =============================================================================
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/[*_~`]/g, '')
+    .replace(/\r?\n/g, ' ');
+}
+
 export function sanitizeInput(input: string, maxLength: number = 200): string {
   if (!input) return '';
 
@@ -203,7 +212,7 @@ export function validateFRClusterResponse(response: string): ClusterResult {
     const issueNumbers: number[] = Array.isArray(entry.issue_numbers)
       ? entry.issue_numbers.filter(isValidIssueNumber)
       : [];
-    if (issueNumbers.length >= 2) {
+    if (issueNumbers.length >= 2 && issueNumbers.length <= 6) {
       clusters.push({ name, issue_numbers: issueNumbers });
     }
   }
@@ -233,7 +242,7 @@ export function validatePRClusterResponse(response: string): PRClusterResult {
     const prNumbers: number[] = Array.isArray(entry.pr_numbers)
       ? entry.pr_numbers.filter((n): n is number => typeof n === 'number' && n > 0 && n < 1_000_000)
       : [];
-    if (prNumbers.length >= 2) {
+    if (prNumbers.length >= 2 && prNumbers.length <= 6) {
       clusters.push({ name, pr_numbers: prNumbers });
     }
   }
@@ -431,6 +440,8 @@ export async function callOpenAI(
     requestBody.response_format = { type: 'json_object' };
   }
 
+  console.log(`OpenAI request: model=${model}, jsonMode=${jsonMode}, temperature=${temperature}`);
+
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -478,7 +489,7 @@ export function buildLinks(
   const links = displayed.map(linkFn).join(', ');
 
   if (numbers.length > maxItems && overflowUrl) {
-    return `${links} <${overflowUrl}|View ${numbers.length - maxItems} more>`;
+    return `${links} <${overflowUrl}|View all on GitHub>`;
   }
   return links;
 }
