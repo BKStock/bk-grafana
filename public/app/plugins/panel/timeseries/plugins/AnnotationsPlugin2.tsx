@@ -5,8 +5,16 @@ import { createPortal } from 'react-dom';
 import tinycolor from 'tinycolor2';
 import uPlot from 'uplot';
 
-import { arrayToDataFrame, colorManipulator, DataFrame, DataTopic, InterpolateFunction } from '@grafana/data';
-import { TimeZone } from '@grafana/schema';
+import {
+  arrayToDataFrame,
+  colorManipulator,
+  DataFrame,
+  DataTopic,
+  FieldType,
+  InterpolateFunction,
+} from '@grafana/data';
+import { maybeSortFrame } from '@grafana/data/internal';
+import { TimeZone, VizAnnotations } from '@grafana/schema';
 import {
   DEFAULT_ANNOTATION_COLOR,
   getPortalContainer,
@@ -27,13 +35,13 @@ interface TimeRange2 {
 
 interface AnnotationsPluginProps {
   config: UPlotConfigBuilder;
+  annotationsOptions: VizAnnotations | undefined;
   annotations: DataFrame[];
   timeZone: TimeZone;
   newRange: TimeRange2 | null;
   setNewRange: (newRage: TimeRange2 | null) => void;
   canvasRegionRendering?: boolean;
   replaceVariables: InterpolateFunction;
-  multiLane?: boolean;
 }
 
 // TODO: batch by color, use Path2D objects
@@ -44,6 +52,11 @@ const renderLine = (ctx: CanvasRenderingContext2D, y0: number, y1: number, x: nu
   ctx.strokeStyle = color;
   ctx.stroke();
 };
+
+enum ClusteringMode {
+  Hover = 'hover',
+  Render = 'render',
+}
 
 // const renderUpTriangle = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) => {
 //   ctx.beginPath();
@@ -74,7 +87,7 @@ export const AnnotationsPlugin2 = ({
   setNewRange,
   replaceVariables,
   canvasRegionRendering = true,
-  multiLane = false,
+  annotationsOptions,
 }: AnnotationsPluginProps) => {
   const [plot, setPlot] = useState<uPlot>();
 
@@ -85,6 +98,8 @@ export const AnnotationsPlugin2 = ({
 
   const [_, forceUpdate] = useReducer((x) => x + 1, 0);
 
+  const clusteringMode: ClusteringMode | null = annotationsOptions?.clustering ? ClusteringMode.Render : null;
+  console.log('clusteringmode', clusteringMode);
   const { canExecuteActions } = usePanelContext();
   const userCanExecuteActions = canExecuteActions?.() ?? false;
 
@@ -110,8 +125,11 @@ export const AnnotationsPlugin2 = ({
           isWip: true,
         },
       };
-
-      xAnnos.push(wipAnnoFrame);
+      const sortedAnnoFrame = maybeSortFrame(
+        wipAnnoFrame,
+        wipAnnoFrame.fields.findIndex((field) => field.name === 'time')
+      );
+      xAnnos.push(sortedAnnoFrame);
     }
 
     return {
@@ -120,12 +138,146 @@ export const AnnotationsPlugin2 = ({
     };
   }, [annotations, newRange]);
 
+  console.log('xAnnos (before cluster)', xAnnos);
+
+  const { clusteredAnnos } = useMemo(() => {
+    const clusteredAnnos: DataFrame[] = [];
+
+    // 15min in millis
+    // todo: compute this from pixel space, to make dynamic, like 10px -> millis
+    let mergeThreshold = (3600 / 4) * 1e3;
+
+    // per-frame clustering
+    if (clusteringMode === ClusteringMode.Render) {
+      for (let i = 0; i < xAnnos.length; i++) {
+        let frame = xAnnos[i];
+
+        let timeVals = frame.fields.find((f) => f.name === 'time')?.values;
+        let colorVals = frame.fields.find((f) => f.name === 'color')?.values;
+
+        if (timeVals && timeVals.length > 1) {
+          let isRegionVals =
+            frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
+
+          let len = timeVals.length;
+
+          let clusterIdx = Array(timeVals.length).fill(null);
+          let clusters: number[][] = [];
+
+          let thisCluster: number[] = [];
+          let prevIdx = null;
+
+          for (let j = 0; j < len; j++) {
+            let time = timeVals[j];
+
+            if (!isRegionVals[j]) {
+              if (prevIdx != null) {
+                if (time - timeVals[prevIdx] <= mergeThreshold) {
+                  console.log('merge threshold hit');
+                  // open cluster
+                  if (thisCluster.length === 0) {
+                    thisCluster.push(prevIdx);
+                    clusterIdx[prevIdx] = clusters.length;
+                  }
+                  thisCluster.push(j);
+                  clusterIdx[j] = clusters.length;
+                } else {
+                  // close cluster
+                  if (thisCluster.length > 0) {
+                    clusters.push(thisCluster);
+                    thisCluster = [];
+                  }
+                }
+              }
+
+              prevIdx = j;
+            }
+          }
+
+          // close cluster
+          if (thisCluster.length > 0) {
+            clusters.push(thisCluster);
+          }
+
+          console.log('clusters', clusters);
+
+          let clusteredFrame: DataFrame = {
+            ...frame,
+            fields: frame.fields
+              .map((field) => ({
+                ...field,
+                values: field.values.slice(),
+              }))
+              // append cluster indices
+              .concat({
+                type: FieldType.number,
+                name: 'clusterIdx',
+                values: clusterIdx,
+                config: {},
+              }),
+          };
+
+          let hasTimeEndField = clusteredFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
+
+          if (!hasTimeEndField) {
+            clusteredFrame.fields.push({
+              type: FieldType.time,
+              name: 'timeEnd',
+              values: Array(clusteredFrame.fields[0].values.length).fill(null),
+              config: {},
+            });
+          }
+
+          // append cluster regions to frame
+          clusters.forEach((idxs, ci) => {
+            clusteredFrame.fields.forEach((field) => {
+              let vals = field.values;
+
+              if (field.name === 'time') {
+                vals.push(timeVals[idxs[0]]);
+              } else if (field.name === 'timeEnd') {
+                let lastIdx = idxs.length - 1;
+                vals.push(timeVals[idxs[lastIdx]]);
+              } else if (field.name === 'isRegion') {
+                vals.push(true);
+              } else if (field.name === 'color') {
+                vals.push(colorVals?.[idxs[0]]);
+              } else if (field.name === 'title') {
+                vals.push(`Cluster ${ci}`);
+              } else if (field.name === 'text') {
+                vals.push(idxs.join());
+              } else if (field.name === 'clusterIdx') {
+                vals.push(ci);
+              } else {
+                vals.push(null);
+              }
+            });
+          });
+
+          clusteredFrame.length = clusteredFrame.fields[0].values.length;
+
+          console.log('clusteredFrame', clusteredFrame);
+          clusteredAnnos.push(clusteredFrame);
+        } else {
+          console.log('regular ol frame', frame);
+          clusteredAnnos.push(frame);
+        }
+      }
+    } else if (clusteringMode === ClusteringMode.Hover) {
+      // TODO
+    }
+
+    return { clusteredAnnos: clusteredAnnos.length > 0 ? clusteredAnnos : xAnnos };
+  }, [xAnnos, clusteringMode]);
+
   const exitWipEdit = useCallback(() => {
     setNewRange(null);
   }, [setNewRange]);
 
-  const xAnnoRef = useRef(xAnnos);
-  xAnnoRef.current = xAnnos;
+  console.log('clusteredAnnos', clusteredAnnos);
+
+  const xAnnoRef = useRef(clusteredAnnos);
+  xAnnoRef.current = clusteredAnnos;
 
   const xyAnnoRef = useRef(xyAnnos);
   xyAnnoRef.current = xyAnnos;
@@ -157,7 +309,8 @@ export const AnnotationsPlugin2 = ({
       // Multi-lane annotations do not support vertical lines or shaded regions
       xAnnos.forEach((frame) => {
         let vals = getVals(frame);
-        if (!multiLane) {
+        const clusterIdx = vals.clusterIdx;
+        if (!annotationsOptions?.multiLane) {
           let y0 = u.bbox.top;
           let y1 = y0 + u.bbox.height;
 
@@ -165,6 +318,10 @@ export const AnnotationsPlugin2 = ({
           ctx.setLineDash([5, 5]);
 
           for (let i = 0; i < vals.time.length; i++) {
+            // skip rendering annos that are clustered (have non-null cluster index)
+            if (clusterIdx?.[i] != null && !vals.isRegion[i]) {
+              continue;
+            }
             let color = getColorByName(vals.color?.[i] ?? DEFAULT_ANNOTATION_COLOR_HEX8);
 
             let x0 = u.valToPos(vals.time[i], 'x', true);
@@ -220,7 +377,7 @@ export const AnnotationsPlugin2 = ({
 
       ctx.restore();
     });
-  }, [config, canvasRegionRendering, getColorByName, multiLane]);
+  }, [config, canvasRegionRendering, getColorByName, annotationsOptions?.multiLane]);
 
   // ensure xAnnos are re-drawn whenever they change
   useEffect(() => {
@@ -248,9 +405,12 @@ export const AnnotationsPlugin2 = ({
       let markers: React.ReactNode[] = [];
 
       // Top offset for multi-lane annotations
-      const top = multiLane ? frameIdx * ANNOTATION_LANE_SIZE : undefined;
+      const top = annotationsOptions?.multiLane ? frameIdx * ANNOTATION_LANE_SIZE : undefined;
 
       for (let i = 0; i < vals.time.length; i++) {
+        if (!vals.isRegion[i] && vals.clusterIdx?.[i] != null) {
+          continue;
+        }
         let color = getColorByName(vals.color?.[i] || DEFAULT_ANNOTATION_COLOR);
         let left = Math.round(plot.valToPos(vals.time[i], 'x')) || 0; // handles -0
         let style: React.CSSProperties | null = null;
