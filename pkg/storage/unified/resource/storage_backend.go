@@ -880,10 +880,6 @@ func (k *kvStorageBackend) ListModifiedSince(ctx context.Context, key Namespaced
 		}
 	}
 
-	if latestEvent.ResourceVersion == sinceRv {
-		return sinceRv, func(yield func(*ModifiedResource, error) bool) { /* nothing to return */ }
-	}
-
 	// Check if sinceRv is older than 1 hour
 	sinceRvTimestamp := snowflake.ID(sinceRv).Time()
 	sinceTime := time.Unix(0, sinceRvTimestamp*int64(time.Millisecond))
@@ -1011,7 +1007,7 @@ func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key 
 	return func(yield func(*ModifiedResource, error) bool) {
 		// we only care about the latest revision of every resource in the list
 		seen := make(map[string]struct{})
-		for evtKeyStr, err := range k.eventStore.ListKeysSince(ctx, sinceRV, SortOrderDesc) {
+		for evtKeyStr, err := range k.eventStore.ListKeysBetween(ctx, sinceRV, latestRV+1, SortOrderDesc) {
 			if err != nil {
 				yield(&ModifiedResource{}, err)
 				return
@@ -1021,10 +1017,6 @@ func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key 
 			if err != nil {
 				yield(&ModifiedResource{}, err)
 				return
-			}
-
-			if evtKey.ResourceVersion > latestRV {
-				continue
 			}
 
 			if evtKey.Group != key.Group || evtKey.Resource != key.Resource || evtKey.Namespace != key.Namespace {

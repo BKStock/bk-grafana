@@ -203,6 +203,25 @@ func (n *eventStore) ListKeysSince(ctx context.Context, sinceRV int64, sortOrder
 	}
 }
 
+func (n *eventStore) ListKeysBetween(ctx context.Context, startRV, endRV int64, sortOrder SortOrder) iter.Seq2[string, error] {
+	opts := ListOptions{
+		Sort:     sortOrder,
+		StartKey: fmt.Sprintf("%d", startRV),
+		EndKey:   fmt.Sprintf("%d", endRV),
+	}
+	return func(yield func(string, error) bool) {
+		for evtKey, err := range n.kv.Keys(ctx, eventsSection, opts) {
+			if err != nil {
+				yield("", err)
+				return
+			}
+			if !yield(evtKey, nil) {
+				return
+			}
+		}
+	}
+}
+
 func (n *eventStore) ListSince(ctx context.Context, sinceRV int64, sortOrder SortOrder) iter.Seq2[Event, error] {
 	return func(yield func(Event, error) bool) {
 		for evtKey, err := range n.ListKeysSince(ctx, sinceRV, sortOrder) {
