@@ -7,6 +7,8 @@ import {
   LibraryPanelKind,
   PanelKind,
   QueryVariableKind,
+  GroupByVariableKind,
+  AdhocVariableKind,
 } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { handyTestingSchema } from '@grafana/schema/apis/dashboard.grafana.app/v2/examples';
 import config from 'app/core/config';
