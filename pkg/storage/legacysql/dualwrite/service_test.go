@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -18,7 +17,7 @@ import (
 func TestService(t *testing.T) {
 	t.Run("dynamic", func(t *testing.T) {
 		ctx := context.Background()
-		mode, err := ProvideService(featuremgmt.WithFeatures(featuremgmt.FlagProvisioning), kvstore.NewFakeKVStore(), NewFakeConfig(), NewFakeMigrator(), NewFakeMigrationStatusReader(), ProvideMetrics(prometheus.NewRegistry()))
+		mode, err := ProvideService(featuremgmt.WithFeatures(featuremgmt.FlagProvisioning), kvstore.NewFakeKVStore(), NewFakeConfig(), NewFakeMigrator(), NewFakeMigrationStatusReader())
 		require.NoError(t, err)
 
 		gr := schema.GroupResource{Group: "ggg", Resource: "rrr"}
@@ -128,7 +127,7 @@ func TestService(t *testing.T) {
 					"dashboards.dashboard.grafana.app", storageModeFromConfigMode(tc.cfg.UnifiedStorage["dashboards.dashboard.grafana.app"].DualWriterMode),
 					"folders.folder.grafana.app", storageModeFromConfigMode(tc.cfg.UnifiedStorage["folders.folder.grafana.app"].DualWriterMode),
 				)
-				svc, err := ProvideService(tc.flags, kvstore.NewFakeKVStore(), &tc.cfg, NewFakeMigrator(), statusReader, ProvideMetrics(prometheus.NewRegistry()))
+				svc, err := ProvideService(tc.flags, kvstore.NewFakeKVStore(), &tc.cfg, NewFakeMigrator(), statusReader)
 				if tc.error != "" {
 					require.ErrorContains(t, err, tc.error)
 					require.Nil(t, svc, "expect a nil service when an error exts")

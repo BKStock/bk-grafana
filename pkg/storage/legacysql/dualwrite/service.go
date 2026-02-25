@@ -75,7 +75,6 @@ func ProvideService(
 	cfg *setting.Cfg,
 	migrator unifiedmigrations.UnifiedStorageMigrationService,
 	statusReader unifiedmigrations.MigrationStatusReader,
-	metrics *Metrics,
 ) (Service, error) {
 	// Ensure migrations have run before starting dualwrite
 	err := migrator.Run(context.Background())
@@ -92,18 +91,16 @@ func ProvideService(
 			return &staticService{cfg: cfg, statusReader: statusReader}, nil
 		}
 
-		if cfg != nil {
-			foldersMode := cfg.UnifiedStorage["folders.folder.grafana.app"].DualWriterMode
-			dashboardsMode := cfg.UnifiedStorage["dashboards.dashboard.grafana.app"].DualWriterMode
+		foldersMode := cfg.UnifiedStorage["folders.folder.grafana.app"].DualWriterMode
+		dashboardsMode := cfg.UnifiedStorage["dashboards.dashboard.grafana.app"].DualWriterMode
 
-			// If both are fully on unified (Mode5), the dynamic service is not needed.
-			if foldersMode == rest.Mode5 && dashboardsMode == rest.Mode5 {
-				return &staticService{cfg: cfg, statusReader: statusReader}, nil
-			}
+		// If both are fully on unified (Mode5), the dynamic service is not needed.
+		if foldersMode == rest.Mode5 && dashboardsMode == rest.Mode5 {
+			return &staticService{cfg: cfg, statusReader: statusReader}, nil
+		}
 
-			if (foldersMode >= rest.Mode4 || dashboardsMode >= rest.Mode4) && foldersMode != dashboardsMode {
-				return nil, fmt.Errorf("dashboards and folders must use the same mode when reading from unified storage")
-			}
+		if (foldersMode >= rest.Mode4 || dashboardsMode >= rest.Mode4) && foldersMode != dashboardsMode {
+			return nil, fmt.Errorf("dashboards and folders must use the same mode when reading from unified storage")
 		}
 	}
 
