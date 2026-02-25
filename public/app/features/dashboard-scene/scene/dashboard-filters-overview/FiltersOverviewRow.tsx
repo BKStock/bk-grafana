@@ -3,7 +3,7 @@ import { memo } from 'react';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { Checkbox, Combobox, ComboboxOption, Icon, MultiCombobox, Tooltip, useStyles2 } from '@grafana/ui';
+import { Checkbox, Combobox, ComboboxOption, Icon, IconButton, MultiCombobox, Tooltip, useStyles2 } from '@grafana/ui';
 
 interface GroupHeaderProps {
   group: string;
@@ -42,12 +42,15 @@ interface FilterRowProps {
   multiValues: string[];
   isGroupBy: boolean;
   isOrigin: boolean;
+  isRestorable: boolean;
+  allowCustomValue: boolean;
   hasGroupByVariable: boolean;
   operatorOptions: Array<ComboboxOption<string>>;
   onOperatorChange: (key: string, operator: string) => void;
   onSingleValueChange: (key: string, value: string) => void;
   onMultiValuesChange: (key: string, values: string[]) => void;
   onGroupByToggle: (key: string, nextValue: boolean) => void;
+  onRestore: (key: string) => void;
   getValueOptions: (key: string, operator: string, inputValue: string) => Promise<Array<ComboboxOption<string>>>;
 }
 
@@ -61,12 +64,15 @@ export const FilterRow = memo(
     multiValues,
     isGroupBy,
     isOrigin,
+    isRestorable,
+    allowCustomValue,
     hasGroupByVariable,
     operatorOptions,
     onOperatorChange,
     onSingleValueChange,
     onMultiValuesChange,
     onGroupByToggle,
+    onRestore,
     getValueOptions,
   }: FilterRowProps) => {
     const styles = useStyles2(getRowStyles);
@@ -99,33 +105,48 @@ export const FilterRow = memo(
           />
         </div>
 
-        {/* Value cell */}
-        <div className={styles.valueCell}>
-          {isMultiOperator ? (
-            <MultiCombobox
-              aria-label={t('dashboard.filters-overview.value', 'Value')}
-              options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
-              value={multiValues}
-              placeholder={t('dashboard.filters-overview.value.placeholder', 'Select values')}
-              isClearable={true}
-              onChange={(selections: Array<ComboboxOption<string>>) => {
-                onMultiValuesChange(
-                  keyValue,
-                  selections.map((s) => s.value)
-                );
-              }}
-            />
-          ) : (
-            <Combobox
-              aria-label={t('dashboard.filters-overview.value', 'Value')}
-              options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
-              value={singleValue ? { label: singleValue, value: singleValue } : null}
-              placeholder={t('dashboard.filters-overview.value.placeholder', 'Select value')}
-              isClearable={true}
-              onChange={(selection: ComboboxOption<string> | null) => {
-                onSingleValueChange(keyValue, selection?.value ?? '');
-              }}
-            />
+        {/* Value + Restore group */}
+        <div className={styles.valueGroup}>
+          <div className={styles.valueCell}>
+            {isMultiOperator ? (
+              <MultiCombobox
+                aria-label={t('dashboard.filters-overview.value', 'Value')}
+                options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
+                value={multiValues}
+                placeholder={t('dashboard.filters-overview.value.placeholder', 'Select values')}
+                isClearable={true}
+                createCustomValue={allowCustomValue}
+                onChange={(selections: Array<ComboboxOption<string>>) => {
+                  onMultiValuesChange(
+                    keyValue,
+                    selections.map((s) => s.value)
+                  );
+                }}
+              />
+            ) : (
+              <Combobox
+                aria-label={t('dashboard.filters-overview.value', 'Value')}
+                options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
+                value={singleValue ? { label: singleValue, value: singleValue } : null}
+                placeholder={t('dashboard.filters-overview.value.placeholder', 'Select value')}
+                isClearable={true}
+                createCustomValue={allowCustomValue}
+                onChange={(selection: ComboboxOption<string> | null) => {
+                  onSingleValueChange(keyValue, selection?.value ?? '');
+                }}
+              />
+            )}
+          </div>
+
+          {isRestorable && (
+            <div className={styles.restoreCell}>
+              <IconButton
+                name="history"
+                size="md"
+                tooltip={t('dashboard.filters-overview.restore', 'Restore default value')}
+                onClick={() => onRestore(keyValue)}
+              />
+            </div>
           )}
         </div>
 
@@ -214,11 +235,17 @@ const getRowStyles = (theme: GrafanaTheme2) => {
         borderRadius: 'unset',
       },
     }),
-    valueCell: css({
+    valueGroup: css({
       ...cellLayering,
       flex: '0 0 auto',
       width: theme.spacing(26),
       marginLeft: -1,
+      display: 'flex',
+      alignItems: 'flex-start',
+    }),
+    valueCell: css({
+      flex: '1 1 auto',
+      minWidth: 0,
       '&& > *': {
         width: '100%',
         paddingLeft: 0,
@@ -233,6 +260,13 @@ const getRowStyles = (theme: GrafanaTheme2) => {
         borderTopLeftRadius: 'unset',
         borderBottomLeftRadius: 'unset',
       },
+    }),
+    restoreCell: css({
+      flex: '0 0 auto',
+      display: 'flex',
+      alignItems: 'center',
+      alignSelf: 'center',
+      marginLeft: theme.spacing(1),
     }),
     groupByCell: css({
       flex: '0 0 auto',

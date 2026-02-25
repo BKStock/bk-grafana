@@ -33,11 +33,12 @@ export const DashboardFiltersOverview = ({
   const styles = useStyles2(getStyles);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters } = useFiltersOverviewState({
-    adhocFilters,
-    groupByVariable,
-    searchQuery,
-  });
+  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters, allowCustomValue } =
+    useFiltersOverviewState({
+      adhocFilters,
+      groupByVariable,
+      searchQuery,
+    });
 
   const virtualizer = useVirtualizer({
     count: listItems.length,
@@ -124,12 +125,18 @@ export const DashboardFiltersOverview = ({
                   multiValues={state.multiValuesByKey[keyValue] ?? []}
                   isGroupBy={state.isGrouped[keyValue] ?? false}
                   isOrigin={state.isOriginByKey[keyValue] ?? false}
+                  isRestorable={
+                    (state.isOriginByKey[keyValue] ?? false) &&
+                    (state.singleValuesByKey[keyValue] ?? '') !== (state.defaultValuesByKey[keyValue] ?? '')
+                  }
+                  allowCustomValue={allowCustomValue}
                   hasGroupByVariable={Boolean(groupByVariable)}
                   operatorOptions={operatorConfig.options}
                   onOperatorChange={actions.setOperator}
                   onSingleValueChange={actions.setSingleValue}
                   onMultiValuesChange={actions.setMultiValues}
                   onGroupByToggle={actions.toggleGroupBy}
+                  onRestore={actions.restoreDefault}
                   getValueOptions={actions.getValueOptionsForKey}
                 />
               </div>

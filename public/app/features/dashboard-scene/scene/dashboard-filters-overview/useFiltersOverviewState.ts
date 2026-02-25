@@ -18,6 +18,7 @@ export interface FiltersOverviewState {
   isGrouped: Record<string, boolean>;
   isOriginByKey: Record<string, boolean>;
   openGroups: Record<string, boolean>;
+  defaultValuesByKey: Record<string, string>;
 }
 
 export interface FiltersOverviewActions {
@@ -26,6 +27,7 @@ export interface FiltersOverviewActions {
   setSingleValue: (key: string, value: string) => void;
   setMultiValues: (key: string, values: string[]) => void;
   toggleGroupBy: (key: string, nextValue: boolean) => void;
+  restoreDefault: (key: string) => void;
   getValueOptionsForKey: (key: string, operator: string, inputValue: string) => Promise<Array<ComboboxOption<string>>>;
   applyChanges: () => void;
 }
@@ -141,6 +143,7 @@ export function useFiltersOverviewState({
     isGrouped: {},
     isOriginByKey: {},
     openGroups: {},
+    defaultValuesByKey: {},
   });
 
   const [loading, setLoading] = useState(true);
@@ -148,7 +151,7 @@ export function useFiltersOverviewState({
 
   const operatorConfig = useMemo(
     () => ({
-      options: OPERATORS.map((op) => ({ label: op.value, value: op.value })),
+      options: OPERATORS.map((op) => ({ label: op.value, value: op.value, description: op.description })),
     }),
     []
   );
@@ -166,6 +169,17 @@ export function useFiltersOverviewState({
       const { keys, operatorsByKey, multiValuesByKey, singleValuesByKey, isOriginByKey } = buildOverviewState(
         adhocFilters.state
       );
+
+      const defaultValuesByKey: Record<string, string> = {};
+      for (const originFilter of adhocFilters.state.originFilters ?? []) {
+        if (originFilter.nonApplicable) {
+          continue;
+        }
+        const original = adhocFilters.getOriginalValue(originFilter);
+        if (original) {
+          defaultValuesByKey[originFilter.key] = original.value[0] ?? '';
+        }
+      }
 
       const existingKeyValues = new Set(keys.map((k) => k.value ?? k.label).filter(Boolean));
       for (const key of await adhocFilters._getKeys(null)) {
@@ -199,6 +213,7 @@ export function useFiltersOverviewState({
         isOriginByKey,
         isGrouped,
         openGroups,
+        defaultValuesByKey,
       }));
       setLoading(false);
     };
@@ -241,6 +256,20 @@ export function useFiltersOverviewState({
 
     toggleGroupBy: (key, nextValue) => {
       setState((prev) => ({ ...prev, isGrouped: { ...prev.isGrouped, [key]: nextValue } }));
+    },
+
+    restoreDefault: (key) => {
+      setState((prev) => {
+        const defaultValue = prev.defaultValuesByKey[key];
+        if (defaultValue === undefined) {
+          return prev;
+        }
+        return {
+          ...prev,
+          singleValuesByKey: { ...prev.singleValuesByKey, [key]: defaultValue },
+          multiValuesByKey: { ...prev.multiValuesByKey, [key]: [] },
+        };
+      });
     },
 
     getValueOptionsForKey: async (key, operator, inputValue) => {
@@ -300,5 +329,6 @@ export function useFiltersOverviewState({
     loading,
     hasKeys: state.keys.length > 0,
     hasAdhocFilters: Boolean(adhocFilters),
+    allowCustomValue: adhocFilters?.state.allowCustomValue ?? true,
   };
 }
