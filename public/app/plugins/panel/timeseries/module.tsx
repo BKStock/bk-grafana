@@ -2,6 +2,7 @@ import { PanelPlugin } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { commonOptionsBuilder } from '@grafana/ui';
 import { optsWithHideZeros } from '@grafana/ui/internal';
+import { addAnnotationOptions } from 'app/features/panel/options/builder/annotations';
 
 import { TimeSeriesPanel } from './TimeSeriesPanel';
 import { TimezonesEditor } from './TimezonesEditor';
@@ -25,6 +26,7 @@ export const plugin = new PanelPlugin<Options, FieldConfig>(TimeSeriesPanel)
       editor: TimezonesEditor,
       defaultValue: undefined,
     });
+    addAnnotationOptions(builder);
   })
   .setSuggestionsSupplier(timeseriesSuggestionsSupplier)
   .setDataSupport({ annotations: true, alertStates: true });
