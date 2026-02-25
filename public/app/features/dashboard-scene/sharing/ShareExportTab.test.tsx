@@ -162,7 +162,11 @@ describe('ShareExportTab', () => {
   });
 
   describe('V2Resource export mode', () => {
-    it('should default to V2Resource export format', async () => {
+    beforeEach(() => {
+      config.featureToggles.dashboardNewLayouts = true;
+    });
+
+    it('should default to V2Resource when dashboardNewLayouts is enabled', async () => {
       const tab = buildV2DashboardScenario();
 
       expect(tab.state.exportFormat).toBe(ExportFormat.V2Resource);
@@ -258,6 +262,11 @@ describe('ShareExportTab', () => {
   });
 
   describe('Classic export mode', () => {
+    it('should default to Classic when dashboardNewLayouts is disabled', () => {
+      const tab = buildV1DashboardScenario();
+      expect(tab.state.exportFormat).toBe(ExportFormat.Classic);
+    });
+
     it('should export V1 dashboard as plain JSON via API', async () => {
       const tab = buildV1DashboardScenario();
       tab.setState({ exportFormat: ExportFormat.Classic });

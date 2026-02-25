@@ -37,7 +37,6 @@ export function ResourceExport({
   onViewYAML,
 }: Props) {
   const hasLibraryPanels = dashboardJson.value?.hasLibraryPanels;
-  const initialSaveModelVersion = dashboardJson.value?.initialSaveModelVersion;
   const isV2Dashboard =
     dashboardJson.value?.json && 'spec' in dashboardJson.value.json && 'elements' in dashboardJson.value.json.spec;
   const showV2LibPanelAlert = isV2Dashboard && isSharingExternally && hasLibraryPanels;
@@ -102,7 +101,7 @@ export function ResourceExport({
         </Box>
       </QueryOperationRow>
 
-      {(isV2Dashboard || exportFormat === ExportFormat.Classic) && (
+      {(isV2Dashboard || exportFormat === ExportFormat.Classic || exportFormat === ExportFormat.V2Resource) && (
         <Stack gap={1} alignItems="start">
           <Label>
             <Stack gap={0.5} alignItems="center">

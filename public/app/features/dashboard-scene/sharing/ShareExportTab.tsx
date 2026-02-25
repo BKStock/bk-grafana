@@ -49,7 +49,7 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       ...state,
       isSharingExternally: false,
       isViewingJSON: false,
-      exportFormat: ExportFormat.V2Resource,
+      exportFormat: config.featureToggles.dashboardNewLayouts ? ExportFormat.V2Resource : ExportFormat.Classic,
     });
   }
 
@@ -70,13 +70,8 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
   public onExportFormatChange = (exportFormat: ExportFormat) => {
     this.setState({
       exportFormat,
+      ...(exportFormat === ExportFormat.Classic && { isViewingYAML: false }),
     });
-
-    if (exportFormat === ExportFormat.Classic) {
-      this.setState({
-        isViewingYAML: false,
-      });
-    }
   };
 
   public onViewJSON = () => {
@@ -165,7 +160,9 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       };
     } catch (err) {
       return {
-        json: { error: `Failed to fetch dashboard in classic format. ${err}` },
+        json: {
+          error: `Failed to fetch dashboard in classic format. ${err instanceof Error ? err.message : String(err)}`,
+        },
         initialSaveModelVersion,
         hasLibraryPanels: undefined,
       };
@@ -223,7 +220,9 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       };
     } catch (err) {
       return {
-        json: { error: `Failed to fetch dashboard as V2 resource. ${err}` },
+        json: {
+          error: `Failed to fetch dashboard as V2 resource. ${err instanceof Error ? err.message : String(err)}`,
+        },
         initialSaveModelVersion,
         hasLibraryPanels: undefined,
       };
@@ -324,7 +323,10 @@ function ShareExportTabRenderer({ model }: SceneComponentProps<ShareExportTab>) 
             <ResourceExport
               dashboardJson={dashboardJson}
               isSharingExternally={isSharingExternally ?? false}
-              exportFormat={exportFormat ?? ExportFormat.Classic}
+              exportFormat={
+                exportFormat ??
+                (config.featureToggles.dashboardNewLayouts ? ExportFormat.V2Resource : ExportFormat.Classic)
+              }
               isViewingYAML={isViewingYAML ?? false}
               onExportFormatChange={model.onExportFormatChange}
               onShareExternallyChange={model.onShareExternallyChange}
