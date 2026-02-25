@@ -1,4 +1,4 @@
-import { PanelOptionsEditorBuilder } from '@grafana/data';
+import { DataTopic, PanelOptionsEditorBuilder } from '@grafana/data';
 import { t } from '@grafana/i18n';
 
 /**
@@ -19,5 +19,6 @@ export function addAnnotationOptions<T>(builder: PanelOptionsEditorBuilder<T>) {
       'Breaks each annotation frame into a separate row in the visualization'
     ),
     defaultValue: false,
+    showIf: (_, __, annotations) => annotations?.some((df) => df.meta?.dataTopic === DataTopic.Annotations),
   });
 }
