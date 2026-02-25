@@ -81,7 +81,7 @@ export function summaryChartQuery(filter: string, alertStateFilter: AlertStateFi
 
 /**
  * Two queries for the workbench tree:
- * - **A** (range table): count-by over alert series, used to render sparkline rows
+ * - **A** (range table): count-by over alert series, used to render timeline rows
  * - **B** (instant table): count-by over unique instances, used for badge counts
  */
 export function workbenchQueries(
@@ -145,7 +145,7 @@ export function alertRuleTimeseriesQuery(
 
 /**
  * Returns a PromQL expression that produces one entry per unique alert instance,
- * deduplicated over the dashboard $__range.
+ * deduplicated over the selected time range (`$__range`).
  *
  * Uses `last_over_time` to capture all instances active during the range, then
  * `unless` to remove pending instances that also had a corresponding firing series.
