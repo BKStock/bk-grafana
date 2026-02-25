@@ -5429,6 +5429,7 @@
       "groupby": "GroupBy",
       "missing-adhoc": "No ad hoc filters available",
       "operator": "Operator",
+      "restore": "Restore default value",
       "search": {
         "aria-label": "Search filters",
         "placeholder": "Search..."
