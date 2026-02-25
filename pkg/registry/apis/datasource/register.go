@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"time"
 
+	"github.com/open-feature/go-sdk/openfeature"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -66,9 +68,14 @@ func RegisterAPIService(
 	reg prometheus.Registerer,
 	pluginSources sources.Registry,
 ) (*DataSourceAPIBuilder, error) {
-	//nolint:staticcheck // not yet migrated to OpenFeature
-	if !features.IsEnabledGlobally(featuremgmt.FlagQueryServiceWithConnections) &&
-		!features.IsEnabledGlobally(featuremgmt.FlagGrafanaAPIServerWithExperimentalAPIs) {
+	ffClient := openfeature.NewDefaultClient()
+	ffCtx, ffCtxCancelFn := context.WithTimeout(context.Background(), time.Second*5)
+	defer ffCtxCancelFn()
+	evalContext := openfeature.TransactionContext(ffCtx)
+
+	flagQueryServiceWithConnections := ffClient.Boolean(ffCtx, featuremgmt.FlagQueryServiceWithConnections, false, evalContext)
+	flagGrafanaAPIServerWithExperimentalAPIs := ffClient.Boolean(ffCtx, featuremgmt.FlagGrafanaAPIServerWithExperimentalAPIs, false, evalContext)
+	if !flagQueryServiceWithConnections && !flagGrafanaAPIServerWithExperimentalAPIs {
 		return nil, nil
 	}
 
@@ -107,7 +114,7 @@ func RegisterAPIService(
 			//nolint:staticcheck // not yet migrated to OpenFeature
 			DataSourceAPIBuilderConfig{
 				LoadQueryTypes:         features.IsEnabledGlobally(featuremgmt.FlagDatasourceQueryTypes),
-				UseDualWriter:          features.IsEnabledGlobally(featuremgmt.FlagQueryServiceWithConnections),
+				UseDualWriter:          flagQueryServiceWithConnections,
 				EnableResourceEndpoint: features.IsEnabledGlobally(featuremgmt.FlagDatasourcesApiServerEnableResourceEndpoint),
 			},
 		)
