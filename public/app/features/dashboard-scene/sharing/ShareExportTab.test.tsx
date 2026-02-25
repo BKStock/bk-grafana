@@ -298,6 +298,59 @@ describe('ShareExportTab', () => {
       // Should report correct initial version
       expect(result.initialSaveModelVersion).toBe('v1');
     });
+
+    // If V2 dashboard → Classic should convert to V1 and export plain JSON
+    it('should convert V2 dashboard to classic V1 format', async () => {
+      const tab = buildV2DashboardScenario();
+      tab.setState({ exportFormat: ExportFormat.Classic });
+
+      const result = await tab.getExportableDashboardJson();
+
+      // Should return plain V1 dashboard JSON (not wrapped in resource)
+      expect(result.json).toMatchObject({
+        title: 'Transformed V1',
+      });
+
+      // Should NOT have resource wrapper properties
+      expect(result.json).not.toHaveProperty('apiVersion');
+      expect(result.json).not.toHaveProperty('kind');
+      expect(result.json).not.toHaveProperty('status');
+
+      // Should NOT have V2-specific properties
+      expect(result.json).not.toHaveProperty('elements');
+      expect(result.json).not.toHaveProperty('layout');
+
+      // Should call V2→V1 transformation
+      expect(transformSceneToV2Spy).toHaveBeenCalled();
+      expect(transformV2ToV1Spy).toHaveBeenCalled();
+
+      // Should report correct initial version
+      expect(result.initialSaveModelVersion).toBe('v2');
+    });
+
+    // If V2 dashboard → Classic with external sharing should transform and apply external sharing
+    it('should handle external sharing when converting V2 dashboard to classic format', async () => {
+      const tab = buildV2DashboardScenario();
+      tab.setState({
+        exportFormat: ExportFormat.Classic,
+        isSharingExternally: true,
+      });
+
+      const result = await tab.getExportableDashboardJson();
+
+      // Should NOT have resource wrapper properties
+      expect(result.json).not.toHaveProperty('apiVersion');
+      expect(result.json).not.toHaveProperty('kind');
+      expect(result.json).not.toHaveProperty('status');
+
+      // Should call V2→V1 transformation and makeExportableV1
+      expect(transformSceneToV2Spy).toHaveBeenCalled();
+      expect(transformV2ToV1Spy).toHaveBeenCalled();
+      expect(makeExportableV1Spy).toHaveBeenCalled();
+
+      // Should report correct initial version
+      expect(result.initialSaveModelVersion).toBe('v2');
+    });
   });
 
   describe('Export mode state management', () => {

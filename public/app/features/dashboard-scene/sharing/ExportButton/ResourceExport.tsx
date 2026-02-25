@@ -78,17 +78,15 @@ export function ResourceExport({
       >
         <Box marginTop={2}>
           <Stack gap={1} direction="column">
-            {initialSaveModelVersion === 'v1' && (
-              <Stack gap={1} alignItems="center">
-                <Label>{switchExportModeLabel}</Label>
-                <RadioButtonGroup
-                  options={exportResourceOptions}
-                  value={exportFormat}
-                  onChange={(value) => onExportFormatChange(value)}
-                  aria-label={switchExportModeLabel}
-                />
-              </Stack>
-            )}
+            <Stack gap={1} alignItems="center">
+              <Label>{switchExportModeLabel}</Label>
+              <RadioButtonGroup
+                options={exportResourceOptions}
+                value={exportFormat}
+                onChange={(value) => onExportFormatChange(value)}
+                aria-label={switchExportModeLabel}
+              />
+            </Stack>
 
             {exportFormat !== ExportFormat.Classic && (
               <Stack gap={1} alignItems="center">

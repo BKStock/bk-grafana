@@ -123,7 +123,8 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       isDashboardV2Spec(origDashboard) &&
       'elements' in exportable &&
       initialSaveModelVersion === 'v2' &&
-      exportFormat !== ExportFormat.V1Resource
+      exportFormat !== ExportFormat.V1Resource &&
+      exportFormat !== ExportFormat.Classic
     ) {
       this.setState({
         exportFormat: ExportFormat.V2Resource,
@@ -291,6 +292,44 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
         hasLibraryPanels: hasLibraryPanelsInV1Dashboard(initialSaveModel),
         initialSaveModelVersion,
       };
+    }
+
+    // Classic mode for natively v2 dashboards: convert v2 -> v1 classic format
+    if (exportFormat === ExportFormat.Classic && initialSaveModelVersion === 'v2' && isDashboardV2Spec(origDashboard)) {
+      try {
+        const spec = transformSceneToSaveModelSchemaV2(scene);
+        const spec1 = transformDashboardV2SpecToV1(spec, {
+          name: metadata.name ?? '',
+          generation: metadata.generation ?? 0,
+          resourceVersion: metadata.resourceVersion ?? '0',
+          creationTimestamp: metadata.creationTimestamp ?? '',
+        });
+
+        if (isSharingExternally) {
+          const oldModel = new DashboardModel(spec1, undefined, {
+            getVariablesFromState: () => {
+              return getVariablesCompatibility(window.__grafanaSceneContext);
+            },
+          });
+          return {
+            json: await makeExportableV1(oldModel),
+            hasLibraryPanels: hasLibraryPanelsInV1Dashboard(spec1),
+            initialSaveModelVersion,
+          };
+        }
+
+        return {
+          json: spec1,
+          hasLibraryPanels: hasLibraryPanelsInV1Dashboard(spec1),
+          initialSaveModelVersion,
+        };
+      } catch (err) {
+        return {
+          json: { error: `Failed to convert dashboard to classic format. ${err}` },
+          initialSaveModelVersion,
+          hasLibraryPanels: undefined,
+        };
+      }
     }
 
     // legacy mode or classic mode when dashboardNewLayouts is disabled

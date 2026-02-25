@@ -94,11 +94,17 @@ describe('ResourceExport', () => {
   });
 
   describe('export mode options for v2 dashboard', () => {
-    it('should not show export mode options', async () => {
+    it('should show export mode options for v2 dashboards', async () => {
       render(<ResourceExport {...createDefaultProps({ dashboardJson: createV2DashboardJson() })} />);
       await expandOptions();
 
-      expect(screen.queryByRole('radiogroup', { name: /model/i })).not.toBeInTheDocument();
+      const radioGroup = screen.getByRole('radiogroup', { name: /model/i });
+      const labels = within(radioGroup)
+        .getAllByRole('radio')
+        .map((radio) => radio.parentElement?.textContent?.trim());
+
+      expect(labels).toHaveLength(3);
+      expect(labels).toEqual(['Classic', 'V1 Resource', 'V2 Resource']);
     });
   });
 
