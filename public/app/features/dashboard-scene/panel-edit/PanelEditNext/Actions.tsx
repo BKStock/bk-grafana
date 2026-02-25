@@ -1,16 +1,17 @@
+import { css } from '@emotion/css';
 import { useCallback, useMemo, useState } from 'react';
 
-import { AlertState, IconName } from '@grafana/data';
+import { AlertState, GrafanaTheme2, IconName } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { Button, ConfirmModal, Stack, Tooltip } from '@grafana/ui';
+import { Button, ConfirmModal, Icon, Stack, Tooltip, useStyles2 } from '@grafana/ui';
 
-import { QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from './constants';
+import { QUERY_EDITOR_COLORS, QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from './constants';
 
 export interface ActionItem {
   name: string;
   type: QueryEditorType;
   isHidden: boolean;
-  isError?: boolean;
+  error?: string;
   /** Alert state for dynamic styling (only used when type is Alert) */
   alertState?: AlertState | null;
 }
@@ -39,6 +40,7 @@ export function Actions({
   onDuplicate,
   onToggleHide,
 }: ActionsProps) {
+  const styles = useStyles2(getStyles);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const config = QUERY_EDITOR_TYPE_CONFIG[item.type];
   const typeLabel = config.getLabel();
@@ -129,12 +131,22 @@ export function Actions({
 
   return (
     <>
-      <Stack direction="row" gap={contentHeader ? 1 : 0}>
+      <Stack direction="row" gap={contentHeader ? 1 : 0} alignItems="center">
         {actionButtons.map(({ label, id, icon, onClick }) => (
           <Tooltip content={label} key={id}>
             <Button size="sm" fill="text" icon={icon} variant="secondary" aria-label={label} onClick={onClick} />
           </Tooltip>
         ))}
+        {!!item.error && (
+          <Tooltip theme="error" content={item.error}>
+            <Icon
+              size="sm"
+              name="exclamation-triangle"
+              aria-label={t('query-editor-next.action.error', 'Error')}
+              className={styles.errorIcon}
+            />
+          </Tooltip>
+        )}
       </Stack>
 
       {showDeleteConfirmation && (
@@ -155,3 +167,10 @@ export function Actions({
     </>
   );
 }
+
+const getStyles = (theme: GrafanaTheme2) => ({
+  errorIcon: css({
+    color: QUERY_EDITOR_COLORS.error,
+    marginLeft: theme.spacing(0.5),
+  }),
+});

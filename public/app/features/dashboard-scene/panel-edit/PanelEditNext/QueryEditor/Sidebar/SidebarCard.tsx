@@ -101,7 +101,7 @@ export const SidebarCard = ({
           <div>
             <div className={styles.cardContentIcons}>
               {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" />}
-              {item.isError && <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />}
+              {!!item.error && <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />}
             </div>
             <div className={cx(styles.hoverActions, { [styles.hoverActionsVisible]: hasFocusWithin })}>
               <Actions
@@ -139,7 +139,7 @@ function getStyles(
     theme,
     editorType: item.type,
     alertState: item.alertState,
-    isError: item.isError,
+    isError: !!item.error,
   });
 
   const selectedBg = `color-mix(in srgb, ${borderColor} 8%, ${theme.colors.background.primary})`;
@@ -173,7 +173,7 @@ function getStyles(
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing(1),
-      marginRight: theme.spacing(1),
+      marginRight: theme.spacing(1.5),
     }),
     wrapper: css({
       position: 'relative',

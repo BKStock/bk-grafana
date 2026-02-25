@@ -4,6 +4,7 @@ import { Icon } from '@grafana/ui';
 import { DataSourceLogo } from 'app/features/datasources/components/picker/DataSourceLogo';
 import { useDatasource } from 'app/features/datasources/hooks';
 
+import { ActionItem } from '../../Actions';
 import { QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from '../../constants';
 import { useActionsContext, useQueryEditorUIContext, useQueryRunnerContext } from '../QueryEditorContext';
 import { getEditorType } from '../utils';
@@ -48,11 +49,11 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
   const isSelected = selectedQuery?.refId === query.refId;
   const isHidden = !!query.hide;
 
-  const item = {
+  const item: ActionItem = {
     name: query.refId,
     type: editorType,
     isHidden,
-    isError,
+    error: data?.errors?.find((e) => e.refId === query.refId)?.message,
   };
 
   return (
