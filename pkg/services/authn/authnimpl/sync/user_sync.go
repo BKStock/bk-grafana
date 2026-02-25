@@ -481,6 +481,7 @@ func (s *UserSync) upsertAuthConnection(ctx context.Context, usr *user.User, ide
 
 	updateAuthInfoCmd := &login.UpdateAuthInfoCommand{
 		UserId:     usr.ID,
+		UserUID:    usr.UID,
 		AuthId:     identity.AuthID,
 		AuthModule: identity.AuthenticatedBy,
 	}
