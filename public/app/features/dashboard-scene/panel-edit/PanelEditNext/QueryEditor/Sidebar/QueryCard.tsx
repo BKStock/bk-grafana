@@ -4,7 +4,7 @@ import { Icon } from '@grafana/ui';
 import { DataSourceLogo } from 'app/features/datasources/components/picker/DataSourceLogo';
 import { useDatasource } from 'app/features/datasources/hooks';
 
-import { QUERY_EDITOR_COLORS, QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from '../../constants';
+import { QUERY_EDITOR_TYPE_CONFIG, QueryEditorType } from '../../constants';
 import { useActionsContext, useQueryEditorUIContext, useQueryRunnerContext } from '../QueryEditorContext';
 import { getEditorType } from '../utils';
 
@@ -21,9 +21,9 @@ const QueryCardIcon = ({
   editorType: QueryEditorType;
   queryDsSettings: DataSourceInstanceSettings | undefined;
 }) => {
-  if (isError) {
-    return <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />;
-  }
+  // if (isError) {
+  //   return <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />;
+  // }
   if (editorType === QueryEditorType.Query) {
     return <DataSourceLogo dataSource={queryDsSettings} size={14} />;
   }
@@ -43,6 +43,7 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
   const { duplicateQuery, deleteQuery, toggleQueryHide } = useActionsContext();
   const { data } = useQueryRunnerContext();
 
+  // Note: when a query is hidden, it is removed from the error list :(
   const isError = data?.errors?.some((e) => e.refId === query.refId) ?? false;
   const isSelected = selectedQuery?.refId === query.refId;
   const isHidden = !!query.hide;

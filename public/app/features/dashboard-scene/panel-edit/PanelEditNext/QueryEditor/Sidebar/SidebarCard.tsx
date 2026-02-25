@@ -99,7 +99,10 @@ export const SidebarCard = ({
         {/** hasActions is indicating if this is an alert card or a query/transformation card. */}
         {hasActions && (
           <div>
-            {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" className={styles.hiddenIcon} />}
+            <div className={styles.cardContentIcons}>
+              {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" />}
+              {item.isError && <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />}
+            </div>
             <div className={cx(styles.hoverActions, { [styles.hoverActionsVisible]: hasFocusWithin })}>
               <Actions
                 handleResetFocus={handleResetFocus}
@@ -164,9 +167,17 @@ function getStyles(
   });
 
   return {
+    cardContentIcons: css({
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing(1),
+      marginRight: theme.spacing(1),
+    }),
     wrapper: css({
       position: 'relative',
-      marginInlineStart: theme.spacing(SIDEBAR_CARD_INDENT),
+      marginLeft: theme.spacing(SIDEBAR_CARD_INDENT),
+      marginRight: theme.spacing(SIDEBAR_CARD_INDENT),
 
       // Two slim pseudo-element strips extend the hover zone to the left and
       // below the card, covering the path to the "+" button without overlapping
@@ -211,7 +222,25 @@ function getStyles(
       justifyContent: 'space-between',
       width: '100%',
       background: isSelected ? selectedBg : 'transparent',
-      borderLeft: `${isSelected ? 3 : 1}px solid ${borderColor}`,
+      borderRadius: theme.shape.radius.default,
+      overflow: 'hidden',
+
+      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${theme.colors.border.weak} 75%, transparent)`}`,
+
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: isSelected ? 3 : 1,
+        background: borderColor,
+        [theme.transitions.handleMotion('no-preference', 'reduce')]: {
+          transition: theme.transitions.create(['width'], {
+            duration: theme.transitions.duration.standard,
+          }),
+        },
+      },
       cursor: 'pointer',
 
       // This transitions the background color of the card when it is hovered or selected.
