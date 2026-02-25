@@ -372,7 +372,9 @@ test.describe('Panels test: Table - Kitchen Sink', { tag: ['@panels', '@table'] 
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
     ).toBeVisible();
 
-    await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink')).click();
+    await dashboardPage
+      .getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink'))
+      .click({ position: { x: 0, y: 0 } });
 
     await expect(
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
@@ -394,7 +396,9 @@ test.describe('Panels test: Table - Kitchen Sink', { tag: ['@panels', '@table'] 
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
     ).toBeVisible();
 
-    await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink')).click();
+    await dashboardPage
+      .getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink'))
+      .click({ position: { x: 0, y: 0 } });
 
     await expect(
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)

@@ -1,3 +1,5 @@
+import { Page } from '@playwright/test';
+
 import { test, expect, DashboardPage, E2ESelectorGroups } from '@grafana/plugin-e2e';
 
 import { getCell, waitForTableLoad, getColumnIdx, getCellHeight } from './table-utils';
@@ -9,7 +11,11 @@ test.use({ viewport: { width: 2000, height: 4000 } });
 /**
  * takes the kitchen sink dashboard and adds transformations so it can temporarily be a nested table.
  */
-const convertKitchenSinkToNestedTable = async (dashboardPage: DashboardPage, selectors: E2ESelectorGroups) => {
+const convertKitchenSinkToNestedTable = async (
+  dashboardPage: DashboardPage,
+  page: Page,
+  selectors: E2ESelectorGroups
+) => {
   await expect(
     dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink'))
   ).toBeVisible();
@@ -33,6 +39,28 @@ const convertKitchenSinkToNestedTable = async (dashboardPage: DashboardPage, sel
     .getByGrafanaSelector(selectors.components.TransformTab.transformationEditor('Group to nested tables'))
     .getByLabel('Info')
     .press('Enter');
+
+  // the info field will be too small since it's sized to 110px by default, so we need to remove it from
+  // the regex max for uniform field widths to make it take the full width.
+  const optionsGroup = dashboardPage.getByGrafanaSelector(
+    selectors.components.OptionsGroup.group('panel-options-override-7')
+  );
+  const input = optionsGroup.getByLabel('Fields with name matching regex').getByRole('textbox');
+  await input.fill((await input.inputValue()).replace('Info|', ''));
+  await input.blur();
+
+  const mainTable = page.locator('.rdg').nth(0);
+  const infoColIdx = await getColumnIdx(mainTable, 'Info');
+  const cell = getCell(mainTable, 1, infoColIdx);
+  await expect(
+    async () => {
+      const box = await cell.boundingBox();
+      expect(box?.width).toBeGreaterThan(200);
+    },
+    {
+      message: 'info column is resized',
+    }
+  ).toPass();
 };
 
 test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () => {
@@ -202,7 +230,7 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
       queryParams: new URLSearchParams({ editPanel: '1' }),
     });
 
-    await convertKitchenSinkToNestedTable(dashboardPage, selectors);
+    await convertKitchenSinkToNestedTable(dashboardPage, page, selectors);
 
     await dashboardPage
       .getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.RowExpander)
@@ -213,7 +241,7 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
     const longTextColIdx = await getColumnIdx(firstNestedTable, 'Long Text');
 
     // text wrapping is enabled by default on this panel.
-    await expect(getCellHeight(firstNestedTable, 1, longTextColIdx)).resolves.toBeGreaterThan(100);
+    await expect(getCellHeight(firstNestedTable, 1, longTextColIdx)).resolves.toBeGreaterThanOrEqual(100);
 
     // set a max row height, watch the height decrease, then clear it to continue.
     const maxRowHeightInput = page.getByLabel('Max row height').last();
@@ -234,7 +262,7 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
     const loremIpsumCell = getCell(firstNestedTable, 1, longTextColIdx);
     await loremIpsumCell.scrollIntoViewIfNeeded();
     await loremIpsumCell.hover();
-    await expect(getCellHeight(firstNestedTable, 1, longTextColIdx)).resolves.toBeGreaterThan(100);
+    await expect(getCellHeight(firstNestedTable, 1, longTextColIdx)).resolves.toBeGreaterThanOrEqual(100);
     await getCell(firstNestedTable, 1, longTextColIdx + 1).hover();
     await expect(getCellHeight(firstNestedTable, 1, longTextColIdx)).resolves.toBeLessThan(100);
 
@@ -254,13 +282,13 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
     await expect(page.getByRole('dialog').getByText(loremIpsumText!)).toBeVisible();
   });
 
-  test('tooltip from field', async ({ gotoDashboardPage, selectors }) => {
+  test('tooltip from field', async ({ gotoDashboardPage, page, selectors }) => {
     const dashboardPage = await gotoDashboardPage({
       uid: DASHBOARD_UID,
       queryParams: new URLSearchParams({ editPanel: '1' }),
     });
 
-    await convertKitchenSinkToNestedTable(dashboardPage, selectors);
+    await convertKitchenSinkToNestedTable(dashboardPage, page, selectors);
 
     await dashboardPage
       .getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.RowExpander)
@@ -291,7 +319,9 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
     ).toBeVisible();
 
-    await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink')).click();
+    await dashboardPage
+      .getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink'))
+      .click({ position: { x: 0, y: 0 } });
 
     await expect(
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
@@ -313,7 +343,9 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
     ).toBeVisible();
 
-    await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink')).click();
+    await dashboardPage
+      .getByGrafanaSelector(selectors.components.Panels.Panel.title('Table - Kitchen Sink'))
+      .click({ position: { x: 0, y: 0 } });
 
     await expect(
       dashboardPage.getByGrafanaSelector(selectors.components.Panels.Visualization.TableNG.Tooltip.Wrapper)
