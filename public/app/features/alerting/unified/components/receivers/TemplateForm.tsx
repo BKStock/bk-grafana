@@ -48,6 +48,7 @@ import {
   useUpdateNotificationTemplate,
   useValidateNotificationTemplate,
 } from '../contact-points/useNotificationTemplates';
+import { isLegacyTemplate } from '../contact-points/utils';
 
 import { PayloadEditor } from './PayloadEditor';
 import { TemplateDataDocs } from './TemplateDataDocs';
@@ -129,7 +130,7 @@ export const TemplateForm = ({ originalTemplate, prefill, alertmanager }: Props)
   const { provenance } = useNotificationTemplateMetadata(originalTemplate);
   const isProvisioned = isProvisionedResource(provenance);
   const isImported = provenance === KnownProvenance.ConvertedPrometheus;
-  const isLegacy = originalTemplate?.kind === 'mimir';
+  const isLegacy = originalTemplate ? isLegacyTemplate(originalTemplate) : false;
   const originalTemplatePrefill: TemplateFormValues | undefined = originalTemplate
     ? { title: originalTemplate.title, content: originalTemplate.content }
     : undefined;
