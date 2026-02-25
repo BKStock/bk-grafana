@@ -5435,6 +5435,7 @@
         "placeholder": "Search..."
       },
       "title": "Edit filters",
+      "use-custom-value": "Use custom value",
       "value": "Value"
     },
     "gen-aihistory": {

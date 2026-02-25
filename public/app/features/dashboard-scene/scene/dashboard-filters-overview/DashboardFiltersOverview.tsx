@@ -33,8 +33,7 @@ export const DashboardFiltersOverview = ({
   const styles = useStyles2(getStyles);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters, allowCustomValue } =
-    useFiltersOverviewState({
+  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters } = useFiltersOverviewState({
       adhocFilters,
       groupByVariable,
       searchQuery,
@@ -129,7 +128,6 @@ export const DashboardFiltersOverview = ({
                     (state.isOriginByKey[keyValue] ?? false) &&
                     (state.singleValuesByKey[keyValue] ?? '') !== (state.defaultValuesByKey[keyValue] ?? '')
                   }
-                  allowCustomValue={allowCustomValue}
                   hasGroupByVariable={Boolean(groupByVariable)}
                   operatorOptions={operatorConfig.options}
                   onOperatorChange={actions.setOperator}

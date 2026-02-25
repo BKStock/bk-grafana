@@ -43,7 +43,6 @@ interface FilterRowProps {
   isGroupBy: boolean;
   isOrigin: boolean;
   isRestorable: boolean;
-  allowCustomValue: boolean;
   hasGroupByVariable: boolean;
   operatorOptions: Array<ComboboxOption<string>>;
   onOperatorChange: (key: string, operator: string) => void;
@@ -65,7 +64,6 @@ export const FilterRow = memo(
     isGroupBy,
     isOrigin,
     isRestorable,
-    allowCustomValue,
     hasGroupByVariable,
     operatorOptions,
     onOperatorChange,
@@ -115,7 +113,6 @@ export const FilterRow = memo(
                 value={multiValues}
                 placeholder={t('dashboard.filters-overview.value.placeholder', 'Select values')}
                 isClearable={true}
-                createCustomValue={allowCustomValue}
                 onChange={(selections: Array<ComboboxOption<string>>) => {
                   onMultiValuesChange(
                     keyValue,
@@ -130,7 +127,6 @@ export const FilterRow = memo(
                 value={singleValue ? { label: singleValue, value: singleValue } : null}
                 placeholder={t('dashboard.filters-overview.value.placeholder', 'Select value')}
                 isClearable={true}
-                createCustomValue={allowCustomValue}
                 onChange={(selection: ComboboxOption<string> | null) => {
                   onSingleValueChange(keyValue, selection?.value ?? '');
                 }}

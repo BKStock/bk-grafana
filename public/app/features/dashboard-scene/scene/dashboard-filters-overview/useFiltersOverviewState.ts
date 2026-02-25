@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { fuzzySearch, SelectableValue } from '@grafana/data';
+import { t } from '@grafana/i18n';
 import { AdHocFilterWithLabels, AdHocFiltersVariable, GroupByVariable, OPERATORS } from '@grafana/scenes';
 import { ComboboxOption } from '@grafana/ui';
 
@@ -291,8 +292,22 @@ export function useFiltersOverviewState({
       if (!inputValue) {
         return options;
       }
+
       const lowered = inputValue.toLowerCase();
-      return options.filter((o) => (o.label ?? o.value).toLowerCase().includes(lowered));
+      const filtered = options.filter((o) => (o.label ?? o.value).toLowerCase().includes(lowered));
+
+      const allowCustom = adhocFilters.state.allowCustomValue ?? true;
+      if (allowCustom) {
+        const exactMatch = filtered.some((o) => o.value === inputValue);
+        if (!exactMatch) {
+          filtered.push({
+            value: inputValue,
+            description: t('dashboard.filters-overview.use-custom-value', 'Use custom value'),
+          });
+        }
+      }
+
+      return filtered;
     },
 
     applyChanges: () => {
@@ -329,6 +344,5 @@ export function useFiltersOverviewState({
     loading,
     hasKeys: state.keys.length > 0,
     hasAdhocFilters: Boolean(adhocFilters),
-    allowCustomValue: adhocFilters?.state.allowCustomValue ?? true,
   };
 }
