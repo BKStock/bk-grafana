@@ -9,7 +9,6 @@ import (
 
 	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/grafana/grafana/pkg/apiserver/rest"
-	"github.com/grafana/grafana/pkg/cmd/grafana-cli/logger"
 	"github.com/grafana/grafana/pkg/infra/kvstore"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/setting"
@@ -265,35 +264,4 @@ func (m *service) Update(ctx context.Context, status StorageStatus) (StorageStat
 	}
 	status.UpdateKey++
 	return status, m.db.set(ctx, status)
-}
-
-// logModeComparison compares currentMode with the mode from MigrationStatusReader
-// and emits metrics/logs for observability.
-func logModeComparison(statusReader unifiedmigrations.MigrationStatusReader, metrics *Metrics, gr schema.GroupResource, currentMode unifiedmigrations.StorageMode) {
-	if statusReader == nil {
-		return
-	}
-	newMode, err := statusReader.GetStorageMode(context.Background(), gr)
-	if err != nil {
-		logger.Warn("Failed to get storage mode from MigrationStatusReader",
-			"resource", gr.String(), "error", err)
-		return
-	}
-
-	logger.Info("Storage mode comparison",
-		"resource", gr.String(),
-		"newMode", newMode.String(),
-		"currentMode", currentMode.String(),
-	)
-}
-
-// storageModeFromStatus derives a StorageMode from the current StorageStatus.
-func storageModeFromStatus(status StorageStatus) unifiedmigrations.StorageMode {
-	if status.ReadUnified && status.WriteUnified && !status.WriteLegacy {
-		return unifiedmigrations.StorageModeUnified
-	}
-	if status.WriteUnified {
-		return unifiedmigrations.StorageModeDualWrite
-	}
-	return unifiedmigrations.StorageModeLegacy
 }
