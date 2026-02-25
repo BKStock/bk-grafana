@@ -1,5 +1,5 @@
 import { css } from '@emotion/css';
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { GrafanaTheme2, PanelData, PanelPluginVisualizationSuggestion, VisualizationSuggestion } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
@@ -20,7 +20,6 @@ export interface Props {
 
 export function VisualizationPresets({ presets, data, suggestion, onPreview, onApply, onSkip, onBack }: Props) {
   const styles = useStyles2(getStyles);
-  const [selectedPresetIndex, setSelectedPresetIndex] = useState<number>(0);
 
   const presetSuggestions = useMemo((): PanelPluginVisualizationSuggestion[] => {
     return presets.map((preset, index) => ({
@@ -35,14 +34,6 @@ export function VisualizationPresets({ presets, data, suggestion, onPreview, onA
   }, [presets, suggestion]);
 
   const handlePresetClick = useCallback(
-    (presetSuggestion: PanelPluginVisualizationSuggestion, index: number) => {
-      setSelectedPresetIndex(index);
-      onPreview(presets[index]);
-    },
-    [onPreview, presets]
-  );
-
-  const handleApplyClick = useCallback(
     (presetSuggestion: PanelPluginVisualizationSuggestion, index: number) => {
       onApply(presets[index]);
     },
@@ -75,16 +66,8 @@ export function VisualizationPresets({ presets, data, suggestion, onPreview, onA
       <VisualizationCardGrid
         items={presetSuggestions}
         data={data}
-        selectedItemKey={presetSuggestions[selectedPresetIndex]?.hash ?? null}
         onItemClick={handlePresetClick}
-        onItemApply={handleApplyClick}
         getItemKey={(item) => item.hash}
-        buttonLabel={t('panel.presets.configure-panel', 'Configure panel')}
-        getButtonAriaLabel={(item) =>
-          t('panel.presets.configure-panel-aria-label', 'Configure {{presetName}} panel', {
-            presetName: item.name,
-          })
-        }
       />
     </>
   );

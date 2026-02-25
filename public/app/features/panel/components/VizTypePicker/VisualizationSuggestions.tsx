@@ -85,9 +85,7 @@ export function VisualizationSuggestions({
 
   const suggestions = result?.suggestions;
   const hasLoadingErrors = result?.hasErrors ?? false;
-  const [suggestionHash, setSuggestionHash] = useState<string | null>(null);
   const [firstCardHash, setFirstCardHash] = useState<string | null>(null);
-  const [selectedSuggestionHasPresets, setSelectedSuggestionHasPresets] = useState<boolean>(false);
   const isNewVizSuggestionsEnabled = config.featureToggles.newVizSuggestions;
   const isUnconfiguredPanel =
     vizPanel?.state.pluginId === UNCONFIGURED_PANEL_PLUGIN_ID || panel?.type === UNCONFIGURED_PANEL_PLUGIN_ID;
@@ -138,27 +136,8 @@ export function VisualizationSuggestions({
           panelState,
           suggestionIndex: suggestionIndex + 1,
         });
-      } else {
-        VizSuggestionsInteractions.suggestionPreviewed({
-          pluginId: suggestion.pluginId,
-          suggestionName: suggestion.name,
-          panelState,
-          isAutoSelected,
-        });
-
-        // Check if this suggestion has presets when it's selected
-        if (config.featureToggles.vizPresets && vizPanel) {
-          getPresetsForPanel(suggestion.pluginId, vizPanel)
-            .then((presetsResult) => {
-              setSelectedSuggestionHasPresets(presetsResult.presets && presetsResult.presets.length > 0);
-            })
-            .catch(() => {
-              setSelectedSuggestionHasPresets(false);
-            });
-        }
       }
 
-      setSuggestionHash(suggestion.hash);
       onChange({
         pluginId: suggestion.pluginId,
         options: suggestion.options,
@@ -167,15 +146,16 @@ export function VisualizationSuggestions({
         fromSuggestions: true,
       });
     },
-    [onChange, panelState, vizPanel]
+    [onChange, panelState]
   );
 
-  const handleApplySuggestion = useCallback(
+  const handleSuggestionClick = useCallback(
     async (item: PanelPluginVisualizationSuggestion, index: number) => {
       if (config.featureToggles.vizPresets && onShowPresets && vizPanel) {
         try {
           const presetsResult = await getPresetsForPanel(item.pluginId, vizPanel);
           if (presetsResult.presets && presetsResult.presets.length > 0) {
+            applySuggestion(item, index, false, false);
             onShowPresets(item, presetsResult.presets);
             return;
           }
@@ -188,44 +168,8 @@ export function VisualizationSuggestions({
     [applySuggestion, onShowPresets, vizPanel]
   );
 
-  const getButtonLabel = () => {
-    return config.featureToggles.vizPresets && selectedSuggestionHasPresets
-      ? t('panel.visualization-suggestions.view-style-options', 'View style options')
-      : t('panel.visualization-suggestions.configure-panel', 'Configure panel');
-  };
-
-  const getButtonAriaLabelForItem = (item: PanelPluginVisualizationSuggestion) => {
-    return config.featureToggles.vizPresets && selectedSuggestionHasPresets
-      ? t(
-          'panel.visualization-suggestions.view-style-options-aria-label',
-          'View style options for {{suggestionName}}',
-          {
-            suggestionName: item.name,
-          }
-        )
-      : t('panel.visualization-suggestions.configure-panel-aria-label', 'Configure {{suggestionName}} panel', {
-          suggestionName: item.name,
-        });
-  };
-
-  const getSecondaryButtonConfig = () => {
-    if (!config.featureToggles.vizPresets || !onShowPresets || !vizPanel) {
-      return undefined;
-    }
-
-    return {
-      onAction: (item: PanelPluginVisualizationSuggestion, index: number) => applySuggestion(item, index, false, true),
-      label: t('panel.visualization-suggestions.configure-panel', 'Configure panel'),
-      getAriaLabel: (item: PanelPluginVisualizationSuggestion) =>
-        t('panel.visualization-suggestions.configure-panel-aria-label', 'Configure {{suggestionName}} panel', {
-          suggestionName: item.name,
-        }),
-      shouldShow: () => selectedSuggestionHasPresets,
-    };
-  };
-
   useEffect(() => {
-    if (!isNewVizSuggestionsEnabled || !suggestions || suggestions.length === 0) {
+    if (!isNewVizSuggestionsEnabled || !suggestions || suggestions.length === 0 || !isUnconfiguredPanel) {
       return;
     }
 
@@ -244,22 +188,13 @@ export function VisualizationSuggestions({
     // if the first suggestion has changed, we're going to change the currently selected suggestion and
     // set the firstCardHash to the new first suggestion's hash. We also choose the first suggestion if
     // the previously selected suggestion is no longer present in the list.
-    const newFirstCardHash = suggestions?.[0]?.hash ?? null;
-    if (firstCardHash !== newFirstCardHash || suggestions.every((s) => s.hash !== suggestionHash)) {
-      applySuggestion(suggestions[0], 0, true);
+    const newFirstCardHash = suggestions[0]?.hash ?? null;
+    if (firstCardHash !== newFirstCardHash) {
+      applySuggestion(suggestions[0], 0, true, false);
       setFirstCardHash(newFirstCardHash);
-      return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    suggestions,
-    suggestionHash,
-    firstCardHash,
-    isNewVizSuggestionsEnabled,
-    isNewPanel,
-    isUnconfiguredPanel,
-    applySuggestion,
-  ]);
+  }, [suggestions, firstCardHash, isNewVizSuggestionsEnabled, isUnconfiguredPanel, applySuggestion]);
 
   if (loading || !data) {
     return (
@@ -303,13 +238,8 @@ export function VisualizationSuggestions({
         groups={isNewVizSuggestionsEnabled ? suggestionsByVizType : undefined}
         items={!isNewVizSuggestionsEnabled ? suggestions : undefined}
         data={data!}
-        selectedItemKey={suggestionHash}
-        onItemClick={(item, index) => applySuggestion(item, index)}
-        onItemApply={handleApplySuggestion}
+        onItemClick={handleSuggestionClick}
         getItemKey={(item) => item.hash}
-        buttonLabel={getButtonLabel()}
-        getButtonAriaLabel={getButtonAriaLabelForItem}
-        secondaryButton={getSecondaryButtonConfig()}
       />
     </>
   );
@@ -330,7 +260,7 @@ function NoDataPanelList({ searchQuery, panel, onChange }: NoDataPanelListProps)
 
   return (
     <>
-      <div className={styles.emptyStateSection}>
+      <div className={styles.emptyStateWrapper}>
         <Icon name="chart-line" size="xxxl" className={styles.emptyStateIcon} />
         <Text element="p" textAlignment="center" color="secondary">
           <Trans i18nKey="panel.visualization-suggestions.run-query-hint">
@@ -387,7 +317,7 @@ const getStyles = (theme: GrafanaTheme2) => {
       alignItems: 'center',
       justifyContent: 'space-between',
     }),
-    emptyStateSection: css({
+    emptyStateWrapper: css({
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

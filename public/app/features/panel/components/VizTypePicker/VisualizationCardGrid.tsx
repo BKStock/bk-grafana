@@ -3,10 +3,9 @@ import { Fragment, useMemo } from 'react';
 import { useMeasure } from 'react-use';
 
 import { GrafanaTheme2, PanelData, PanelPluginMeta, PanelPluginVisualizationSuggestion } from '@grafana/data';
-import { selectors } from '@grafana/e2e-selectors';
 import { t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
-import { Button, Text, useStyles2 } from '@grafana/ui';
+import { Text, useStyles2 } from '@grafana/ui';
 import { MIN_MULTI_COLUMN_SIZE } from 'app/features/panel/suggestions/constants';
 
 import { VisualizationSuggestionCard } from './VisualizationSuggestionCard';
@@ -16,38 +15,15 @@ export interface VisualizationCardGridGroup {
   items: PanelPluginVisualizationSuggestion[];
 }
 
-export interface SecondaryButtonConfig {
-  onAction: (item: PanelPluginVisualizationSuggestion, index: number) => void;
-  label: string;
-  getAriaLabel: (item: PanelPluginVisualizationSuggestion) => string;
-  shouldShow: (item: PanelPluginVisualizationSuggestion) => boolean;
-}
-
 export interface Props {
   items?: PanelPluginVisualizationSuggestion[];
   groups?: VisualizationCardGridGroup[];
   data: PanelData;
-  selectedItemKey: string | null;
   onItemClick: (item: PanelPluginVisualizationSuggestion, index: number) => void;
-  onItemApply: (item: PanelPluginVisualizationSuggestion, index: number) => void;
   getItemKey: (item: PanelPluginVisualizationSuggestion) => string;
-  buttonLabel: string;
-  getButtonAriaLabel: (item: PanelPluginVisualizationSuggestion) => string;
-  secondaryButton?: SecondaryButtonConfig;
 }
 
-export function VisualizationCardGrid({
-  items,
-  groups,
-  data,
-  selectedItemKey,
-  onItemClick,
-  onItemApply,
-  getItemKey,
-  buttonLabel,
-  getButtonAriaLabel,
-  secondaryButton,
-}: Props) {
+export function VisualizationCardGrid({ items, groups, data, onItemClick, getItemKey }: Props) {
   const styles = useStyles2(getStyles);
   const [firstCardRef, { width }] = useMeasure<HTMLDivElement>();
   const isNewVizSuggestionsEnabled = config.featureToggles.newVizSuggestions;
@@ -73,7 +49,6 @@ export function VisualizationCardGrid({
 
   const renderCard = (item: PanelPluginVisualizationSuggestion, isFirst: boolean) => {
     const itemKey = getItemKey(item);
-    const isCardSelected = selectedItemKey === itemKey;
     const itemIndex = itemIndexMap.get(itemKey) ?? -1;
 
     return (
@@ -82,7 +57,6 @@ export function VisualizationCardGrid({
         className={styles.cardContainer}
         tabIndex={0}
         role="button"
-        aria-pressed={isCardSelected}
         onKeyDown={(ev) => {
           if (ev.key === 'Enter' || ev.key === ' ') {
             ev.preventDefault();
@@ -91,39 +65,10 @@ export function VisualizationCardGrid({
         }}
         ref={isFirst ? firstCardRef : undefined}
       >
-        {isCardSelected && (
-          <div className={styles.buttonContainer}>
-            <Button
-              tabIndex={-1}
-              variant="primary"
-              size="md"
-              className={styles.applySuggestionButton}
-              data-testid={selectors.components.VisualizationPreview.confirm(item.name)}
-              aria-label={getButtonAriaLabel(item)}
-              onClick={() => onItemApply(item, itemIndex)}
-            >
-              {buttonLabel}
-            </Button>
-            {secondaryButton && secondaryButton.shouldShow(item) && (
-              <Button
-                tabIndex={-1}
-                variant="primary"
-                fill="text"
-                size="sm"
-                className={styles.secondaryButton}
-                aria-label={secondaryButton.getAriaLabel(item)}
-                onClick={() => secondaryButton.onAction(item, itemIndex)}
-              >
-                {secondaryButton.label}
-              </Button>
-            )}
-          </div>
-        )}
         <VisualizationSuggestionCard
           data={data}
           suggestion={item}
           width={width}
-          isSelected={isCardSelected}
           onClick={() => onItemClick(item, itemIndex)}
         />
       </div>
@@ -179,23 +124,6 @@ const getStyles = (theme: GrafanaTheme2) => {
       alignItems: 'center',
       display: 'inline-block',
       marginRight: theme.spacing(1),
-    }),
-    buttonContainer: css({
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      zIndex: 10,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: theme.spacing(1),
-      alignItems: 'center',
-    }),
-    applySuggestionButton: css({
-      padding: theme.spacing(0, 2),
-    }),
-    secondaryButton: css({
-      padding: theme.spacing(0, 1),
     }),
   };
 };
