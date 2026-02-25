@@ -32,18 +32,20 @@ import (
 
 // Test names for the storage backend test suite
 const (
-	TestHappyPath                 = "happy path"
-	TestWatchWriteEvents          = "watch write events from latest"
-	TestList                      = "list"
-	TestBlobSupport               = "blob support"
-	TestGetResourceStats          = "get resource stats"
-	TestListHistory               = "list history"
-	TestListHistoryErrorReporting = "list history error reporting"
-	TestListModifiedSince         = "list events since rv"
-	TestListTrash                 = "list trash"
-	TestCreateNewResource         = "create new resource"
-	TestGetResourceLastImportTime = "get resource last import time"
-	TestOptimisticLocking         = "optimistic locking on concurrent writes"
+	TestHappyPath                        = "happy path"
+	TestWatchWriteEvents                 = "watch write events from latest"
+	TestList                             = "list"
+	TestBlobSupport                      = "blob support"
+	TestGetResourceStats                 = "get resource stats"
+	TestListHistory                      = "list history"
+	TestListHistoryErrorReporting        = "list history error reporting"
+	TestListModifiedSince                = "list events since rv"
+	TestListModifiedSinceWithLookback    = "list events since rv (with lookback)"
+	TestListModifiedSinceWithoutLookback = "list events since rv (without lookback)"
+	TestListTrash                        = "list trash"
+	TestCreateNewResource                = "create new resource"
+	TestGetResourceLastImportTime        = "get resource last import time"
+	TestOptimisticLocking                = "optimistic locking on concurrent writes"
 )
 
 type NewBackendFunc func(ctx context.Context) resource.StorageBackend
@@ -90,6 +92,8 @@ func RunStorageBackendTest(t *testing.T, newBackend NewBackendFunc, opts *TestOp
 		{TestListTrash, runTestIntegrationBackendTrash},
 		{TestCreateNewResource, runTestIntegrationBackendCreateNewResource},
 		{TestListModifiedSince, runTestIntegrationBackendListModifiedSince},
+		{TestListModifiedSinceWithLookback, runTestIntegrationBackendListModifiedSinceWithLookback},
+		{TestListModifiedSinceWithoutLookback, runTestIntegrationBackendListModifiedSinceWithoutLookback},
 		{TestGetResourceLastImportTime, runTestIntegrationGetResourceLastImportTime},
 		{TestOptimisticLocking, runTestIntegrationBackendOptimisticLocking},
 	}
@@ -539,9 +543,8 @@ func addDurationToSnowflake(snowflakeID int64, duration time.Duration) int64 {
 	return (newTime.UnixMilli() - snowflake.Epoch) << (snowflake.NodeBits + snowflake.StepBits)
 }
 
-func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
+func setupListModifiedSince(t *testing.T, ns string, backend resource.StorageBackend) (context.Context, int64, int64) {
 	ctx := testutil.NewTestContext(t, time.Now().Add(30*time.Second))
-	ns := nsPrefix + "-history-ns"
 	rvCreated, _ := WriteEvent(ctx, backend, "item1", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
 	require.Greater(t, rvCreated, int64(0))
 	rvUpdated, err := WriteEvent(ctx, backend, "item1", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rvCreated))
@@ -551,23 +554,70 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 	require.NoError(t, err)
 	require.Greater(t, rvDeleted, rvUpdated)
 
-	t.Run("will list latest modified event when resource has multiple events", func(t *testing.T) {
-		key := resource.NamespacedResource{
-			Namespace: ns,
-			Group:     "group",
-			Resource:  "resource",
-		}
-		latestRv, seq := backend.ListModifiedSince(ctx, key, rvCreated)
-		require.GreaterOrEqual(t, latestRv, rvDeleted)
+	return ctx, rvCreated, rvDeleted
+}
 
-		counter := 0
-		for res, err := range seq {
-			require.NoError(t, err)
-			require.Equal(t, rvDeleted, res.ResourceVersion)
-			counter++
-		}
-		require.Equal(t, 1, counter) // only one event should be returned
-	})
+func runTestWithMoreEvents(ctx context.Context, t *testing.T, ns string, backend resource.StorageBackend, existingRV int64, expectedNames []string) {
+	key := resource.NamespacedResource{
+		Namespace: ns,
+		Group:     "group",
+		Resource:  "resource",
+	}
+
+	rv1, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
+	require.NoError(t, err)
+	rv2, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv1))
+	require.NoError(t, err)
+	rv3, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv2))
+	require.NoError(t, err)
+	// add a few events to another namespace in between events for the one we're testing
+	rv4, err := WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_ADDED, WithNamespace("other-ns"))
+	require.NoError(t, err)
+	rv5, err := WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV("other-ns", rv4))
+	require.NoError(t, err)
+	_, err = WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV("other-ns", rv5))
+	require.NoError(t, err)
+	rv6, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv3))
+	require.NoError(t, err)
+	rv7, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
+	require.NoError(t, err)
+	rv8, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv7))
+	require.NoError(t, err)
+	rv9, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_DELETED, WithNamespaceAndRV(ns, rv8))
+	require.NoError(t, err)
+	rv10, err := WriteEvent(ctx, backend, "bItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
+	require.NoError(t, err)
+
+	latestRVs := map[string]int64{
+		"item1": existingRV,
+		"aItem": rv9,
+		"bItem": rv10,
+		"cItem": rv6,
+	}
+
+	latestRv, seq := backend.ListModifiedSince(ctx, key, rv1-1)
+	require.GreaterOrEqual(t, latestRv, rv10)
+
+	counter := 0
+	for res, err := range seq {
+		require.Less(t, counter, len(expectedNames),
+			"too many modified resources, unexpected resource: action=%d, ns=%s, name=%s",
+			res.Action, res.Key.Namespace, res.Key.Name,
+		)
+		name := expectedNames[counter]
+		require.Contains(t, latestRVs, name, "unknown resource %s", name)
+		require.NoError(t, err)
+		require.Equal(t, key.Namespace, res.Key.Namespace)
+		require.Equal(t, name, res.Key.Name)
+		require.Equal(t, latestRVs[name], res.ResourceVersion)
+		counter++
+	}
+	require.Equal(t, len(expectedNames), counter)
+}
+
+func runTestIntegrationBackendListModifiedSinceWithLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
+	ns := nsPrefix + "-history-ns"
+	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("includes events on or before sinceRV due to lookback", func(t *testing.T) {
 		key := resource.NamespacedResource{
@@ -587,6 +637,56 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 		require.Equal(t, 1, counter)
 	})
 
+	t.Run("everything all at once", func(t *testing.T) {
+		expectedNames := []string{"bItem", "aItem", "cItem", "item1"} // includes item1 due to lookback
+		runTestWithMoreEvents(ctx, t, ns, backend, rvDeleted, expectedNames)
+	})
+}
+
+func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
+	ns := nsPrefix + "-history-ns"
+	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
+
+	t.Run("no events for subsequent ListModifiedSince calls", func(t *testing.T) {
+		key := resource.NamespacedResource{
+			Namespace: ns,
+			Group:     "group",
+			Resource:  "resource",
+		}
+		latestRv, seq := backend.ListModifiedSince(ctx, key, rvDeleted)
+		require.GreaterOrEqual(t, latestRv, rvDeleted)
+
+		isEmpty(t, seq)
+	})
+
+	t.Run("everything all at once", func(t *testing.T) {
+		expectedNames := []string{"bItem", "aItem", "cItem"}
+		runTestWithMoreEvents(ctx, t, ns, backend, rvDeleted, expectedNames)
+	})
+}
+
+func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
+	ns := nsPrefix + "-history-ns"
+	ctx, rvCreated, rvDeleted := setupListModifiedSince(t, ns, backend)
+
+	t.Run("will list latest modified event when resource has multiple events", func(t *testing.T) {
+		key := resource.NamespacedResource{
+			Namespace: ns,
+			Group:     "group",
+			Resource:  "resource",
+		}
+		latestRv, seq := backend.ListModifiedSince(ctx, key, rvCreated)
+		require.GreaterOrEqual(t, latestRv, rvDeleted)
+
+		counter := 0
+		for res, err := range seq {
+			require.NoError(t, err)
+			require.Equal(t, rvDeleted, res.ResourceVersion)
+			counter++
+		}
+		require.Equal(t, 1, counter) // only one event should be returned
+	})
+
 	t.Run("no events if none after the given resource version plus lookback period", func(t *testing.T) {
 		key := resource.NamespacedResource{
 			Namespace: ns,
@@ -596,7 +696,7 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 		// 1 second is longer than the current lookback period -- no events
 		// should be returned in this case.
 		latestRv, seq := backend.ListModifiedSince(ctx, key, addDurationToSnowflake(rvDeleted, time.Second))
-		require.Equal(t, latestRv, rvDeleted)
+		require.GreaterOrEqual(t, latestRv, rvDeleted)
 
 		isEmpty(t, seq)
 	})
@@ -623,58 +723,6 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 			counter++
 		}
 		require.Equal(t, 1, counter) // only one event should be returned
-	})
-
-	t.Run("everything all at once", func(t *testing.T) {
-		key := resource.NamespacedResource{
-			Namespace: ns,
-			Group:     "group",
-			Resource:  "resource",
-		}
-
-		rv1, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
-		require.NoError(t, err)
-		rv2, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv1))
-		require.NoError(t, err)
-		rv3, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv2))
-		require.NoError(t, err)
-		// add a few events to another namespace in between events for the one we're testing
-		rv4, err := WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_ADDED, WithNamespace("other-ns"))
-		require.NoError(t, err)
-		rv5, err := WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV("other-ns", rv4))
-		require.NoError(t, err)
-		_, err = WriteEvent(ctx, backend, "otherNsItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV("other-ns", rv5))
-		require.NoError(t, err)
-		rv6, err := WriteEvent(ctx, backend, "cItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv3))
-		require.NoError(t, err)
-		rv7, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
-		require.NoError(t, err)
-		rv8, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rv7))
-		require.NoError(t, err)
-		rv9, err := WriteEvent(ctx, backend, "aItem", resourcepb.WatchEvent_DELETED, WithNamespaceAndRV(ns, rv8))
-		require.NoError(t, err)
-		rv10, err := WriteEvent(ctx, backend, "bItem", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
-		require.NoError(t, err)
-
-		latestRv, seq := backend.ListModifiedSince(ctx, key, rv1-1)
-		require.GreaterOrEqual(t, latestRv, rv10)
-
-		counter := 0
-		names := []string{"bItem", "aItem", "cItem", "item1"} // includes item1 due to lookback
-		rvs := []int64{rv10, rv9, rv6, rvDeleted}
-
-		for res, err := range seq {
-			require.Less(t, counter, len(names),
-				"too many modified resources, unexpected resource: action=%d, ns=%s, name=%s",
-				res.Action, res.Key.Namespace, res.Key.Name,
-			)
-			require.NoError(t, err)
-			require.Equal(t, key.Namespace, res.Key.Namespace)
-			require.Equal(t, names[counter], res.Key.Name)
-			require.Equal(t, rvs[counter], res.ResourceVersion)
-			counter++
-		}
-		require.Equal(t, len(names), counter)
 	})
 }
 

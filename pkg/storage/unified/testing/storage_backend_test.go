@@ -32,6 +32,8 @@ func TestBadgerKVStorageBackend(t *testing.T) {
 		SkipTests: map[string]bool{
 			// TODO: fix these tests and remove this skip
 			TestBlobSupport: true,
+			// Storage backend implements lookback.
+			TestListModifiedSinceWithoutLookback: true,
 		},
 	})
 }
@@ -57,6 +59,8 @@ func TestIntegrationSQLKVStorageBackend(t *testing.T) {
 
 	skipTests := map[string]bool{
 		TestBlobSupport: true,
+		// Storage backend implements lookback.
+		TestListModifiedSinceWithoutLookback: true,
 	}
 
 	t.Run("Without RvManager", func(t *testing.T) {

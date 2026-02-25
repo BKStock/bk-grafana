@@ -97,16 +97,23 @@ func TestIntegrationSQLStorageBackend(t *testing.T) {
 	testutil.SkipIntegrationTestInShortMode(t)
 	t.Cleanup(db.CleanupTestDB)
 
+	testOptions := &unitest.TestOptions{
+		SkipTests: map[string]bool{
+			// SQL backend does not implement lookback.
+			unitest.TestListModifiedSinceWithLookback: true,
+		},
+	}
+
 	t.Run("IsHA (polling notifier)", func(t *testing.T) {
 		unitest.RunStorageBackendTest(t, func(ctx context.Context) resource.StorageBackend {
 			return newTestBackend(t, true, 0, 0)
-		}, nil)
+		}, testOptions)
 	})
 
 	t.Run("NotHA (in process notifier)", func(t *testing.T) {
 		unitest.RunStorageBackendTest(t, func(ctx context.Context) resource.StorageBackend {
 			return newTestBackend(t, false, 0, 0)
-		}, nil)
+		}, testOptions)
 	})
 }
 
