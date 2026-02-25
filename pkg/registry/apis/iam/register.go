@@ -157,10 +157,14 @@ func NewAPIService(
 	reg prometheus.Registerer,
 	tokenExchanger authn.TokenExchanger,
 	authorizerDialConfigs map[schema.GroupResource]iamauthorizer.DialConfig,
+	tracingService tracing.Tracer,
 ) *IdentityAccessManagementAPIBuilder {
 	store := legacy.NewLegacySQLStores(dbProvider)
 	resourcePermissionsStorage := resourcepermission.ProvideStorageBackend(dbProvider)
 	registerMetrics(reg)
+
+	//nolint:staticcheck // not yet migrated to OpenFeature
+	enableAuthnMutation := features.IsEnabledGlobally(featuremgmt.FlagKubernetesAuthnMutation)
 
 	coreRoleAuthorizer := iamauthorizer.NewCoreRoleAuthorizer(accessClient)
 	globalRoleAuthorizer := globalRoleApiInstaller.GetAuthorizer()
@@ -175,7 +179,10 @@ func NewAPIService(
 
 	return &IdentityAccessManagementAPIBuilder{
 		store:                      store,
+		userLegacyStore:            user.NewLegacyStore(store, accessClient, enableAuthnMutation, tracingService),
+		teamBindingLegacyStore:     teambinding.NewLegacyBindingStore(store, enableAuthnMutation, tracingService),
 		display:                    user.NewLegacyDisplayREST(store),
+		tracing:                    tracingService,
 		resourcePermissionsStorage: resourcePermissionsStorage,
 		coreRolesStorage:           coreRoleStorage,
 		roleBindingsStorage:        roleBindingsStorage,
@@ -424,18 +431,20 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateTeamsAPIGroup(opts builder.AP
 		storage[teamResource.StoragePath()] = dw
 	}
 
-	legacyTeamBindingSearchClient := teambinding.NewLegacyTeamBindingSearchClient(b.store, b.tracing)
+	if b.dual != nil && b.unified != nil {
+		legacyTeamBindingSearchClient := teambinding.NewLegacyTeamBindingSearchClient(b.store, b.tracing)
 
-	teamBindingSearchClient := resource.NewSearchClient(
-		dualwrite.NewSearchAdapter(b.dual),
-		iamv0.TeamBindingResourceInfo.GroupResource(),
-		b.unified,
-		legacyTeamBindingSearchClient,
-		b.features,
-	)
+		teamBindingSearchClient := resource.NewSearchClient(
+			dualwrite.NewSearchAdapter(b.dual),
+			iamv0.TeamBindingResourceInfo.GroupResource(),
+			b.unified,
+			legacyTeamBindingSearchClient,
+			b.features,
+		)
 
-	storage[teamResource.StoragePath("members")] = team.NewTeamMembersREST(teamBindingSearchClient, b.tracing,
-		b.features, b.accessClient)
+		storage[teamResource.StoragePath("members")] = team.NewTeamMembersREST(teamBindingSearchClient, b.tracing,
+			b.features, b.accessClient)
+	}
 
 	if b.teamGroupsHandler != nil {
 		storage[teamResource.StoragePath("groups")] = b.teamGroupsHandler
@@ -508,17 +517,19 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateUsersAPIGroup(opts builder.AP
 		storage[userResource.StoragePath()] = dw
 	}
 
-	legacyTeamBindingSearchClient := teambinding.NewLegacyTeamBindingSearchClient(b.store, b.tracing)
+	if b.dual != nil && b.unified != nil {
+		legacyTeamBindingSearchClient := teambinding.NewLegacyTeamBindingSearchClient(b.store, b.tracing)
 
-	teamBindingSearchClient := resource.NewSearchClient(
-		dualwrite.NewSearchAdapter(b.dual),
-		iamv0.TeamBindingResourceInfo.GroupResource(),
-		b.unified,
-		legacyTeamBindingSearchClient,
-		b.features,
-	)
+		teamBindingSearchClient := resource.NewSearchClient(
+			dualwrite.NewSearchAdapter(b.dual),
+			iamv0.TeamBindingResourceInfo.GroupResource(),
+			b.unified,
+			legacyTeamBindingSearchClient,
+			b.features,
+		)
 
-	storage[userResource.StoragePath("teams")] = user.NewUserTeamREST(teamBindingSearchClient, b.tracing, b.features)
+		storage[userResource.StoragePath("teams")] = user.NewUserTeamREST(teamBindingSearchClient, b.tracing, b.features)
+	}
 
 	return nil
 }
