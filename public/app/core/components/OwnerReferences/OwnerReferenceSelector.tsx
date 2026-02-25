@@ -61,6 +61,7 @@ export const OwnerReferenceSelector = ({
         <Alert
           severity="error"
           title={t('manage-owner-references.error-load-team-details', 'Could not load team details')}
+          aria-label={t('manage-owner-references.error-load-team-details', 'Could not load team details aaaaaaahhh')}
         >
           {extractErrorMessage(selectedTeamError)}
         </Alert>
