@@ -122,7 +122,9 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
 
     await waitForTableLoad(page);
 
-    await expect(page.locator('[role="row"]')).toHaveCount(3); // header + 2 rows
+    const mainTable = page.locator('.rdg').nth(0);
+
+    await expect(mainTable.locator('>[role="row"]')).toHaveCount(3);
 
     // click both expanders to expand the nested tables
     await dashboardPage
@@ -135,6 +137,8 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
       .last()
       .click();
 
+    await expect(mainTable.locator('>[role="row"]')).toHaveCount(5);
+
     const firstNestedTable = page.locator('.rdg').nth(1);
     const secondNestedTable = page.locator('.rdg').nth(2);
 
@@ -142,12 +146,13 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
     const firstTableRowCount = await firstNestedTable.locator('[role="row"]').count();
     const secondTableRowCount = await secondNestedTable.locator('[role="row"]').count();
 
+    const stateColumnIdx = await getColumnIdx(mainTable, 'State');
     const infoColumnIdx = await getColumnIdx(firstNestedTable, 'Info');
 
     const infoColumnHeader = firstNestedTable.getByRole('columnheader').nth(infoColumnIdx);
 
-    // get the first value in the "State" column, filter it out, then check that it went away.
-    const firstStateValue = (await getCell(firstNestedTable, 1, infoColumnIdx).textContent())!;
+    // get the first value in the "Info" column, filter it out, then check that it went away.
+    const firstInfoValue = (await getCell(firstNestedTable, 1, infoColumnIdx).textContent())!;
     await infoColumnHeader.getByTestId(selectors.components.Panels.Visualization.TableNG.Filters.HeaderButton).click();
     const filterContainer = dashboardPage.getByGrafanaSelector(
       selectors.components.Panels.Visualization.TableNG.Filters.Container
@@ -157,16 +162,34 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
 
     // select all, then click the first value to unselect it, filtering it out.
     await filterContainer.getByTestId(selectors.components.Panels.Visualization.TableNG.Filters.SelectAll).click();
-    await filterContainer.getByTitle(firstStateValue, { exact: true }).locator('label').click();
+    await filterContainer.getByTitle(firstInfoValue, { exact: true }).locator('label').click();
     await filterContainer.getByRole('button', { name: 'Ok' }).click();
 
     // make sure the filter container closed when we clicked "Ok".
     await expect(filterContainer).not.toBeVisible();
 
     // did it actually filter out our value?
-    await expect(getCell(firstNestedTable, 1, infoColumnIdx)).not.toHaveText(firstStateValue);
+    await expect(getCell(firstNestedTable, 1, infoColumnIdx)).not.toHaveText(firstInfoValue);
     expect(await firstNestedTable.locator('[role="row"]').count()).toBeLessThan(firstTableRowCount);
     expect(await secondNestedTable.locator('[role="row"]').count()).toBe(secondTableRowCount);
+
+    // confirm that filtering the main table works as expected.
+    const lastStateValue = (await getCell(mainTable, 3, stateColumnIdx).textContent())!;
+    await expect(mainTable.locator('>[role="row"]')).toHaveCount(5); // header, top-level row + row containing nested table x2
+    await expect(page.locator('.rdg')).toHaveCount(3); // main table + nested tables x2
+
+    await mainTable
+      .getByRole('columnheader')
+      .nth(stateColumnIdx)
+      .getByTestId(selectors.components.Panels.Visualization.TableNG.Filters.HeaderButton)
+      .click();
+    await filterContainer.getByTestId(selectors.components.Panels.Visualization.TableNG.Filters.SelectAll).click();
+    await filterContainer.getByTitle(lastStateValue, { exact: true }).locator('label').click();
+    await filterContainer.getByRole('button', { name: 'Ok' }).click();
+    await expect(filterContainer).not.toBeVisible();
+
+    await expect(getCell(mainTable, 1, stateColumnIdx)).not.toHaveText(lastStateValue);
+    await expect(page.locator('.rdg')).toHaveCount(2);
   });
 
   test('word wrap, hover overflow, max cell height, and cell inspect', async ({

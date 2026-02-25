@@ -716,9 +716,6 @@ export function applyFilter(
   const filterValues = Object.entries(filter);
 
   const filterRows = (row: TableRow): boolean => {
-    if (row.data) {
-      return true;
-    }
     for (const [, value] of filterValues) {
       if (value.parentIndex != null && row.__parentIndex !== value.parentIndex) {
         continue;

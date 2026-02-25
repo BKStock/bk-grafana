@@ -126,7 +126,7 @@ export function TableNG(props: TableNGProps) {
     enablePagination = false,
     enableSharedCrosshair = false,
     enableVirtualization,
-    frozenColumns = 0,
+    frozenColumns: _frozenColumns = 0,
     getActions = () => [],
     height,
     maxRowHeight: _maxRowHeight,
@@ -264,6 +264,8 @@ export function TableNG(props: TableNGProps) {
     [theme]
   );
 
+  // https://github.com/grafana/grafana/issues/118984: nested tables don't support frozen columns yet.
+  const frozenColumns = useMemo(() => (hasNestedFrames ? 0 : _frozenColumns), [hasNestedFrames, _frozenColumns]);
   const [widths, numFrozenColsFullyInView] = useColWidths(visibleFields, availableWidth, frozenColumns);
 
   const headerHeight = useHeaderHeight({
@@ -325,9 +327,8 @@ export function TableNG(props: TableNGProps) {
   });
 
   const isExpanded = useCallback(
-    (row: TableRow) =>
-      expandedRows.has(row.__index) && row.__index + 1 >= pageRangeStart && row.__index + 1 <= pageRangeEnd,
-    [expandedRows, pageRangeStart, pageRangeEnd]
+    (row: TableRow) => (row.__depth > 0 ? expandedRows.has(row.__index) : false),
+    [expandedRows]
   );
 
   const [scrollToIndex, setScrollToIndex] = useState(initialRowIndex);
@@ -387,7 +388,7 @@ export function TableNG(props: TableNGProps) {
 
   const renderRow = useMemo(
     () => renderRowFactory(data.fields, panelContext, isExpanded, enableSharedCrosshair),
-    [data, enableSharedCrosshair, isExpanded, panelContext]
+    [data.fields, panelContext, isExpanded, enableSharedCrosshair]
   );
 
   const commonDataGridProps = useMemo(
@@ -859,7 +860,7 @@ export function TableNG(props: TableNGProps) {
   const nestedColumnsMatrix = useMemo(
     () =>
       rows
-        .filter((r) => !!r.data)
+        .filter((r) => r.__depth > 0)
         .map((r) =>
           fromFields(
             getVisibleFields(r.data!.fields),
@@ -1038,8 +1039,7 @@ const renderRowFactory = (
     const { row } = props;
 
     // Don't render non expanded child rows
-    const exp = isExpanded(row);
-    if (row.__depth > 0 && !exp) {
+    if (row.__depth > 0 && !isExpanded(row)) {
       return null;
     }
 
@@ -1052,8 +1052,8 @@ const renderRowFactory = (
     const a11yProps: AriaAttributes = {
       'aria-level': row.__depth + 1,
     };
-    if (row.data) {
-      a11yProps['aria-expanded'] = exp;
+    if (row.__depth > 0) {
+      a11yProps['aria-expanded'] = isExpanded(row);
     }
 
     return <Row key={key} {...props} {...handlers} {...a11yProps} />;
