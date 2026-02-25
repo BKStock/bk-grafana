@@ -265,7 +265,7 @@ describe('VariablesEditView', () => {
       expect(screen.queryByText('Provisioned by data source')).not.toBeInTheDocument();
     });
 
-    it('should show Provisioned by data source section when at least one variable has source', async () => {
+    it('should show Provisioned by data source section when at least one variable has origin', async () => {
       const result = await buildTestScene();
       const { variableView } = result;
       const variableSet = variableView.getVariableSet();
@@ -275,9 +275,9 @@ describe('VariablesEditView', () => {
         query: 'a,b',
         value: 'a',
         text: 'a',
-        source: {
+        origin: {
           type: 'datasource',
-          ref: { group: 'test' },
+          group: 'test',
         },
       });
       variableSet.setState({ variables: [...variables, defaultVariable] });
@@ -287,7 +287,7 @@ describe('VariablesEditView', () => {
       expect(screen.getByText('Provisioned by data source')).toBeInTheDocument();
     });
 
-    it('should show User defined variables first then Provisioned by data source when both present', async () => {
+    it('should show User defined variables first then Provisioned by data origin when both present', async () => {
       const result = await buildTestScene();
       const { variableView } = result;
       const variableSet = variableView.getVariableSet();
@@ -297,9 +297,9 @@ describe('VariablesEditView', () => {
         query: 'a,b',
         value: 'a',
         text: 'a',
-        source: {
+        origin: {
           type: 'datasource',
-          ref: { group: 'test' },
+          group: 'test',
         },
       });
       variableSet.setState({ variables: [...variables, defaultVariable] });

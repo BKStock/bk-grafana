@@ -3,6 +3,7 @@ import { uniqueId } from 'lodash';
 import { config, getDataSourceSrv } from '@grafana/runtime';
 import {
   AdHocFiltersVariable,
+  AdHocFilterWithLabels,
   behaviors,
   ConstantVariable,
   CustomVariable,
@@ -297,17 +298,15 @@ function createVariablesForDashboard(dashboard: DashboardV2Spec, defaultVariable
     .filter(isDefined);
 
   const defaultVariableObjects = defaultVariables
-    ? defaultVariables
-        .map((v) => {
-          try {
-            return createSceneVariableFromVariableModel(v);
-          } catch (err) {
-            console.error(err);
-            return null;
-          }
-        })
-        .filter(isDefined)
-    : [];
+    .map((v) => {
+      try {
+        return createSceneVariableFromVariableModel(v);
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    })
+    .filter(isDefined);
 
   // Explicitly disable scopes for public dashboards
   if (config.featureToggles.scopeFilters && !config.publicDashboardAccessToken) {
@@ -315,7 +314,7 @@ function createVariablesForDashboard(dashboard: DashboardV2Spec, defaultVariable
   }
 
   return new SceneVariableSet({
-    variables: [...variableObjects, ...defaultVariableObjects],
+    variables: [...defaultVariableObjects, ...variableObjects],
   });
 }
 
@@ -324,7 +323,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.spec.name,
     label: variable.spec.label,
     description: variable.spec.description,
-    source: variable.spec.source,
+    origin: variable.spec.origin,
   };
   if (variable.kind === defaultAdhocVariableKind().kind) {
     const ds = getDataSourceForQuery(
@@ -334,6 +333,12 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
       },
       variable.group
     );
+
+    // Separate filters by origin - filters with origin go to originFilters, others go to filters
+    const originFilters: AdHocFilterWithLabels[] = [];
+    const filters: AdHocFilterWithLabels[] = [];
+    variable.spec.filters?.forEach((filter) => (filter.origin ? originFilters.push(filter) : filters.push(filter)));
+
     const adhocVariableState: AdHocFiltersVariable['state'] = {
       ...commonProperties,
       type: 'adhoc',
@@ -342,12 +347,13 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
       hide: transformVariableHideToEnumV1(variable.spec.hide),
       datasource: ds,
       applyMode: 'auto',
-      filters: variable.spec.filters ?? [],
+      filters,
+      originFilters,
       baseFilters: variable.spec.baseFilters ?? [],
       defaultKeys: variable.spec.defaultKeys.length ? variable.spec.defaultKeys : undefined,
       useQueriesAsFilterForOptions: true,
       drilldownRecommendationsEnabled: config.featureToggles.drilldownRecommendations,
-      layout: config.featureToggles.newFiltersUI ? 'combobox' : undefined,
+      layout: 'combobox',
       supportsMultiValueOperators: Boolean(
         getDataSourceSrv().getInstanceSettings({ type: ds?.type })?.meta.multiValueFilterOperators
       ),
@@ -491,6 +497,9 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
       drilldownRecommendationsEnabled: config.featureToggles.drilldownRecommendations,
       // @ts-expect-error
       defaultOptions: variable.options,
+      defaultValue: variable.spec.defaultValue
+        ? { value: variable.spec.defaultValue.value, text: variable.spec.defaultValue.text }
+        : undefined,
     });
   } else if (variable.kind === defaultSwitchVariableKind().kind) {
     return new SwitchVariable({
@@ -568,7 +577,7 @@ export function createVariablesForSnapshot(dashboard: DashboardV2Spec): SceneVar
             baseFilters: v.spec.baseFilters ?? [],
             defaultKeys: v.spec.defaultKeys?.length ? v.spec.defaultKeys : undefined,
             useQueriesAsFilterForOptions: true,
-            layout: config.featureToggles.newFiltersUI ? 'combobox' : undefined,
+            layout: 'combobox',
             supportsMultiValueOperators: Boolean(
               getDataSourceSrv().getInstanceSettings({ type: ds?.type })?.meta.multiValueFilterOperators
             ),

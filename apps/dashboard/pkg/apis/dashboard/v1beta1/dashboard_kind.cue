@@ -37,7 +37,7 @@ lineage: schemas: [{
 			revision?: int64
 
 			// ID of a dashboard imported from the https://grafana.com/grafana/dashboards/ portal
-			gnetId?: string
+			gnetId?: int64
 
 			// Tags associated with dashboard.
 			tags?: [...string]
@@ -306,7 +306,7 @@ lineage: schemas: [{
 			// If true, includes current time range in the link as query params
 			keepTime: bool | *false
 			// The source that registered the link (if any)
-			source?: #ControlSourceRef
+			origin?: #ControlSourceRef
 
 		} @cuetsy(kind="interface")
 
@@ -857,9 +857,8 @@ lineage: schemas: [{
 
 		#DatasourceControlSourceRef: {
 			type: "datasource"
-			ref: {
-				group?: string
-			}
+			// The plugin type-id
+			group: string
 		} 
 
 		#ControlSourceRef: #DatasourceControlSourceRef

@@ -14,7 +14,7 @@ import {
   SwitchVariable,
   TextBoxVariable,
 } from '@grafana/scenes';
-import { VariableKind } from '@grafana/schema/dist/esm/schema/dashboard/v2';
+import { VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { DashboardModel } from 'app/features/dashboard/state/DashboardModel';
 
 import { SnapshotVariable } from '../serialization/custom-variables/SnapshotVariable';
@@ -39,17 +39,15 @@ export function createVariablesForDashboard(oldModel: DashboardModel, defaultVar
     .filter((v): v is SceneVariable => Boolean(v));
 
   const defaultVariableObjects = defaultVariables
-    ? defaultVariables
-        .map((v) => {
-          try {
-            return createSceneVariableFromVariableModelV2(v);
-          } catch (err) {
-            console.error(err);
-            return null;
-          }
-        })
-        .filter((v): v is SceneVariable => Boolean(v))
-    : [];
+    .map((v) => {
+      try {
+        return createSceneVariableFromVariableModelV2(v);
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    })
+    .filter((v): v is SceneVariable => Boolean(v));
 
   // Explicitly disable scopes for public dashboards
   if (config.featureToggles.scopeFilters && !config.publicDashboardAccessToken) {
@@ -80,7 +78,7 @@ export function createVariablesForSnapshot(oldModel: DashboardModel) {
             baseFilters: v.baseFilters ?? [],
             defaultKeys: v.defaultKeys,
             useQueriesAsFilterForOptions: true,
-            layout: config.featureToggles.newFiltersUI ? 'combobox' : undefined,
+            layout: 'combobox',
             supportsMultiValueOperators: Boolean(
               getDataSourceSrv().getInstanceSettings({ type: v.datasource?.type })?.meta.multiValueFilterOperators
             ),
@@ -158,7 +156,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
     name: variable.name,
     label: variable.label,
     description: variable.description,
-    source: variable.source,
+    origin: variable.origin,
   };
   if (variable.type === 'adhoc') {
     const originFilters: AdHocVariableFilter[] = [];
@@ -179,7 +177,7 @@ export function createSceneVariableFromVariableModel(variable: TypedVariableMode
       allowCustomValue: variable.allowCustomValue,
       useQueriesAsFilterForOptions: true,
       drilldownRecommendationsEnabled: config.featureToggles.drilldownRecommendations,
-      layout: config.featureToggles.newFiltersUI ? 'combobox' : undefined,
+      layout: 'combobox',
       collapsible: config.featureToggles.dashboardAdHocAndGroupByWrapper,
       supportsMultiValueOperators: Boolean(
         getDataSourceSrv().getInstanceSettings({ type: variable.datasource?.type })?.meta.multiValueFilterOperators

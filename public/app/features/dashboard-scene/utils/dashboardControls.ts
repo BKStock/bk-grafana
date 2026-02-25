@@ -1,14 +1,94 @@
-import { getDataSourceSrv } from '@grafana/runtime';
+import { nanoid } from 'nanoid';
+
+import { getDataSourceSrv, reportInteraction } from '@grafana/runtime';
 import { SceneVariable } from '@grafana/scenes';
 import { DashboardLink, DataSourceRef } from '@grafana/schema';
-import { Spec as DashboardV2Spec, VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
+import { ControlSourceRef, Spec as DashboardV2Spec, VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
+import { reportPerformance } from 'app/core/services/echo/EchoSrv';
 import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
-import { DashboardModel } from 'app/features/dashboard/state/DashboardModel';
 import { DashboardDTO } from 'app/types/dashboard';
 
 import { getRuntimePanelDataSource } from '../serialization/layoutSerializers/utils';
 
-export const loadDatasources = (refs: DataSourceRef[]) => {
+export function loadDefaultControlsFromDatasources(refs: DataSourceRef[]) {
+  const traceId = nanoid(8);
+
+  return invokeAndTrack(() => loadDefaultControlsByRefs(refs, traceId), {
+    traceId,
+    phase: 'total',
+  });
+}
+
+async function loadDefaultControlsByRefs(refs: DataSourceRef[], traceId: string) {
+  const totalStart = performance.now();
+
+  const datasources = await invokeAndTrack(() => loadDatasources(refs), {
+    traceId,
+    phase: 'load_datasources',
+  });
+
+  const defaultVariables: VariableKind[] = [];
+  const defaultLinks: DashboardLink[] = [];
+
+  for (const ds of datasources) {
+    try {
+      if (ds.getDefaultVariables) {
+        const dsVariables = await invokeAndTrack(ds.getDefaultVariables, {
+          traceId,
+          phase: 'default_variables',
+          datasourceType: ds.type,
+        });
+
+        if (dsVariables && dsVariables.length) {
+          defaultVariables.push(
+            ...dsVariables.map((v) => {
+              const variable = { ...v };
+              variable.spec = {
+                ...variable.spec,
+                origin: {
+                  type: 'datasource' as const,
+                  group: ds.type,
+                },
+              };
+              return variable;
+            })
+          );
+        }
+      }
+
+      if (ds.getDefaultLinks) {
+        const dsLinks = await invokeAndTrack(ds.getDefaultLinks, {
+          traceId,
+          phase: 'default_links',
+          datasourceType: ds.type,
+        });
+
+        if (dsLinks && dsLinks.length) {
+          defaultLinks.push(
+            ...dsLinks.map((l) => {
+              return {
+                ...l,
+                origin: {
+                  type: 'datasource' as const,
+                  group: ds.type,
+                },
+              };
+            })
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load default controls from datasource', ds.type, e);
+    }
+  }
+
+  const totalDurationMs = performance.now() - totalStart;
+  reportPerformance('dashboards_default_controls_load_total_ms', totalDurationMs);
+
+  return { defaultVariables, defaultLinks };
+}
+
+const loadDatasources = async (refs: DataSourceRef[]) => {
   return Promise.all(refs.map((ref) => getDataSourceSrv().get(ref)));
 };
 
@@ -25,83 +105,76 @@ export const deduplicateDatasourceRefsByType = (refs: Array<DataSourceRef | null
   return Object.values(dsByType);
 };
 
-export const loadDefaultControlsFromDatasources = async (refs: DataSourceRef[]) => {
-  const datasources = await loadDatasources(refs);
-  const defaultVariables: VariableKind[] = [];
-  const defaultLinks: DashboardLink[] = [];
+type LoadDefaultControlsPhase = 'total' | 'load_datasources' | 'default_variables' | 'default_links';
+type InvokeAndTrackOptions = { traceId: string; phase: LoadDefaultControlsPhase; datasourceType?: string };
 
-  // Default variables
-  for (const ds of datasources) {
-    if (ds.getDefaultVariables) {
-      const ref = ds.getRef();
-      const dsVariables = ds.getDefaultVariables();
+async function invokeAndTrack<T>(action: () => Promise<T>, options: InvokeAndTrackOptions): Promise<T> {
+  const start = performance.now();
+  const result = await action();
 
-      if (dsVariables && dsVariables.length) {
-        defaultVariables.push(
-          ...dsVariables.map((v) => {
-            v.spec.source = {
-              type: 'datasource' as const,
-              ref: { group: ref.type },
-            };
-            v.spec.hide = 'inControlsMenu';
+  reportInteraction('dashboards_load_default_controls', {
+    ...options,
+    duration_ms: Math.round(performance.now() - start),
+  });
 
-            return v;
-          })
-        );
-      }
+  return result;
+}
+
+function getDatasourceRefFromPanel(panel: {
+  datasource?: DataSourceRef | null;
+  targets?: Array<{ datasource?: DataSourceRef | null }>;
+}): DataSourceRef | null | undefined {
+  if (panel.datasource != null) {
+    return panel.datasource;
+  }
+  const targetWithDatasource = panel.targets?.find((t) => t.datasource != null);
+  return targetWithDatasource?.datasource;
+}
+
+function getDsRefsFromV1Panels(
+  panels: Array<{
+    type?: string;
+    datasource?: DataSourceRef | null;
+    targets?: Array<{ datasource?: DataSourceRef | null }>;
+  }> = []
+): Array<DataSourceRef | null | undefined> {
+  const refs: Array<DataSourceRef | null | undefined> = [];
+  for (const panel of panels) {
+    if (panel.type === 'row') {
+      continue;
     }
-
-    // Default links
-    if (ds.getDefaultLinks) {
-      const ref = ds.getRef();
-      const dsLinks = ds.getDefaultLinks();
-
-      if (dsLinks && dsLinks.length) {
-        defaultLinks.push(
-          ...dsLinks.map((l) => {
-            return {
-              ...l,
-              // Putting under the dashboard-controls menu by default
-              placement: 'inControlsMenu' as const,
-              source: {
-                type: 'datasource' as const,
-                ref: { group: ref.type },
-              },
-            };
-          })
-        );
-      }
+    const ref = getDatasourceRefFromPanel(panel);
+    if (ref != null) {
+      refs.push(ref);
     }
   }
+  return refs;
+}
 
-  return { defaultVariables, defaultLinks };
-};
-
-export const getDsRefsFromV1Dashboard = (rsp: DashboardDTO) => {
-  const dashboardModel = new DashboardModel(rsp.dashboard, rsp.meta);
-
-  // Datasources from panels
-  const datasourceRefs = dashboardModel.panels
-    .filter((panel) => panel.type !== 'row')
-    .map((panel): DataSourceRef | null | undefined =>
-      panel.datasource
-        ? panel.datasource
-        : panel.targets?.find((t) => t.datasource !== null && t.datasource !== undefined)?.datasource
-    )
-    .filter((ref) => ref !== null && ref !== undefined);
-
-  // Datasources from variables
-  if (dashboardModel.templating?.list) {
-    for (const variable of dashboardModel.templating.list) {
-      if (variable.type === 'query' && variable.datasource) {
-        datasourceRefs.push(variable.datasource);
-      } else if (variable.type === 'datasource' && variable.query) {
-        datasourceRefs.push({ type: variable.query });
-      }
+function getDsRefsFromV1Variables(
+  variableList: Array<{
+    type?: string;
+    datasource?: DataSourceRef | null;
+    query?: string | Record<string, unknown>;
+  }> = []
+): Array<DataSourceRef | null | undefined> {
+  const refs: Array<DataSourceRef | null | undefined> = [];
+  for (const variable of variableList) {
+    if (variable.type === 'query' && variable.datasource) {
+      refs.push(variable.datasource);
+    } else if (variable.type === 'datasource' && typeof variable.query === 'string') {
+      refs.push({ type: variable.query });
     }
   }
+  return refs;
+}
 
-  return deduplicateDatasourceRefsByType(datasourceRefs);
+export const getDsRefsFromV1Dashboard = (rsp: DashboardDTO): DataSourceRef[] => {
+  const dashboard = rsp.dashboard;
+  const refsFromPanels = getDsRefsFromV1Panels(dashboard.panels);
+  const refsFromVariables = getDsRefsFromV1Variables(dashboard.templating?.list);
+
+  return deduplicateDatasourceRefsByType([...refsFromPanels, ...refsFromVariables]);
 };
 
 export const getDsRefsFromV2Dashboard = (rsp: DashboardWithAccessInfo<DashboardV2Spec>) => {
@@ -168,24 +241,14 @@ const sortByProp = <T>(items: T[], propGetter: (item: T) => Object | undefined) 
   });
 };
 
-export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.source);
-export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.source);
+export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.origin);
+export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.origin);
 
-/** Source describing where a default control (variable or link) was added from, e.g. a datasource */
-export interface ControlSource {
-  type: 'datasource';
-  ref: { group?: string };
-}
-
-/**
- * Returns the display name of the plugin that added the control (e.g. datasource type name).
- * Uses sync lookup from getList() so it's safe to call in render.
- */
-export function getPluginNameForControlSource(source: ControlSource | undefined): string | undefined {
-  if (!source?.ref?.group) {
+export function getPluginNameForControlSource(origin: ControlSourceRef | undefined): string | undefined {
+  if (!origin?.group) {
     return undefined;
   }
   const list = getDataSourceSrv().getList({});
-  const ds = list.find((d) => d.meta.id === source.ref.group);
-  return ds?.meta.name ?? source.ref.group;
+  const ds = list.find((d) => d.meta.id === origin.group);
+  return ds?.meta.name ?? origin.group;
 }

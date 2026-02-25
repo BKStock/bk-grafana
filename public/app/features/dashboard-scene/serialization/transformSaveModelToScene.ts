@@ -416,7 +416,7 @@ export function createDashboardSceneFromDashboardModel(
       editable: oldModel.editable,
       preload: dto.preload ?? false,
       isDirty: false,
-      links: [...(oldModel.links ?? []), ...(options?.defaultLinks ?? [])],
+      links: [...(options?.defaultLinks ?? []), ...(oldModel.links ?? [])],
       meta: oldModel.meta,
       tags: oldModel.tags || [],
       title: oldModel.title,

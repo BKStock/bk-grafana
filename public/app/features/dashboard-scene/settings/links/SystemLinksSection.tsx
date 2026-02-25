@@ -34,7 +34,7 @@ export function SystemLinksSection({ links }: Props) {
           </thead>
           <tbody>
             {links.map((link, index) => {
-              const pluginName = getPluginNameForControlSource(link.source);
+              const pluginName = getPluginNameForControlSource(link.origin);
 
               return (
                 <tr key={`${link.title}-${index}-default`}>

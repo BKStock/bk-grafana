@@ -24,7 +24,7 @@ export function DashboardLinkList({
 }: DashboardLinkListProps) {
   const styles = useStyles2(getStyles);
 
-  const editableLinks = links.filter((link) => link.source === undefined);
+  const editableLinks = links.filter((link) => link.origin === undefined);
   const isEmptyList = editableLinks.length === 0;
 
   if (isEmptyList) {

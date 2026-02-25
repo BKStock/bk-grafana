@@ -37,8 +37,8 @@ export function SystemVariablesSection({ variables }: Props) {
           <tbody>
             {variables.map((variable, index) => {
               const variableState = variable.state;
-              const source = variableState.source;
-              const pluginName = getPluginNameForControlSource(source);
+              const origin = variableState.origin;
+              const pluginName = getPluginNameForControlSource(origin);
 
               return (
                 <tr key={`${variableState.name}-${index}`}>

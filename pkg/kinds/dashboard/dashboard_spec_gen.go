@@ -32,7 +32,7 @@ type Spec struct {
 	// to see if the version has changed since the last time.
 	Revision *int64 `json:"revision,omitempty"`
 	// ID of a dashboard imported from the https://grafana.com/grafana/dashboards/ portal
-	GnetId *string `json:"gnetId,omitempty"`
+	GnetId *int64 `json:"gnetId,omitempty"`
 	// Tags associated with dashboard.
 	Tags []string `json:"tags,omitempty"`
 	// Timezone of dashboard. Accepted values are IANA TZDB zone ID or "browser" or "utc".
@@ -288,7 +288,7 @@ type DashboardLink struct {
 	// If true, includes current time range in the link as query params
 	KeepTime bool `json:"keepTime"`
 	// The source that registered the link (if any)
-	Source *ControlSourceRef `json:"source,omitempty"`
+	Origin *ControlSourceRef `json:"origin,omitempty"`
 }
 
 // NewDashboardLink creates a new DashboardLink object.
@@ -323,15 +323,15 @@ func NewControlSourceRef() *ControlSourceRef {
 }
 
 type DatasourceControlSourceRef struct {
-	Type string                                 `json:"type"`
-	Ref  DashboardDatasourceControlSourceRefRef `json:"ref"`
+	Type string `json:"type"`
+	// The plugin type-id
+	Group string `json:"group"`
 }
 
 // NewDatasourceControlSourceRef creates a new DatasourceControlSourceRef object.
 func NewDatasourceControlSourceRef() *DatasourceControlSourceRef {
 	return &DatasourceControlSourceRef{
 		Type: "datasource",
-		Ref:  *NewDashboardDatasourceControlSourceRefRef(),
 	}
 }
 
@@ -1135,15 +1135,6 @@ type DashboardSpecTemplating struct {
 // NewDashboardSpecTemplating creates a new DashboardSpecTemplating object.
 func NewDashboardSpecTemplating() *DashboardSpecTemplating {
 	return &DashboardSpecTemplating{}
-}
-
-type DashboardDatasourceControlSourceRefRef struct {
-	Group *string `json:"group,omitempty"`
-}
-
-// NewDashboardDatasourceControlSourceRefRef creates a new DashboardDatasourceControlSourceRefRef object.
-func NewDashboardDatasourceControlSourceRefRef() *DashboardDatasourceControlSourceRefRef {
-	return &DashboardDatasourceControlSourceRefRef{}
 }
 
 type DashboardFieldConfigSourceOverrides struct {

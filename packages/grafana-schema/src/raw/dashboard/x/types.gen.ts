@@ -338,18 +338,19 @@ export interface DashboardLink {
    */
   keepTime: boolean;
   /**
+   * The source that registered the link (if any)
+   */
+  origin?: {
+    type: 'datasource';
+    /**
+     * The plugin type-id
+     */
+    group: string;
+  };
+  /**
    * Placement can be used to display the link somewhere else on the dashboard other than above the visualisations.
    */
   placement?: DashboardLinkPlacement;
-  /**
-   * The source that registered the link (if any)
-   */
-  source?: {
-    type: 'datasource';
-    ref: {
-      group?: string;
-    };
-  };
   /**
    * List of tags to limit the linked dashboards. If empty, all dashboards will be displayed. Only valid if the type is dashboards
    */
@@ -1216,7 +1217,7 @@ export interface Dashboard {
   /**
    * ID of a dashboard imported from the https://grafana.com/grafana/dashboards/ portal
    */
-  gnetId?: string;
+  gnetId?: number;
   /**
    * Configuration of dashboard cursor sync behavior.
    * Accepted values are 0 (sync turned off), 1 (shared crosshair), 2 (shared crosshair and tooltip).

@@ -39,30 +39,30 @@ export class DashboardLinksEditView extends SceneObjectBase<DashboardLinksEditVi
   }
 
   public onNewLink = () => {
-    const editableLinks = this.links.filter((l) => l.source === undefined);
+    const editableLinks = this.links.filter((l) => l.origin === undefined);
     this.links = [...this.links, NEW_LINK];
     this.setState({ editIndex: editableLinks.length });
   };
 
-  /** Index is into the editable links list (excludes default links with source). */
+  /** Index is into the editable links list (excludes default links with origin). */
   public onDelete = (editableIndex: number) => {
     const links = this.links;
-    const defaultLinks = links.filter((l) => l.source != null);
-    const editableLinks = links.filter((l) => l.source === undefined);
+    const defaultLinks = links.filter((l) => l.origin != null);
+    const editableLinks = links.filter((l) => l.origin === undefined);
     const newEditable = editableLinks.filter((_, i) => i !== editableIndex);
     this.links = [...defaultLinks, ...newEditable];
     this.setState({ editIndex: undefined });
   };
 
   public onDuplicate = (link: DashboardLink) => {
-    this.links = [...this.links, { ...link, source: undefined }];
+    this.links = [...this.links, { ...link, origin: undefined }];
   };
 
   /** Indices are into the editable links list. */
   public onOrderChange = (editableIndex: number, direction: number) => {
     const links = this.links;
-    const defaultLinks = links.filter((l) => l.source != null);
-    const editableLinks = links.filter((l) => l.source === undefined);
+    const defaultLinks = links.filter((l) => l.origin != null);
+    const editableLinks = links.filter((l) => l.origin === undefined);
     const newEditable = arrayUtils.moveItemImmutably(editableLinks, editableIndex, editableIndex + direction);
     this.links = [...defaultLinks, ...newEditable];
   };
@@ -78,8 +78,8 @@ export class DashboardLinksEditView extends SceneObjectBase<DashboardLinksEditVi
       return;
     }
     const links = this.links;
-    const defaultLinks = links.filter((l) => l.source != null);
-    const editableLinks = links.filter((l) => l.source === undefined);
+    const defaultLinks = links.filter((l) => l.origin != null);
+    const editableLinks = links.filter((l) => l.origin === undefined);
     const newEditable = [...editableLinks];
     newEditable[editableIndex] = link;
     this.links = [...defaultLinks, ...newEditable];
@@ -96,8 +96,8 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
   const { links } = dashboard.useState();
   const { navModel, pageNav } = useDashboardEditPageNav(dashboard, model.getUrlKey());
 
-  const defaultLinks = links.filter((l) => l.source != null);
-  const editableLinks = links.filter((l) => l.source === undefined);
+  const defaultLinks = links.filter((l) => l.origin != null);
+  const editableLinks = links.filter((l) => l.origin === undefined);
   const linkToEdit = editIndex !== undefined ? editableLinks[editIndex] : undefined;
 
   if (linkToEdit) {

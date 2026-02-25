@@ -230,7 +230,7 @@ function VariableEditorSettingsListView({ model }: SceneComponentProps<Variables
   const { editIndex } = model.useState();
   const usagesNetwork = useMemo(() => model.getUsagesNetwork(), [model]);
   const usages = useMemo(() => model.getUsages(), [model]);
-  const defaultVariables = useMemo(() => variables.filter((v) => Boolean(v.state?.source)), [variables]);
+  const defaultVariables = useMemo(() => variables.filter((v) => Boolean(v.state?.origin)), [variables]);
   const saveModel = model.getSaveModel();
 
   if (editIndex !== undefined && variables[editIndex]) {

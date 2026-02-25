@@ -7,7 +7,7 @@ import { Trans, t } from '@grafana/i18n';
 import { reportInteraction } from '@grafana/runtime';
 import { SceneVariable, SceneVariableState } from '@grafana/scenes';
 import { Dashboard } from '@grafana/schema';
-import { CollapsableSection, Icon, Spinner, Stack, Tooltip, useStyles2, Text } from '@grafana/ui';
+import { CollapsableSection, Icon, Spinner, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
 
 import { VariableUsagesButton } from '../../variables/VariableUsagesButton';
 import { getUnknownsNetwork, UsagesToNetwork } from '../../variables/utils';
@@ -78,10 +78,8 @@ function CollapseLabel(): ReactElement {
   const style = useStyles2(getStyles);
 
   return (
-    <Stack direction="row" alignItems="center">
-      <Text element="h5">
-        <Trans i18nKey="variables.unknown-table.renamed-or-missing-variables">Renamed or missing variables</Trans>
-      </Text>
+    <Text variant="h5">
+      <Trans i18nKey="variables.unknown-table.renamed-or-missing-variables">Renamed or missing variables</Trans>
       <Tooltip
         content={t(
           'variables.unknown-table.tooltip-renamed-or-missing-variables',
@@ -90,7 +88,7 @@ function CollapseLabel(): ReactElement {
       >
         <Icon name="info-circle" className={style.infoIcon} />
       </Tooltip>
-    </Stack>
+    </Text>
   );
 }
 
