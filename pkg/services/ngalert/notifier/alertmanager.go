@@ -2,9 +2,7 @@ package notifier
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -214,12 +212,21 @@ func (am *alertmanager) ApplyConfig(_ context.Context, cfg alertingNotify.Notifi
 	var configChanged bool
 	var outerErr error
 	am.Base.WithLock(func() {
-		changed, err := am.applyConfig(cfg)
+		// If configuration hasn't changed, we've got nothing to do.
+		if am.Base.ConfigHash() == cfg.Hash {
+			am.logger.Debug("Config hasn't changed, skipping configuration sync.")
+			return
+		}
+
+		am.logger.Info("Applying new configuration to Alertmanager", "configHash", fmt.Sprintf("%x", cfg.Hash))
+		err := am.Base.ApplyConfig(cfg)
 		if err != nil {
 			outerErr = fmt.Errorf("unable to apply configuration: %w", err)
 			return
 		}
-		configChanged = changed
+
+		am.updateConfigMetrics(cfg, len(cfg.Raw))
+		configChanged = true
 	})
 
 	return configChanged, outerErr
@@ -266,34 +273,6 @@ func (am *alertmanager) aggregateInhibitMatchers(rules []apimodels.InhibitRule, 
 		amu.Match += len(r.SourceMatch)
 		amu.Match += len(r.TargetMatch)
 	}
-}
-
-// applyConfig applies a new configuration by re-initializing all components using the configuration provided.
-// It returns a boolean indicating whether the user config was changed and an error.
-// It is not safe to call concurrently.
-func (am *alertmanager) applyConfig(cfg alertingNotify.NotificationsConfiguration) (bool, error) {
-	// First, let's make sure this config is not already loaded
-	rawConfig, err := json.Marshal(cfg)
-	if err != nil {
-		// In theory, this should never happen.
-		return false, err
-	}
-
-	// If configuration hasn't changed, we've got nothing to do.
-	cfg.Hash = md5.Sum(rawConfig)
-	if am.Base.ConfigHash() == cfg.Hash {
-		am.logger.Debug("Config hasn't changed, skipping configuration sync.")
-		return false, nil
-	}
-
-	am.logger.Info("Applying new configuration to Alertmanager", "configHash", fmt.Sprintf("%x", cfg.Hash))
-	err = am.Base.ApplyConfig(cfg)
-	if err != nil {
-		return false, err
-	}
-
-	am.updateConfigMetrics(cfg, len(rawConfig))
-	return true, nil
 }
 
 // PutAlerts receives the alerts and then sends them through the corresponding route based on whenever the alert has a receiver embedded or not

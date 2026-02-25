@@ -2,7 +2,6 @@ package notifier
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -119,18 +118,7 @@ func (moa *MultiOrgAlertmanager) prepareApplyConfig(ctx context.Context, orgID i
 		return alertingNotify.NotificationsConfiguration{}, fmt.Errorf("invalid template limits: %w", err)
 	}
 
-	raw := []byte(cfg.AlertmanagerConfiguration)
-	return alertingNotify.NotificationsConfiguration{
-		RoutingTree:       preparedConfig.Route.AsAMRoute(),
-		InhibitRules:      preparedConfig.InhibitRules,
-		MuteTimeIntervals: preparedConfig.MuteTimeIntervals,
-		TimeIntervals:     preparedConfig.TimeIntervals,
-		Templates:         alertingNotify.PostableAPITemplatesToTemplateDefinitions(prepared.GetMergedTemplateDefinitions()),
-		Receivers:         alertingNotify.PostableAPIReceiversToAPIReceivers(preparedConfig.Receivers),
-		Limits:            limits,
-		Hash:              md5.Sum(raw),
-		Raw:               raw, // Used in GetStatus.
-	}, nil
+	return PostableAPIConfigToNotificationsConfiguration(prepared, limits)
 }
 
 func (moa *MultiOrgAlertmanager) SaveAndApplyDefaultConfig(ctx context.Context, orgId int64) error {

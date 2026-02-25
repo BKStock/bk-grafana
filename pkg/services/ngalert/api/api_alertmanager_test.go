@@ -183,12 +183,17 @@ func TestAlertmanagerAutogenConfig(t *testing.T) {
 		return sut, configs
 	}
 
-	compare := func(t *testing.T, expectedAm string, testAm string) {
+	compare := func(t *testing.T, expectedAm string, testAm string, normalizeMatchers bool) {
 		test, err := notifier.Load([]byte(testAm))
 		require.NoError(t, err)
 
 		exp, err := notifier.Load([]byte(expectedAm))
 		require.NoError(t, err)
+
+		if normalizeMatchers {
+			mergeMatchers(test.AlertmanagerConfig.Route)
+			mergeMatchers(exp.AlertmanagerConfig.Route)
+		}
 
 		cOpt := []cmp.Option{
 			cmpopts.IgnoreUnexported(apimodels.PostableUserConfig{}, apimodels.Route{}, labels.Matcher{}),
@@ -209,7 +214,7 @@ func TestAlertmanagerAutogenConfig(t *testing.T) {
 			response := sut.RouteGetAlertingConfig(rc)
 			require.Equal(t, 200, response.Status())
 
-			compare(t, validConfigWithAutogen, string(response.Body()))
+			compare(t, validConfigWithAutogen, string(response.Body()), false)
 		})
 
 		t.Run("when not admin return no autogen routes", func(t *testing.T) {
@@ -220,7 +225,7 @@ func TestAlertmanagerAutogenConfig(t *testing.T) {
 			response := sut.RouteGetAlertingConfig(rc)
 			require.Equal(t, 200, response.Status())
 
-			compare(t, validConfigWithoutAutogen, string(response.Body()))
+			compare(t, validConfigWithoutAutogen, string(response.Body()), false)
 		})
 	})
 
@@ -245,7 +250,7 @@ func TestAlertmanagerAutogenConfig(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			compare(t, validConfigWithAutogen, string(configBody))
+			compare(t, validConfigWithAutogen, string(configBody), true)
 		})
 
 		t.Run("when not admin return no autogen routes", func(t *testing.T) {
@@ -267,7 +272,7 @@ func TestAlertmanagerAutogenConfig(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			compare(t, validConfigWithoutAutogen, string(configBody))
+			compare(t, validConfigWithoutAutogen, string(configBody), true)
 		})
 	})
 }
@@ -639,4 +644,14 @@ func asGettableHistoricUserConfigs(t *testing.T, r response.Response) []apimodel
 	err := json.Unmarshal(r.Body(), &body)
 	require.NoError(t, err)
 	return body
+}
+
+// mergeMatchers converts all ObjectMatchers to Matchers.
+// This helps with comparisons that have gone through compat layers.
+func mergeMatchers(route *apimodels.Route) {
+	route.Matchers = append(route.Matchers, route.ObjectMatchers...)
+	route.ObjectMatchers = nil
+	for _, r := range route.Routes {
+		mergeMatchers(r)
+	}
 }

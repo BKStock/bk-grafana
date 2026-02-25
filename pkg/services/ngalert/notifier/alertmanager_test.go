@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -90,10 +91,11 @@ func TestAlertmanager_ApplyConfig(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name          string
-		config        *definitions.PostableUserConfig
-		expectedError string
-		skipInvalid   bool
+		name                  string
+		config                *definitions.PostableUserConfig
+		expectedError         string
+		skipInvalid           bool
+		expectedTemplateCount int
 	}{
 		{
 			name: "basic config",
@@ -103,7 +105,8 @@ func TestAlertmanager_ApplyConfig(t *testing.T) {
 					"grafana-template": "{{ define \"grafana.title\" }}Alert{{ end }}",
 				},
 			},
-			skipInvalid: false,
+			skipInvalid:           false,
+			expectedTemplateCount: 1,
 		},
 		{
 			name: "with mimir config",
@@ -139,7 +142,8 @@ receivers:
 					},
 				},
 			},
-			skipInvalid: false,
+			skipInvalid:           false,
+			expectedTemplateCount: 2,
 		},
 		{
 			name: "invalid config fails",
@@ -175,15 +179,9 @@ receivers:
 			} else {
 				require.NoError(t, err)
 				require.True(t, changed)
-				appliedCfg, err := Load(am.Base.GetStatus())
-				require.NoError(t, err)
-
-				templateDefs := appliedCfg.GetMergedTemplateDefinitions()
-				expectedTemplateCount := len(appliedCfg.TemplateFiles)
-				if len(appliedCfg.ExtraConfigs) > 0 {
-					expectedTemplateCount += len(appliedCfg.ExtraConfigs[0].TemplateFiles)
-				}
-				require.Len(t, templateDefs, expectedTemplateCount)
+				appliedCfg := alertingNotify.NotificationsConfiguration{}
+				require.NoError(t, json.Unmarshal(am.Base.GetStatus(), &appliedCfg))
+				require.Len(t, appliedCfg.Templates, tc.expectedTemplateCount)
 			}
 		})
 	}
