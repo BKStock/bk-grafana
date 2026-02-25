@@ -92,7 +92,7 @@ export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, 
     const iconSize = longestLabelIndex > -1 && items[longestLabelIndex].icon ? ICON_WIDTH : 0;
 
     const textWidth = Math.max(labelWidth + iconSize, descriptionWidth);
-    return textWidth + SCROLL_CONTAINER_PADDING + (MENU_ITEM_PADDING * 2) + scrollbarWidth;
+    return textWidth + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth;
   }, [items, scrollbarWidth]);
 
   const floatStyles = {
