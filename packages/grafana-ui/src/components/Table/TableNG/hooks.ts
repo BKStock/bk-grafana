@@ -2,7 +2,7 @@ import { debounce } from 'lodash';
 import { useState, useMemo, useCallback, useRef, useLayoutEffect, RefObject, CSSProperties, useEffect } from 'react';
 import { Column, DataGridHandle, DataGridProps, SortColumn } from 'react-data-grid';
 
-import { compareArrayValues, Field, FieldType, formattedValueToString, reduceField, ReducerID } from '@grafana/data';
+import { Field, FieldType, formattedValueToString, reduceField, ReducerID } from '@grafana/data';
 
 import { TableColumnResizeActionCallback } from '../types';
 
@@ -608,22 +608,12 @@ export function useScrollbarWidth(ref: RefObject<DataGridHandle | null>, height:
   return scrollbarWidth;
 }
 
-const numIsEqual = (a: number, b: number) => a === b;
-
 export function useColWidths(
   visibleFields: Field[],
   availableWidth: number,
   frozenColumns?: number
 ): [number[], number] {
-  const [widths, setWidths] = useState<number[]>(computeColWidths(visibleFields, availableWidth));
-
-  // only replace the widths array if something actually changed
-  useEffect(() => {
-    const newWidths = computeColWidths(visibleFields, availableWidth);
-    if (!compareArrayValues(widths, newWidths, numIsEqual)) {
-      setWidths(newWidths);
-    }
-  }, [availableWidth, widths, visibleFields]);
+  const widths = useMemo(() => computeColWidths(visibleFields, availableWidth), [visibleFields, availableWidth]);
 
   // this is to avoid buggy situations where all visible columns are frozen
   const numFrozenColsFullyInView = useMemo(() => {
