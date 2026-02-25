@@ -22,6 +22,7 @@ import {
 } from '@grafana/ui';
 import { LS_VISUALIZATION_SELECT_TAB_KEY } from 'app/core/constants';
 import { VisualizationSelectPaneTab } from 'app/features/dashboard/components/PanelEditor/types';
+import { PresetsTransition } from 'app/features/panel/components/VizTypePicker/PresetsTransition';
 import { VisualizationPresets } from 'app/features/panel/components/VizTypePicker/VisualizationPresets';
 import { VisualizationSuggestions } from 'app/features/panel/components/VizTypePicker/VisualizationSuggestions';
 import { VizTypePicker } from 'app/features/panel/components/VizTypePicker/VizTypePicker';
@@ -200,17 +201,19 @@ export function PanelVizTypePicker({
                 onShowPresets={(suggestion, presets) => setPresetsState({ suggestion, presets })}
               />
             )}
-            {presetsState && data && (
-              <VisualizationPresets
-                presets={presetsState.presets}
-                data={data}
-                suggestion={presetsState.suggestion}
-                onPreview={(preset) => applyPresetChange(preset, true)}
-                onApply={(preset) => applyPresetChange(preset, false)}
-                onSkip={() => applyPresetChange(undefined, false)}
-                onBack={() => setPresetsState(null)}
-              />
-            )}
+            <PresetsTransition visible={Boolean(presetsState && data)}>
+              {presetsState && data && (
+                <VisualizationPresets
+                  presets={presetsState.presets}
+                  data={data}
+                  suggestion={presetsState.suggestion}
+                  onPreview={(preset) => applyPresetChange(preset, true)}
+                  onApply={(preset) => applyPresetChange(preset, false)}
+                  onSkip={() => applyPresetChange(undefined, false)}
+                  onBack={() => setPresetsState(null)}
+                />
+              )}
+            </PresetsTransition>
             {listMode === VisualizationSelectPaneTab.Visualizations && (
               <VizTypePicker
                 pluginId={panel.state.pluginId}
