@@ -41,14 +41,14 @@ type MigrationRunner struct {
 }
 
 // NewMigrationRunner creates a new migration runner.
-func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, tableRenamer MigrationTableRenamer, definition MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
+func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, tableRenamer MigrationTableRenamer, def MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
 	r := &MigrationRunner{
 		unifiedMigrator: unifiedMigrator,
 		tableLocker:     tableLocker,
 		tableRenamer:    tableRenamer,
-		definition:      definition,
+		definition:      def,
 		log:             log.New("storage.unified.migration_runner." + definition.ID),
-		resources:       definition.GetGroupResources(),
+		resources:       def.GetGroupResources(),
 		validators:      validators,
 	}
 	for _, opt := range opts {
@@ -92,15 +92,26 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 			r.log.Error("Failed to get transaction from session", "error", err)
 			return fmt.Errorf("failed to get transaction: %w", err)
 		}
+		// Increase page cache to prevent cache spill during bulk inserts.
+		// When the cache spills, SQLite needs an EXCLUSIVE lock which deadlocks with the
+		// SHARED lock held by the legacy database rows cursor on another connection.
+		// Configurable via [unified_storage] migration_cache_size_kb (default: 50MB).
+		cacheKB := 50000
+		if r.cfg.MigrationCacheSizeKB > 0 {
+			cacheKB = r.cfg.MigrationCacheSizeKB
+		}
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA cache_size = -%d", cacheKB)); err != nil {
+			r.log.Warn("Failed to set SQLite cache_size for migration", "error", err)
+		}
 		ctx = resource.ContextWithTransaction(ctx, tx.Tx)
 		r.log.Info("Stored migrator transaction in context for bulk operations (SQLite compatibility)")
 	}
 
-	lockTables := lockTablesForResources(r.definition)
+	lockTables := r.definition.GetLockTables()
 	hasRename := len(r.definition.RenameTables) > 0
 	unlocked := false
 
-	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, mg, lockTables)
+	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, lockTables)
 	if err != nil {
 		return fmt.Errorf("failed to lock tables for migration: %w", err)
 	}

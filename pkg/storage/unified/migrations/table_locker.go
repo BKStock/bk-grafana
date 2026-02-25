@@ -16,8 +16,8 @@ var tableLockerLog = log.New("migrations.table_locker")
 
 // MigrationTableLocker abstracts locking of legacy database tables during migration.
 type MigrationTableLocker interface {
-	// LockMigrationTables locks legacy tables during migration to prevent concurrent writes.
-	LockMigrationTables(ctx context.Context, sess *xorm.Session, mg *migrator.Migrator, tables []string) (func(context.Context) error, error)
+	// LockMigrationTables locks legacy tables during migration to prevent concurrent updates.
+	LockMigrationTables(ctx context.Context, sess *xorm.Session, tables []string) (func(context.Context) error, error)
 }
 
 // newTableLocker returns the appropriate locker for the database type.
@@ -26,48 +26,68 @@ func newTableLocker(sqlStore db.DB, sql legacysql.LegacyDatabaseProvider) Migrat
 	case "sqlite3":
 		return &sqliteTableLocker{}
 	case "postgres":
-		return &postgresTableLocker{}
+		return &postgresTableLocker{sql: sql}
 	default:
 		return &mysqlTableLocker{sql: sql}
 	}
 }
 
-// sqliteTableLocker is a no-op — SQLite uses a shared transaction (single writer).
+// sqliteTableLocker implements a no-op table locker
 type sqliteTableLocker struct{}
 
-func (l *sqliteTableLocker) LockMigrationTables(_ context.Context, _ *xorm.Session, _ *migrator.Migrator, _ []string) (func(context.Context) error, error) {
+func (l *sqliteTableLocker) LockMigrationTables(_ context.Context, _ *xorm.Session, _ []string) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
 }
 
-// postgresTableLocker acquires SHARE MODE locks on the migration session (sess).
-// Postgres auto-upgrades to ACCESS EXCLUSIVE when ALTER TABLE RENAME executes on the same session.
-type postgresTableLocker struct{}
+// postgresTableLocker acquires SHARE MODE locks, upgraded to ACCESS EXCLUSIVE during a RENAME operation.
+type postgresTableLocker struct {
+	sql legacysql.LegacyDatabaseProvider
+}
 
-func (l *postgresTableLocker) LockMigrationTables(_ context.Context, sess *xorm.Session, mg *migrator.Migrator, tables []string) (func(context.Context) error, error) {
+func (l *postgresTableLocker) LockMigrationTables(ctx context.Context, sess *xorm.Session, tables []string) (func(context.Context) error, error) {
+	if len(tables) == 0 {
+		return func(context.Context) error { return nil }, nil
+	}
+
+	sqlHelper, err := l.sql(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(tables))
 	for _, table := range tables {
-		exists, err := mg.DBEngine.IsTableExist(table)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if table %q exists: %w", table, err)
-		}
-		if !exists {
+		if table == "" {
 			continue
 		}
-		lockSQL := "LOCK TABLE " + mg.Dialect.Quote(table) + " IN SHARE MODE"
+		if _, ok := seen[table]; ok {
+			continue
+		}
+		seen[table] = struct{}{}
+		fullName := sqlHelper.Table(table)
+		exists, err := sess.IsTableExist(fullName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if table %q exists: %w", fullName, err)
+		}
+		if !exists {
+			tableLockerLog.Info("Skipping lock for non-existent table", "table", fullName)
+			continue
+		}
+		lockSQL := "LOCK TABLE " + sqlHelper.DB.Quote(fullName) + " IN SHARE MODE"
 		if _, err := sess.Exec(lockSQL); err != nil {
-			return nil, fmt.Errorf("failed to lock table %q: %w", table, err)
+			return nil, fmt.Errorf("failed to lock table %q: %w", fullName, err)
 		}
 	}
-	// Lock is released when sess's transaction commits/rollbacks — no explicit unlock needed.
+	// Lock is released when sess's transaction commits/rollbacks
 	return func(context.Context) error { return nil }, nil
 }
 
-// mysqlTableLocker acquires READ locks on a dedicated connection outside the pool.
-// We avoid using the same connection, since MySQL requires all tables in a query to be locked together.
+// mysqlTableLocker acquires READ locks on a dedicated connection, avoiding implicit commits
+// and having to lock all tables in the import query.
 type mysqlTableLocker struct {
 	sql legacysql.LegacyDatabaseProvider
 }
 
-func (l *mysqlTableLocker) LockMigrationTables(ctx context.Context, _ *xorm.Session, _ *migrator.Migrator, tables []string) (func(context.Context) error, error) {
+func (l *mysqlTableLocker) LockMigrationTables(ctx context.Context, _ *xorm.Session, tables []string) (func(context.Context) error, error) {
 	if len(tables) == 0 {
 		return func(context.Context) error { return nil }, nil
 	}
@@ -133,8 +153,4 @@ func (l *mysqlTableLocker) LockMigrationTables(ctx context.Context, _ *xorm.Sess
 		_, err := conn.ExecContext(ctx, "UNLOCK TABLES")
 		return err
 	}, nil
-}
-
-func lockTablesForResources(def MigrationDefinition) []string {
-	return def.GetLockTables()
 }

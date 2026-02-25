@@ -267,13 +267,15 @@ func TestResourceMigration_AutoMigrateEnablesMode5(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Build schema.GroupResource from resource strings
-			resources := make([]schema.GroupResource, 0, len(tt.resources))
+			// Build ResourceInfo from resource strings
+			resourceInfos := make([]ResourceInfo, 0, len(tt.resources))
 			for _, r := range tt.resources {
 				parts := strings.SplitN(r, ".", 2)
-				resources = append(resources, schema.GroupResource{
-					Resource: parts[0],
-					Group:    parts[1],
+				resourceInfos = append(resourceInfos, ResourceInfo{
+					GroupResource: schema.GroupResource{
+						Resource: parts[0],
+						Group:    parts[1],
+					},
 				})
 			}
 

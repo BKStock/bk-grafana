@@ -71,7 +71,7 @@ func (d MigrationDefinition) GetGroupResources() []schema.GroupResource {
 	return result
 }
 
-// GetLockTables returns the lock tables for all resources in this migration definition, deduplicated.
+// GetLockTables returns all lock tables across all resources in the definition.
 func (d MigrationDefinition) GetLockTables() []string {
 	tables := make([]string, 0, len(d.Resources))
 	seen := make(map[string]struct{})

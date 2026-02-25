@@ -24,16 +24,17 @@ type tableLockerMock struct {
 	tables     []string
 }
 
-func (m *tableLockerMock) LockMigrationTables(_ context.Context, _ *xorm.Session, _ *migrator.Migrator, tables []string) (func(context.Context) error, error) {
+func (m *tableLockerMock) LockMigrationTables(_ context.Context, _ *xorm.Session, tables []string) (func(context.Context) error, error) {
 	m.tables = tables
 	return m.unlockFunc, nil
 }
 
 func TestIntegrationMigrationRunnerLocksTables(t *testing.T) {
 	testutil.SkipIntegrationTestInShortMode(t)
-	if !db.IsTestDbMySQL() {
-		t.Skip("MySQL-only: tableLocker mock is only exercised on MySQL path")
+	if db.IsTestDbSQLite() {
+		t.Skip("SQLite uses no-op locker")
 	}
+
 	dbstore := db.InitTestDB(t)
 	t.Cleanup(db.CleanupTestDB)
 
@@ -51,11 +52,12 @@ func TestIntegrationMigrationRunnerLocksTables(t *testing.T) {
 	m.EXPECT().Migrate(mock.Anything, mock.Anything).Return(&resourcepb.BulkResponse{}, nil)
 	m.EXPECT().RebuildIndexes(mock.Anything, mock.Anything).Return(nil)
 
-	runner := NewMigrationRunner(m, locker, &transactionalTableRenamer{log: logger}, def, nil)
+	runner := NewMigrationRunner(m, locker, def, nil)
 	engine := dbstore.GetEngine()
 	mg := migrator.NewMigrator(engine, setting.NewCfg())
 	sess := engine.NewSession()
 	defer sess.Close()
+	require.NoError(t, sess.Begin())
 	_, _ = sess.Exec("INSERT INTO org (id, name, created, updated, version) VALUES (1, 'test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)")
 
 	require.NoError(t, runner.Run(context.Background(), sess, mg, RunOptions{DriverName: engine.DriverName()}))
@@ -83,103 +85,93 @@ func TestIntegrationTableLocker(t *testing.T) {
 	t.Cleanup(db.CleanupTestDB)
 	engine := dbstore.GetEngine()
 	ctx := context.Background()
-
-	type lockerSetup struct {
+	type lockerTestSetup struct {
 		name   string
 		locker MigrationTableLocker
-		sess   func(t *testing.T) *xorm.Session // nil for MySQL (doesn't need sess)
-		mg     *migrator.Migrator               // nil for MySQL
-		unlock func(unlock func(context.Context) error, sess *xorm.Session)
+		sess   func(t *testing.T) *xorm.Session
 	}
-
-	var setups []lockerSetup
-	if db.IsTestDbMySQL() {
+	var setup lockerTestSetup
+	switch dbstore.GetDBType() {
+	case migrator.Postgres:
 		sqlProvider := legacysql.NewDatabaseProvider(dbstore)
-		setups = append(setups, lockerSetup{
-			name:   "mysql",
-			locker: &mysqlTableLocker{sql: sqlProvider},
-			unlock: func(unlock func(context.Context) error, _ *xorm.Session) {
-				require.NoError(t, unlock(ctx))
-			},
-		})
-	}
-	if db.IsTestDbPostgres() {
-		mg := migrator.NewMigrator(engine, setting.NewCfg())
-		setups = append(setups, lockerSetup{
+		setup = lockerTestSetup{
 			name:   "postgres",
-			locker: &postgresTableLocker{},
-			mg:     mg,
+			locker: &postgresTableLocker{sql: sqlProvider},
 			sess: func(t *testing.T) *xorm.Session {
 				t.Helper()
 				s := engine.NewSession()
-				t.Cleanup(func() { s.Close() })
+				t.Cleanup(func() { _ = s.Rollback(); s.Close() })
 				require.NoError(t, s.Begin())
 				return s
 			},
-			unlock: func(_ func(context.Context) error, sess *xorm.Session) {
-				require.NoError(t, sess.Rollback())
-			},
-		})
+		}
+	case migrator.MySQL:
+		sqlProvider := legacysql.NewDatabaseProvider(dbstore)
+		setup = lockerTestSetup{
+			name:   "mysql",
+			locker: &mysqlTableLocker{sql: sqlProvider},
+			sess:   func(t *testing.T) *xorm.Session { return nil }, // MySQL locker doesn't use session
+		}
+	default:
+		setup = lockerTestSetup{
+			name:   "sqlite",
+			locker: &sqliteTableLocker{},
+			sess:   func(t *testing.T) *xorm.Session { return nil },
+		}
 	}
 
-	for _, setup := range setups {
-		t.Run(setup.name+"/lock and unlock", func(t *testing.T) {
-			var sess *xorm.Session
-			if setup.sess != nil {
-				sess = setup.sess(t)
-			}
-			unlock, err := setup.locker.LockMigrationTables(ctx, sess, setup.mg, []string{createTestTable(t, dbstore), createTestTable(t, dbstore)})
-			require.NoError(t, err)
-			setup.unlock(unlock, sess)
-		})
+	t.Run(setup.name+"/lock and unlock tables", func(t *testing.T) {
+		tables := []string{createTestTable(t, dbstore), createTestTable(t, dbstore)}
+		sess := setup.sess(t) // register sess cleanup AFTER table cleanup (LIFO: sess closes first)
+		unlock, err := setup.locker.LockMigrationTables(ctx, sess, tables)
+		require.NoError(t, err)
+		require.NoError(t, unlock(ctx))
+	})
 
-		t.Run(setup.name+"/empty list is no-op", func(t *testing.T) {
-			var sess *xorm.Session
-			if setup.sess != nil {
-				sess = setup.sess(t)
-			}
-			unlock, err := setup.locker.LockMigrationTables(ctx, sess, setup.mg, nil)
-			require.NoError(t, err)
-			setup.unlock(unlock, sess)
-		})
+	t.Run(setup.name+"/empty tables list returns no-op", func(t *testing.T) {
+		sess := setup.sess(t)
+		unlock, err := setup.locker.LockMigrationTables(ctx, sess, nil)
+		require.NoError(t, err)
+		require.NoError(t, unlock(ctx))
+	})
 
-		t.Run(setup.name+"/non-existent tables skipped", func(t *testing.T) {
-			var sess *xorm.Session
-			if setup.sess != nil {
-				sess = setup.sess(t)
-			}
-			unlock, err := setup.locker.LockMigrationTables(ctx, sess, setup.mg, []string{createTestTable(t, dbstore), "nonexistent_" + uuid.New().String()[:8]})
-			require.NoError(t, err)
-			setup.unlock(unlock, sess)
-		})
+	t.Run(setup.name+"/verify lock prevents writes", func(t *testing.T) {
+		if db.IsTestDbSQLite() {
+			t.Skip("Skipping for SQLite, locking is not needed due to single writer connection")
+		}
+		table := createTestTable(t, dbstore)
+		sess := setup.sess(t) // register sess cleanup AFTER table cleanup
+		unlock, err := setup.locker.LockMigrationTables(ctx, sess, []string{table})
+		require.NoError(t, err)
+		require.NotNil(t, unlock)
 
-		t.Run(setup.name+"/lock blocks writes", func(t *testing.T) {
-			table := createTestTable(t, dbstore)
-			var sess *xorm.Session
-			if setup.sess != nil {
-				sess = setup.sess(t)
-			}
-			unlock, err := setup.locker.LockMigrationTables(ctx, sess, setup.mg, []string{table})
-			require.NoError(t, err)
+		// Try to write to the locked table from a separate connection (goroutine).
+		writeErr := make(chan error, 1)
+		go func() {
+			_, werr := engine.Exec(fmt.Sprintf("UPDATE %s SET val=val WHERE id=-1", engine.Quote(table)))
+			writeErr <- werr
+		}()
 
-			writeErr := make(chan error, 1)
-			go func() {
-				_, werr := engine.Exec(fmt.Sprintf("UPDATE %s SET val=val WHERE id=-1", engine.Quote(table)))
-				writeErr <- werr
-			}()
+		// Verify that write is blocked while the lock is held
+		select {
+		case <-writeErr:
+			t.Fatal("Write should be blocked while lock is held")
+		case <-time.After(2 * time.Second):
+			// Good — write is still blocked after 2s
+		}
 
-			select {
-			case <-writeErr:
-				t.Fatal("write should be blocked")
-			case <-time.After(2 * time.Second):
-			}
-			setup.unlock(unlock, sess)
-			select {
-			case err = <-writeErr:
-				require.NoError(t, err)
-			case <-time.After(10 * time.Second):
-				t.Fatal("write still blocked after unlock")
-			}
-		})
-	}
+		// Release the lock
+		require.NoError(t, unlock(ctx))
+		if sess != nil {
+			_ = sess.Rollback()
+		}
+
+		// Now write should complete
+		select {
+		case err = <-writeErr:
+			require.NoError(t, err, "Write should succeed after unlock")
+		case <-time.After(10 * time.Second):
+			t.Fatal("Write is still blocked after unlock")
+		}
+	})
 }
