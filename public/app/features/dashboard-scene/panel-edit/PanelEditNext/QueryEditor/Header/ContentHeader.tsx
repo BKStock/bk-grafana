@@ -265,16 +265,28 @@ const getStyles = (
 
   return {
     container: css({
-      borderLeft: `4px solid ${borderColor}`,
+      position: 'relative',
       backgroundColor: theme.colors.background.secondary,
       padding: theme.spacing(0.5),
+      paddingLeft: `calc(${theme.spacing(0.5)} + 4px)`,
       borderTopLeftRadius: theme.shape.radius.default,
       borderTopRightRadius: theme.shape.radius.default,
+      overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: theme.spacing(1),
       minHeight: theme.spacing(5),
+
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        background: borderColor,
+      },
     }),
     leftSection: css({
       display: 'flex',
