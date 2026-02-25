@@ -314,6 +314,13 @@ export function useFiltersOverviewState({
       if (groupByVariable) {
         const { nextValues, nextText } = buildGroupByUpdate(state.keys, state.isGrouped);
         groupByVariable.changeValueTo(nextValues, nextText, true);
+
+        if (groupByVariable.state.defaultValue) {
+          const isRestorable = groupByVariable.checkIfRestorable(nextValues);
+          if (isRestorable !== groupByVariable.state.restorable) {
+            groupByVariable.setState({ restorable: isRestorable });
+          }
+        }
       }
 
       if (adhocFilters) {
