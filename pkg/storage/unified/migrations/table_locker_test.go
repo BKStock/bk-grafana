@@ -31,6 +31,9 @@ func (m *tableLockerMock) LockMigrationTables(_ context.Context, _ *xorm.Session
 
 func TestIntegrationMigrationRunnerLocksTables(t *testing.T) {
 	testutil.SkipIntegrationTestInShortMode(t)
+	if db.IsTestDbSQLite() {
+		t.Skip("SQLite uses no-op locker")
+	}
 
 	dbstore := db.InitTestDB(t)
 	t.Cleanup(db.CleanupTestDB)
@@ -74,9 +77,6 @@ func createTestTable(t *testing.T, dbstore db.DB) string {
 
 func TestIntegrationTableLocker(t *testing.T) {
 	testutil.SkipIntegrationTestInShortMode(t)
-	if db.IsTestDbSQLite() {
-		t.Skip("SQLite uses no-op locker")
-	}
 
 	dbstore := db.InitTestDB(t)
 	t.Cleanup(db.CleanupTestDB)
