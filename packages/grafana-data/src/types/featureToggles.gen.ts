@@ -495,7 +495,7 @@ export interface FeatureToggles {
   auditLoggingAppPlatform?: boolean;
   /**
   * Enable the secrets management app platform UI
-  * @default false
+  * @default true
   */
   secretsManagementAppPlatformUI?: boolean;
   /**
