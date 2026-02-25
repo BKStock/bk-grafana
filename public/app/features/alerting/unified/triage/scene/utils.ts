@@ -1,5 +1,5 @@
 import { TimeRange } from '@grafana/data';
-import { AdHocFilterWithLabels, sceneGraph, sceneUtils } from '@grafana/scenes';
+import { AdHocFilterWithLabels, AdHocFiltersVariable, SceneObject, sceneGraph, sceneUtils } from '@grafana/scenes';
 import { useSceneContext } from '@grafana/scenes-react';
 
 import { VARIABLES } from '../constants';
@@ -71,4 +71,25 @@ export function useQueryFilter(): QueryFilter {
   const hasActiveFilters = filters.length > 0;
 
   return { filter, alertStateFilter, hasActiveFilters };
+}
+
+type AdHocFilterOperator = '=' | '!=' | '=~' | '!~' | '=|' | '!=|';
+
+export function addOrReplaceFilter(
+  sceneContext: SceneObject,
+  key: string,
+  operator: AdHocFilterOperator,
+  value: string
+) {
+  const filtersVariable = sceneGraph.lookupVariable(VARIABLES.filters, sceneContext);
+  if (filtersVariable instanceof AdHocFiltersVariable) {
+    const currentFilters = filtersVariable.state.filters;
+    const existingIndex = currentFilters.findIndex((f) => f.key === key);
+    const newFilter = { key, operator, value };
+    const updatedFilters =
+      existingIndex >= 0
+        ? currentFilters.map((f, i) => (i === existingIndex ? newFilter : f))
+        : [...currentFilters, newFilter];
+    filtersVariable.setState({ filters: updatedFilters });
+  }
 }

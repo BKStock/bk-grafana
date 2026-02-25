@@ -8,10 +8,11 @@ import { useQueryRunner, useSceneContext } from '@grafana/scenes-react';
 import { Box, Button, ErrorBoundaryAlert, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
 import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
-import { AllLabelsDrawer, LabelBadgeCounts, addOrReplaceFilter } from './AllLabelsDrawer';
+import { AllLabelsDrawer } from './AllLabelsDrawer';
+import { LabelBadgeCounts } from './BadgeCounts';
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
 import { type LabelStats, useLabelsBreakdown } from './useLabelsBreakdown';
-import { useQueryFilter } from './utils';
+import { addOrReplaceFilter, useQueryFilter } from './utils';
 
 const PREVIEW_LABEL_COUNT = 5;
 
@@ -89,8 +90,13 @@ function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: C
   );
 }
 
+const TOOLTIP_MAX_VALUES = 10;
+
 function LabelTooltipContent({ label }: { label: LabelStats }) {
   const styles = useStyles2(getTooltipStyles);
+
+  const visibleValues = label.values.slice(0, TOOLTIP_MAX_VALUES);
+  const hiddenCount = label.values.length - visibleValues.length;
 
   return (
     <Box padding={0.5}>
@@ -101,12 +107,19 @@ function LabelTooltipContent({ label }: { label: LabelStats }) {
         </Stack>
       </Box>
       <div className={styles.tooltipDivider} />
-      {label.values.map(({ value, firing, pending }) => (
+      {visibleValues.map(({ value, firing, pending }) => (
         <Stack key={value} direction="row" justifyContent="space-between" gap={2}>
           <span>{value}</span>
           <LabelBadgeCounts firing={firing} pending={pending} />
         </Stack>
       ))}
+      {hiddenCount > 0 && (
+        <Text color="secondary" variant="bodySmall">
+          <Trans i18nKey="alerting.triage.tooltip-more-values" values={{ count: hiddenCount }}>
+            {'and {{ count }} more'}
+          </Trans>
+        </Text>
+      )}
     </Box>
   );
 }

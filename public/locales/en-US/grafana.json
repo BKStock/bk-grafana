@@ -3432,8 +3432,8 @@
       "show-all-labels_other": "Show all ({{ count }})",
       "show-all-values_one": "Show all ({{ count }})",
       "show-all-values_other": "Show all ({{ count }})",
-      "top-label-tooltip-header_one": "{{ key }} ({{ count }} instances)",
-      "top-label-tooltip-header_other": "{{ key }} ({{ count }} instances)"
+      "tooltip-more-values_one": "and {{ count }} more",
+      "tooltip-more-values_other": "and {{ count }} more"
     },
     "type-selector-button": {
       "add-expression": "Add expression"

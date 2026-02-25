@@ -3,15 +3,12 @@ import { Fragment, useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
-import { AdHocFiltersVariable, SceneObject, sceneGraph } from '@grafana/scenes';
 import { useSceneContext } from '@grafana/scenes-react';
-import { Button, Drawer, Icon, Stack, Text, useStyles2 } from '@grafana/ui';
+import { Button, Drawer, useStyles2 } from '@grafana/ui';
 
-import { VARIABLES } from '../constants';
-
+import { FiringCount, PendingCount } from './BadgeCounts';
 import { type LabelStats, type LabelValueCount } from './useLabelsBreakdown';
-
-type AdHocFilterOperator = '=' | '!=' | '=~' | '!~' | '=|' | '!=|';
+import { addOrReplaceFilter } from './utils';
 
 // --- Public API ---
 
@@ -74,64 +71,6 @@ export function AllLabelsDrawer({ allLabels, onClose }: AllLabelsDrawerProps) {
       </div>
     </Drawer>
   );
-}
-
-// --- Shared components ---
-
-export function FiringCount({ count }: { count: number }) {
-  if (count === 0) {
-    return <span />;
-  }
-  return (
-    <Text color="error" tabular>
-      <Stack direction="row" gap={0.25} alignItems="center">
-        <Icon name="exclamation-circle" size="xs" />
-        {count}
-      </Stack>
-    </Text>
-  );
-}
-
-export function PendingCount({ count }: { count: number }) {
-  if (count === 0) {
-    return <span />;
-  }
-  return (
-    <Text color="warning" tabular>
-      <Stack direction="row" gap={0.25} alignItems="center">
-        <Icon name="circle" size="xs" />
-        {count}
-      </Stack>
-    </Text>
-  );
-}
-
-export function LabelBadgeCounts({ firing, pending }: { firing: number; pending: number }) {
-  return (
-    <Stack direction="row" gap={0.5} alignItems="center">
-      <FiringCount count={firing} />
-      <PendingCount count={pending} />
-    </Stack>
-  );
-}
-
-export function addOrReplaceFilter(
-  sceneContext: SceneObject,
-  key: string,
-  operator: AdHocFilterOperator,
-  value: string
-) {
-  const filtersVariable = sceneGraph.lookupVariable(VARIABLES.filters, sceneContext);
-  if (filtersVariable instanceof AdHocFiltersVariable) {
-    const currentFilters = filtersVariable.state.filters;
-    const existingIndex = currentFilters.findIndex((f) => f.key === key);
-    const newFilter = { key, operator, value };
-    const updatedFilters =
-      existingIndex >= 0
-        ? currentFilters.map((f, i) => (i === existingIndex ? newFilter : f))
-        : [...currentFilters, newFilter];
-    filtersVariable.setState({ filters: updatedFilters });
-  }
 }
 
 // --- Internal components ---
