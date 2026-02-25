@@ -68,12 +68,12 @@ function SystemVariablesSectionLabel() {
   return (
     <Stack direction="row" alignItems="center" gap={1}>
       <Text element="h5">
-        <Trans i18nKey="dashboard-scene.default-variables-table.heading">System variables</Trans>
+        <Trans i18nKey="dashboard-scene.default-variables-table.heading">Provisioned by data source</Trans>
       </Text>
       <Tooltip
         content={t(
           'dashboard-scene.default-variables-table.heading-tooltip',
-          'These variables are provided by the system and cannot be edited.'
+          'These variables are provisioned by the data source and cannot be edited.'
         )}
       >
         <Icon name="info-circle" className={styles.iconMuted} aria-hidden />

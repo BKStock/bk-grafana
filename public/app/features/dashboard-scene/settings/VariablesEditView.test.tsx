@@ -255,17 +255,17 @@ describe('VariablesEditView', () => {
     });
   });
 
-  describe('System variables section', () => {
-    it('should not show System variables section when no variables have source', async () => {
+  describe('Provisioned by data source section', () => {
+    it('should not show Provisioned by data source section when no variables have source', async () => {
       const result = await buildTestScene();
       const variableView = result.variableView;
 
       render(<variableView.Component model={variableView} />);
 
-      expect(screen.queryByText('System variables')).not.toBeInTheDocument();
+      expect(screen.queryByText('Provisioned by data source')).not.toBeInTheDocument();
     });
 
-    it('should show System variables section when at least one variable has source', async () => {
+    it('should show Provisioned by data source section when at least one variable has source', async () => {
       const result = await buildTestScene();
       const { variableView } = result;
       const variableSet = variableView.getVariableSet();
@@ -284,10 +284,10 @@ describe('VariablesEditView', () => {
 
       render(<variableView.Component model={variableView} />);
 
-      expect(screen.getByText('System variables')).toBeInTheDocument();
+      expect(screen.getByText('Provisioned by data source')).toBeInTheDocument();
     });
 
-    it('should show User defined variables first then System variables when both present', async () => {
+    it('should show User defined variables first then Provisioned by data source when both present', async () => {
       const result = await buildTestScene();
       const { variableView } = result;
       const variableSet = variableView.getVariableSet();
@@ -308,8 +308,8 @@ describe('VariablesEditView', () => {
 
       const container = document.body;
       const userDefinedIndex = container.textContent!.indexOf('User defined variables');
-      const systemLinksIndex = container.textContent!.indexOf('System variables');
-      expect(userDefinedIndex).toBeLessThan(systemLinksIndex);
+      const provisionedSectionIndex = container.textContent!.indexOf('Provisioned by data source');
+      expect(userDefinedIndex).toBeLessThan(provisionedSectionIndex);
     });
   });
 });

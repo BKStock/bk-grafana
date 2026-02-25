@@ -206,17 +206,17 @@ describe('DashboardLinksEditView', () => {
       expect(getByText('Back to list')).toBeInTheDocument();
     });
 
-    it('should not show System links section when no links have source', () => {
+    it('should not show Provisioned by data source section when no links have source', () => {
       dashboard.setState({
         links: [{ ...NEW_LINK, title: 'user-link' }],
       });
       const { queryByText } = render(<settings.Component model={settings} />);
 
-      expect(queryByText('System links')).not.toBeInTheDocument();
+      expect(queryByText('Provisioned by data source')).not.toBeInTheDocument();
       expect(queryByText('user-link')).toBeInTheDocument();
     });
 
-    it('should show System links section when links have source', () => {
+    it('should show Provisioned by data source section when links have source', () => {
       const defaultLink = {
         ...NEW_LINK,
         title: 'Datasource link',
@@ -225,10 +225,10 @@ describe('DashboardLinksEditView', () => {
       dashboard.setState({ links: [defaultLink] });
       const { getByText } = render(<settings.Component model={settings} />);
 
-      expect(getByText('System links')).toBeInTheDocument();
+      expect(getByText('Provisioned by data source')).toBeInTheDocument();
     });
 
-    it('should show User defined links first then System links when both present', () => {
+    it('should show User defined links first then Provisioned by data source when both present', () => {
       const userLink = { ...NEW_LINK, title: 'My link' };
       const defaultLink = {
         ...NEW_LINK,
@@ -239,13 +239,13 @@ describe('DashboardLinksEditView', () => {
       const { getByText } = render(<settings.Component model={settings} />);
 
       expect(getByText('User defined links')).toBeInTheDocument();
-      expect(getByText('System links')).toBeInTheDocument();
+      expect(getByText('Provisioned by data source')).toBeInTheDocument();
       expect(getByText('My link')).toBeInTheDocument();
 
       const container = document.body;
       const userDefinedIndex = container.textContent!.indexOf('User defined links');
-      const systemLinksIndex = container.textContent!.indexOf('System links');
-      expect(userDefinedIndex).toBeLessThan(systemLinksIndex);
+      const provisionedSectionIndex = container.textContent!.indexOf('Provisioned by data source');
+      expect(userDefinedIndex).toBeLessThan(provisionedSectionIndex);
     });
   });
 });

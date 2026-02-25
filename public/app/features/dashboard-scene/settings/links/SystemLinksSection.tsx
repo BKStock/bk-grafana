@@ -76,12 +76,12 @@ function SystemLinksSectionLabel() {
   return (
     <Stack direction="row" alignItems="center" gap={1}>
       <Text element="h5">
-        <Trans i18nKey="dashboard-scene.default-links-table.heading">System links</Trans>
+        <Trans i18nKey="dashboard-scene.default-links-table.heading">Provisioned by data source</Trans>
       </Text>
       <Tooltip
         content={t(
           'dashboard-scene.default-links-table.heading-tooltip',
-          'These links are provided by the system and cannot be edited.'
+          'These links are provisioned by the data source and cannot be edited.'
         )}
       >
         <Icon name="info-circle" className={styles.iconMuted} aria-hidden />
