@@ -5427,7 +5427,7 @@
       "close": "Close",
       "empty": "No labels available",
       "groupby": "GroupBy",
-      "missing-adhoc": "No ad hoc filters available",
+      "missing-filters": "No filters available",
       "operator": "Operator",
       "search": {
         "aria-label": "Search filters",

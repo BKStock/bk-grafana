@@ -33,7 +33,7 @@ export const DashboardFiltersOverview = ({
   const styles = useStyles2(getStyles);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasAdhocFilters } = useFiltersOverviewState({
+  const { state, listItems, operatorConfig, actions, loading, hasKeys, hasFilters } = useFiltersOverviewState({
     adhocFilters,
     groupByVariable,
     searchQuery,
@@ -48,8 +48,8 @@ export const DashboardFiltersOverview = ({
     gap: ROW_GAP,
   });
 
-  if (!hasAdhocFilters) {
-    return <div>{t('dashboard.filters-overview.missing-adhoc', 'No ad hoc filters available')}</div>;
+  if (!hasFilters) {
+    return <div>{t('dashboard.filters-overview.missing-filters', 'No filters available')}</div>;
   }
 
   if (loading) {

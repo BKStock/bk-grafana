@@ -299,6 +299,6 @@ export function useFiltersOverviewState({
     actions,
     loading,
     hasKeys: state.keys.length > 0,
-    hasAdhocFilters: Boolean(adhocFilters),
+    hasFilters: Boolean(adhocFilters || groupByVariable),
   };
 }
