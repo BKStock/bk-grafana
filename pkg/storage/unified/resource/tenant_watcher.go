@@ -3,9 +3,12 @@ package resource
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	authnlib "github.com/grafana/authlib/authn"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/setting"
+	kvpkg "github.com/grafana/grafana/pkg/storage/unified/resource/kv"
 )
 
 var tenantGVR = schema.GroupVersionResource{
@@ -29,7 +33,18 @@ var tenantGVR = schema.GroupVersionResource{
 const (
 	labelPendingDelete           = "cloud.grafana.com/pending-delete"
 	annotationPendingDeleteAfter = "cloud.grafana.com/pending-delete-after"
+
+	pendingDeleteSection = kvpkg.PendingDeleteSection
 )
+
+// PendingDeleteRecord is the JSON blob stored in the KV store for a tenant
+// that has been marked as pending deletion.
+type PendingDeleteRecord struct {
+	DeleteAfter       string `json:"deleteAfter"`
+	ResourcesLabelled bool   `json:"resourcesLabelled"`
+}
+
+const pendingDeleteFlushInterval = 5 * time.Second
 
 // TenantWatcher watches Tenant CRDs via a Kubernetes informer and syncs
 // pending-delete state to the KV store.
@@ -38,6 +53,9 @@ type TenantWatcher struct {
 	kv     KV
 	ctx    context.Context
 	stopCh chan struct{}
+
+	clearMu      sync.Mutex
+	clearPending []string
 }
 
 // TenantWatcherConfig holds configuration for the TenantWatcher.
@@ -143,7 +161,7 @@ func NewTenantWatcher(ctx context.Context, kv KV, writeEvent EventAppender, cfg 
 
 	resync := cfg.ResyncInterval
 	if resync <= 0 {
-		resync = 60 * time.Minute
+		resync = 3 * time.Hour
 	}
 
 	client, err := dynamic.NewForConfig(restCfg)
@@ -174,6 +192,7 @@ func NewTenantWatcher(ctx context.Context, kv KV, writeEvent EventAppender, cfg 
 	}
 
 	factory.Start(tw.stopCh)
+	go tw.flushClearLoop()
 	logger.Info("tenant watcher started")
 
 	return tw, nil
@@ -204,10 +223,40 @@ func (tw *TenantWatcher) handleTenant(tenant *unstructured.Unstructured) {
 }
 
 // markPendingDelete records that a tenant is pending deletion in the KV store.
+// If a record already exists for the tenant, this is a no-op.
 func (tw *TenantWatcher) markPendingDelete(name string, deleteAfter string) {
-	// TODO
-	// Save a pending delete record to the KV store.
-	tw.log.Info("marking tenant pending delete", "tenant", name, "delete_after", deleteAfter)
+	reader, err := tw.kv.Get(tw.ctx, pendingDeleteSection, name)
+	if err == nil {
+		_ = reader.Close()
+		tw.log.Debug("tenant already has pending delete record, skipping", "tenant", name)
+		return
+	}
+	if !errors.Is(err, ErrNotFound) {
+		tw.log.Error("failed to check pending delete record", "tenant", name, "error", err)
+		return
+	}
+
+	record := PendingDeleteRecord{
+		DeleteAfter:       deleteAfter,
+		ResourcesLabelled: false,
+	}
+
+	writer, err := tw.kv.Save(tw.ctx, pendingDeleteSection, name)
+	if err != nil {
+		tw.log.Error("failed to save pending delete record", "tenant", name, "error", err)
+		return
+	}
+	if err := json.NewEncoder(writer).Encode(record); err != nil {
+		_ = writer.Close()
+		tw.log.Error("failed to encode pending delete record", "tenant", name, "error", err)
+		return
+	}
+	if err := writer.Close(); err != nil {
+		tw.log.Error("failed to close pending delete writer", "tenant", name, "error", err)
+		return
+	}
+
+	tw.log.Info("marked tenant pending delete", "tenant", name, "delete_after", deleteAfter)
 }
 
 /*
@@ -220,9 +269,41 @@ func (tw *TenantWatcher) markResourcesPendingDelete() {
 }
 */
 
-// clearPendingDelete removes the pending-delete record for a tenant from the KV store, if one exists, and unmarks all resources for the tenant as pending delete.
+// clearPendingDelete buffers a tenant name for batch deletion from the KV store.
 func (tw *TenantWatcher) clearPendingDelete(name string) {
-	// TODO
-	// Remove the pending delete record from the KV store.
-	tw.log.Info("clearing tenant pending delete", "tenant", name)
+	tw.clearMu.Lock()
+	tw.clearPending = append(tw.clearPending, name)
+	tw.clearMu.Unlock()
+}
+
+// flushClearLoop periodically flushes buffered clear requests via BatchDelete.
+func (tw *TenantWatcher) flushClearLoop() {
+	ticker := time.NewTicker(pendingDeleteFlushInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-tw.stopCh:
+			tw.flushClearPending()
+			return
+		case <-ticker.C:
+			tw.flushClearPending()
+		}
+	}
+}
+
+func (tw *TenantWatcher) flushClearPending() {
+	tw.clearMu.Lock()
+	names := tw.clearPending
+	tw.clearPending = nil
+	tw.clearMu.Unlock()
+
+	if len(names) == 0 {
+		return
+	}
+
+	if err := tw.kv.BatchDelete(tw.ctx, pendingDeleteSection, names); err != nil {
+		tw.log.Error("failed to batch delete pending delete records", "count", len(names), "error", err)
+		return
+	}
+	tw.log.Info("cleared pending delete records", "count", len(names))
 }
