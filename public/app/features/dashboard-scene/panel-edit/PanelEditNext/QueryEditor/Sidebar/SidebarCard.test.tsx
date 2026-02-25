@@ -26,6 +26,11 @@ interface RenderSidebarCardProps {
   setSelectedQuery?: jest.Mock;
   setPendingExpression?: jest.Mock;
   isHidden?: boolean;
+  actionsOverrides?: {
+    onDelete?: jest.Mock;
+    onToggleHide?: jest.Mock;
+    onDuplicate?: jest.Mock;
+  };
 }
 
 function renderSidebarCard({
@@ -36,6 +41,11 @@ function renderSidebarCard({
   setSelectedQuery = jest.fn(),
   setPendingExpression = jest.fn(),
   isHidden = false,
+  actionsOverrides = {
+    onDelete: jest.fn(),
+    onToggleHide: jest.fn(),
+    onDuplicate: jest.fn(),
+  },
 }: RenderSidebarCardProps = {}) {
   const queries: DataQuery[] = [{ refId: id, datasource: { type: 'test', uid: 'test' } }];
   const item = {
@@ -49,9 +59,9 @@ function renderSidebarCard({
       isSelected={isSelected}
       id={id}
       onClick={onClick}
-      onDelete={jest.fn()}
-      onToggleHide={jest.fn()}
-      onDuplicate={jest.fn()}
+      onDelete={actionsOverrides.onDelete}
+      onToggleHide={actionsOverrides.onToggleHide}
+      onDuplicate={actionsOverrides.onDuplicate}
       item={item}
     >
       <span>Card content</span>
@@ -178,7 +188,7 @@ describe('SidebarCard', () => {
     });
   });
 
-  describe('hidden icon', () => {
+  describe('hover actions and hidden icon', () => {
     it('renders the hidden icon when the card is hidden', () => {
       renderSidebarCard({ id: 'A', isHidden: true });
       const icons = screen.getAllByTestId('icon-eye-slash');
@@ -188,6 +198,28 @@ describe('SidebarCard', () => {
     it('does not render the hidden icon when the card is visible', () => {
       renderSidebarCard({ id: 'A', isHidden: false });
       expect(screen.queryByTestId('icon-eye-slash')).not.toBeInTheDocument();
+    });
+
+    it('renders the hover actions when hasActions is true', () => {
+      renderSidebarCard({
+        id: 'A',
+        actionsOverrides: { onDelete: jest.fn(), onToggleHide: jest.fn(), onDuplicate: jest.fn() },
+      });
+
+      expect(screen.getByRole('button', { name: /hide query/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /duplicate query/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /remove query/i })).toBeInTheDocument();
+    });
+
+    it('does not render the hover actions when hasActions is false', () => {
+      renderSidebarCard({
+        id: 'A',
+        actionsOverrides: { onDelete: undefined, onToggleHide: undefined, onDuplicate: undefined },
+      });
+
+      expect(screen.queryByRole('button', { name: /hide query/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /duplicate query/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /remove query/i })).not.toBeInTheDocument();
     });
   });
 });
