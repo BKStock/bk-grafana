@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -531,6 +532,13 @@ func runTestIntegrationBackendList(t *testing.T, backend resource.StorageBackend
 	})
 }
 
+func addDurationToSnowflake(snowflakeID int64, duration time.Duration) int64 {
+	timestamp := snowflake.ID(snowflakeID).Time()
+	t := time.Unix(0, timestamp*int64(time.Millisecond))
+	newTime := t.Add(duration)
+	return (newTime.UnixMilli() - snowflake.Epoch) << (snowflake.NodeBits + snowflake.StepBits)
+}
+
 func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
 	ctx := testutil.NewTestContext(t, time.Now().Add(30*time.Second))
 	ns := nsPrefix + "-history-ns"
@@ -561,30 +569,35 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 		require.Equal(t, 1, counter) // only one event should be returned
 	})
 
-	t.Run("no events if none after the given resource version", func(t *testing.T) {
+	t.Run("includes events on or before sinceRV due to lookback", func(t *testing.T) {
 		key := resource.NamespacedResource{
 			Namespace: ns,
 			Group:     "group",
 			Resource:  "resource",
 		}
 		latestRv, seq := backend.ListModifiedSince(ctx, key, rvDeleted)
-		require.GreaterOrEqual(t, latestRv, rvDeleted)
+		require.Equal(t, latestRv, rvDeleted)
 
-		isEmpty(t, seq)
+		counter := 0
+		for res, err := range seq {
+			require.NoError(t, err)
+			require.Equal(t, rvDeleted, res.ResourceVersion)
+			counter++
+		}
+		require.Equal(t, 1, counter)
 	})
 
-	t.Run("no events for subsequent listModifiedSince calls", func(t *testing.T) {
+	t.Run("no events if none after the given resource version plus lookback period", func(t *testing.T) {
 		key := resource.NamespacedResource{
 			Namespace: ns,
 			Group:     "group",
 			Resource:  "resource",
 		}
-		latestRv1, seq := backend.ListModifiedSince(ctx, key, rvDeleted)
-		require.GreaterOrEqual(t, latestRv1, rvDeleted)
-		isEmpty(t, seq)
+		// 1 second is longer than the current lookback period -- no events
+		// should be returned in this case.
+		latestRv, seq := backend.ListModifiedSince(ctx, key, addDurationToSnowflake(rvDeleted, time.Second))
+		require.Equal(t, latestRv, rvDeleted)
 
-		latestRv2, seq := backend.ListModifiedSince(ctx, key, latestRv1)
-		require.Equal(t, latestRv1, latestRv2)
 		isEmpty(t, seq)
 	})
 
@@ -647,16 +660,21 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 		require.GreaterOrEqual(t, latestRv, rv10)
 
 		counter := 0
-		names := []string{"bItem", "aItem", "cItem"}
-		rvs := []int64{rv10, rv9, rv6}
+		names := []string{"bItem", "aItem", "cItem", "item1"} // includes item1 due to lookback
+		rvs := []int64{rv10, rv9, rv6, rvDeleted}
+
 		for res, err := range seq {
+			require.Less(t, counter, len(names),
+				"too many modified resources, unexpected resource: action=%d, ns=%s, name=%s",
+				res.Action, res.Key.Namespace, res.Key.Name,
+			)
 			require.NoError(t, err)
 			require.Equal(t, key.Namespace, res.Key.Namespace)
 			require.Equal(t, names[counter], res.Key.Name)
 			require.Equal(t, rvs[counter], res.ResourceVersion)
 			counter++
 		}
-		require.Equal(t, 3, counter)
+		require.Equal(t, len(names), counter)
 	})
 }
 

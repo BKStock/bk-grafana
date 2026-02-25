@@ -1007,7 +1007,7 @@ func (k *kvStorageBackend) listModifiedSinceEventStore(ctx context.Context, key 
 	return func(yield func(*ModifiedResource, error) bool) {
 		// we only care about the latest revision of every resource in the list
 		seen := make(map[string]struct{})
-		for evtKeyStr, err := range k.eventStore.ListKeysBetween(ctx, sinceRV, latestRV+1, SortOrderDesc) {
+		for evtKeyStr, err := range k.eventStore.ListKeysBetween(ctx, sinceRV, latestRV, SortOrderDesc) {
 			if err != nil {
 				yield(&ModifiedResource{}, err)
 				return

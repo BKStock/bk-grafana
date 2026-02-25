@@ -184,12 +184,7 @@ func (n *eventStore) Get(ctx context.Context, key EventKey) (Event, error) {
 	return event, nil
 }
 
-// ListSince returns a sequence of events since the given resource version.
-func (n *eventStore) ListKeysSince(ctx context.Context, sinceRV int64, sortOrder SortOrder) iter.Seq2[string, error] {
-	opts := ListOptions{
-		Sort:     sortOrder,
-		StartKey: fmt.Sprintf("%d", sinceRV),
-	}
+func (n *eventStore) listWithOptions(ctx context.Context, opts ListOptions) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		for evtKey, err := range n.kv.Keys(ctx, eventsSection, opts) {
 			if err != nil {
@@ -203,23 +198,21 @@ func (n *eventStore) ListKeysSince(ctx context.Context, sinceRV int64, sortOrder
 	}
 }
 
+// ListSince returns a sequence of events since the given resource version, inclusive.
+func (n *eventStore) ListKeysSince(ctx context.Context, sinceRV int64, sortOrder SortOrder) iter.Seq2[string, error] {
+	return n.listWithOptions(ctx, ListOptions{
+		Sort:     sortOrder,
+		StartKey: fmt.Sprintf("%d", sinceRV),
+	})
+}
+
+// ListKeysBetween lists events in the [startRV, endRV] range.
 func (n *eventStore) ListKeysBetween(ctx context.Context, startRV, endRV int64, sortOrder SortOrder) iter.Seq2[string, error] {
-	opts := ListOptions{
+	return n.listWithOptions(ctx, ListOptions{
 		Sort:     sortOrder,
 		StartKey: fmt.Sprintf("%d", startRV),
-		EndKey:   fmt.Sprintf("%d", endRV),
-	}
-	return func(yield func(string, error) bool) {
-		for evtKey, err := range n.kv.Keys(ctx, eventsSection, opts) {
-			if err != nil {
-				yield("", err)
-				return
-			}
-			if !yield(evtKey, nil) {
-				return
-			}
-		}
-	}
+		EndKey:   fmt.Sprintf("%d", endRV+1 /* inclusive */),
+	})
 }
 
 func (n *eventStore) ListSince(ctx context.Context, sinceRV int64, sortOrder SortOrder) iter.Seq2[Event, error] {
