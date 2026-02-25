@@ -2,79 +2,90 @@ package sync
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
+
+	"github.com/grafana/grafana-app-sdk/k8s"
 	"github.com/grafana/grafana-app-sdk/resource"
-	iamv0 "github.com/grafana/grafana/apps/iam/pkg/apis/iam/v0alpha1"
+	iamv0alpha1 "github.com/grafana/grafana/apps/iam/pkg/apis/iam/v0alpha1"
+	"github.com/grafana/grafana/pkg/aggregator/apiserver/scheme"
 	"github.com/grafana/grafana/pkg/apimachinery/identity"
-	"github.com/grafana/grafana/pkg/services/apiserver/client"
+	"github.com/grafana/grafana/pkg/infra/log"
+	"github.com/grafana/grafana/pkg/services/apiserver"
+	"github.com/grafana/grafana/pkg/services/apiserver/endpoints/request"
 	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/user"
+	"github.com/grafana/grafana/pkg/setting"
 	res "github.com/grafana/grafana/pkg/storage/unified/resource"
-	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 	"github.com/grafana/grafana/pkg/storage/unified/search/builders"
 	"github.com/grafana/grafana/pkg/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type K8sUserService struct {
-	userClient *iamv0.UserClient
-	k8sClient  client.K8sHandler
+	logger             log.Logger
+	namespaceMapper    request.NamespaceMapper
+	restConfigProvider apiserver.RestConfigProvider
+	clientGenerator    resource.ClientGenerator
+	userClient         *iamv0alpha1.UserClient
+	restClient         *rest.RESTClient
+	initClients        sync.Once
 }
 
 var _ UserProxy = (*K8sUserService)(nil)
 
-func NewK8sUserService(userClient *iamv0.UserClient, k8sClient client.K8sHandler) *K8sUserService {
-	return &K8sUserService{userClient: userClient, k8sClient: k8sClient}
-}
-
-func (a *K8sUserService) GetByUserAuth(ctx context.Context, userAuth *login.UserAuth, orgID int64) (*user.User, error) {
-	namespace := a.k8sClient.GetNamespace(orgID)
-
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: userAuth.UserUID})
-	if err != nil {
-		return nil, err
+func NewK8sUserService(logger log.Logger, cfg *setting.Cfg,
+	restConfigProvider apiserver.RestConfigProvider) *K8sUserService {
+	return &K8sUserService{
+		logger:             logger,
+		namespaceMapper:    request.GetNamespaceMapper(cfg),
+		restConfigProvider: restConfigProvider,
+		initClients:        sync.Once{},
 	}
-
-	return iamUserToUser(u, namespace), nil
 }
 
-func (a *K8sUserService) GetByEmail(ctx context.Context, email string, orgID int64) (*user.User, error) {
-	namespace := a.k8sClient.GetNamespace(orgID)
+// initK8sClients lazily initializes the Kubernetes clients on first use.
+func (s *K8sUserService) initK8sClients(ctx context.Context, logger log.Logger) {
+	s.initClients.Do(func() {
+		if s.restConfigProvider == nil {
+			return
+		}
 
-	resp, err := a.k8sClient.Search(ctx, orgID, &resourcepb.ResourceSearchRequest{
-		Options: &resourcepb.ListOptions{
-			Fields: []*resourcepb.Requirement{
-				{
-					Key:      res.SEARCH_FIELD_PREFIX + builders.USER_EMAIL,
-					Operator: "=",
-					Values:   []string{email},
-				},
-			},
-		},
-		Fields: []string{res.SEARCH_FIELD_TITLE, builders.USER_EMAIL, builders.USER_LOGIN},
-		Limit:  1,
+		restConfig, err := s.restConfigProvider.GetRestConfig(ctx)
+		if err != nil {
+			logger.Warn("Failed to get rest config", "error", err)
+			return
+		}
+
+		s.clientGenerator = k8s.NewClientRegistry(*restConfig, k8s.DefaultClientConfig())
+
+		if c, err := iamv0alpha1.NewUserClientFromGenerator(s.clientGenerator); err != nil {
+			logger.Warn("Failed to create user client", "error", err)
+		} else {
+			s.userClient = c
+		}
+
+		restConfigCopy := rest.CopyConfig(restConfig)
+		restConfigCopy.GroupVersion = &iamv0alpha1.SchemeGroupVersion
+		restConfigCopy.NegotiatedSerializer = scheme.Codecs
+		restConfigCopy.APIPath = "/apis"
+
+		if c, err := rest.RESTClientFor(restConfigCopy); err != nil {
+			logger.Warn("Failed to create REST client", "error", err)
+		} else {
+			s.restClient = c
+		}
 	})
-	if err != nil {
-		return nil, err
-	}
+}
 
-	if resp.Error != nil {
-		return nil, fmt.Errorf("user search: %s: %s", resp.Error.Message, resp.Error.Details)
-	}
+func (s *K8sUserService) GetByUserAuth(ctx context.Context, userAuth *login.UserAuth, orgID int64) (*user.User, error) {
+	s.initK8sClients(ctx, s.logger)
 
-	rows := resp.GetResults().GetRows()
-	if len(rows) == 0 {
-		return nil, user.ErrUserNotFound
-	}
+	namespace := s.namespaceMapper(orgID)
 
-	userUID := rows[0].GetKey().GetName()
-	if userUID == "" {
-		return nil, user.ErrUserNotFound
-	}
-
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: userUID})
+	u, err := s.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: userAuth.UserUID})
 	if err != nil {
 		return nil, err
 	}
@@ -82,50 +93,54 @@ func (a *K8sUserService) GetByEmail(ctx context.Context, email string, orgID int
 	return iamUserToUser(u, namespace), nil
 }
 
-func (a *K8sUserService) GetByLogin(ctx context.Context, login string, orgID int64) (*user.User, error) {
-	namespace := a.k8sClient.GetNamespace(orgID)
+func (s *K8sUserService) GetByEmail(ctx context.Context, email string, orgID int64) (*user.User, error) {
+	s.initK8sClients(ctx, s.logger)
 
-	resp, err := a.k8sClient.Search(ctx, orgID, &resourcepb.ResourceSearchRequest{
-		Options: &resourcepb.ListOptions{
-			Fields: []*resourcepb.Requirement{
-				{
-					Key:      res.SEARCH_FIELD_PREFIX + builders.USER_LOGIN,
-					Operator: "=",
-					Values:   []string{login},
-				},
-			},
+	namespace := s.namespaceMapper(orgID)
+
+	users, err := s.userClient.List(ctx, namespace, resource.ListOptions{
+		FieldSelectors: []string{
+			res.SEARCH_FIELD_PREFIX + builders.USER_EMAIL + "=" + email,
 		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.Error != nil {
-		return nil, fmt.Errorf("user search: %s: %s", resp.Error.Message, resp.Error.Details)
-	}
-
-	rows := resp.GetResults().GetRows()
-	if len(rows) == 0 {
+	if len(users.Items) == 0 {
 		return nil, user.ErrUserNotFound
 	}
 
-	userUID := rows[0].GetKey().GetName()
-	if userUID == "" {
-		return nil, user.ErrUserNotFound
-	}
+	return iamUserToUser(&users.Items[0], namespace), nil
+}
 
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: userUID})
+func (s *K8sUserService) GetByLogin(ctx context.Context, login string, orgID int64) (*user.User, error) {
+	s.initK8sClients(ctx, s.logger)
+
+	namespace := s.namespaceMapper(orgID)
+
+	users, err := s.userClient.List(ctx, namespace, resource.ListOptions{
+		FieldSelectors: []string{
+			res.SEARCH_FIELD_PREFIX + builders.USER_LOGIN + "=" + login,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return iamUserToUser(u, namespace), nil
+	if len(users.Items) == 0 {
+		return nil, user.ErrUserNotFound
+	}
+
+	return iamUserToUser(&users.Items[0], namespace), nil
 }
 
-func (a *K8sUserService) GetSignedInUser(ctx context.Context, query *user.GetSignedInUserQuery) (*user.SignedInUser, error) {
-	namespace := a.k8sClient.GetNamespace(query.OrgID)
+func (s *K8sUserService) GetSignedInUser(ctx context.Context, query *user.GetSignedInUserQuery) (*user.SignedInUser, error) {
+	s.initK8sClients(ctx, s.logger)
 
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: query.UserUID})
+	namespace := s.namespaceMapper(query.OrgID)
+
+	u, err := s.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: query.UserUID})
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +172,10 @@ func (a *K8sUserService) GetSignedInUser(ctx context.Context, query *user.GetSig
 	}, nil
 }
 
-func (a *K8sUserService) Create(ctx context.Context, cmd *user.CreateUserCommand) (*user.User, error) {
-	namespace := a.k8sClient.GetNamespace(cmd.OrgID)
+func (s *K8sUserService) Create(ctx context.Context, cmd *user.CreateUserCommand) (*user.User, error) {
+	s.initK8sClients(ctx, s.logger)
+
+	namespace := s.namespaceMapper(cmd.OrgID)
 
 	uid := cmd.UID
 	if uid == "" {
@@ -170,12 +187,12 @@ func (a *K8sUserService) Create(ctx context.Context, cmd *user.CreateUserCommand
 		login = cmd.Email
 	}
 
-	obj := &iamv0.User{
+	obj := &iamv0alpha1.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      uid,
 			Namespace: namespace,
 		},
-		Spec: iamv0.UserSpec{
+		Spec: iamv0alpha1.UserSpec{
 			Login:         login,
 			Email:         cmd.Email,
 			Title:         cmd.Name,
@@ -190,7 +207,7 @@ func (a *K8sUserService) Create(ctx context.Context, cmd *user.CreateUserCommand
 		obj.Spec.Role = "Viewer"
 	}
 
-	created, err := a.userClient.Create(ctx, obj, resource.CreateOptions{})
+	created, err := s.userClient.Create(ctx, obj, resource.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +215,12 @@ func (a *K8sUserService) Create(ctx context.Context, cmd *user.CreateUserCommand
 	return iamUserToUser(created, namespace), nil
 }
 
-func (a *K8sUserService) Update(ctx context.Context, cmd *user.UpdateUserCommand) error {
-	namespace := a.k8sClient.GetNamespace(*cmd.OrgID)
+func (s *K8sUserService) Update(ctx context.Context, cmd *user.UpdateUserCommand) error {
+	s.initK8sClients(ctx, s.logger)
 
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID})
+	namespace := s.namespaceMapper(*cmd.OrgID)
+
+	u, err := s.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID})
 	if err != nil {
 		return err
 	}
@@ -225,25 +244,27 @@ func (a *K8sUserService) Update(ctx context.Context, cmd *user.UpdateUserCommand
 		u.Spec.EmailVerified = *cmd.EmailVerified
 	}
 
-	_, err = a.userClient.Update(ctx, u, resource.UpdateOptions{ResourceVersion: u.ResourceVersion})
+	_, err = s.userClient.Update(ctx, u, resource.UpdateOptions{ResourceVersion: u.ResourceVersion})
 	return err
 }
 
-func (a *K8sUserService) UpdateLastSeenAt(ctx context.Context, cmd *user.UpdateUserLastSeenAtCommand) error {
-	namespace := a.k8sClient.GetNamespace(cmd.OrgID)
+func (s *K8sUserService) UpdateLastSeenAt(ctx context.Context, cmd *user.UpdateUserLastSeenAtCommand) error {
+	s.initK8sClients(ctx, s.logger)
 
-	u, err := a.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID})
+	namespace := s.namespaceMapper(cmd.OrgID)
+
+	u, err := s.userClient.Get(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID})
 	if err != nil {
 		return err
 	}
 
-	_, err = a.userClient.UpdateStatus(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID}, iamv0.UserStatus{
+	_, err = s.userClient.UpdateStatus(ctx, resource.Identifier{Namespace: namespace, Name: cmd.UserUID}, iamv0alpha1.UserStatus{
 		LastSeenAt: time.Now().Unix(),
 	}, resource.UpdateOptions{ResourceVersion: u.ResourceVersion})
 	return err
 }
 
-func iamUserToUser(u *iamv0.User, namespace string) *user.User {
+func iamUserToUser(u *iamv0alpha1.User, namespace string) *user.User {
 	var lastSeenAt time.Time
 	if u.Status.LastSeenAt > 0 {
 		lastSeenAt = time.Unix(u.Status.LastSeenAt, 0)

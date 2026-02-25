@@ -23,7 +23,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/quota"
 	"github.com/grafana/grafana/pkg/services/quota/quotatest"
 	"github.com/grafana/grafana/pkg/services/scimutil"
-	"github.com/grafana/grafana/pkg/services/search/sort"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/services/user/usertest"
 	"github.com/grafana/grafana/pkg/setting"
@@ -888,7 +887,7 @@ func TestUserSync_SyncUserHook(t *testing.T) {
 			cfg.Raw.Section("auth.scim").Key("user_sync_enabled").SetValue("true")
 			cfg.Raw.Section("auth.scim").Key("reject_non_provisioned_users").SetValue("true")
 
-			s := ProvideUserSync(tt.fields.userService, userProtection, tt.fields.authInfoService, tt.fields.quotaService, tracing.InitializeTracerForTest(), featuremgmt.WithFeatures(), cfg, nil, nil, nil, sort.ProvideService())
+			s := ProvideUserSync(tt.fields.userService, userProtection, tt.fields.authInfoService, tt.fields.quotaService, tracing.InitializeTracerForTest(), featuremgmt.WithFeatures(), cfg, nil)
 			err := s.SyncUserHook(context.Background(), tt.args.id, nil)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -915,7 +914,7 @@ func TestUserSync_SyncUserRetryFetch(t *testing.T) {
 		tracing.NewNoopTracerService(),
 		featuremgmt.WithFeatures(),
 		setting.NewCfg(),
-		nil, nil, nil, sort.ProvideService(),
+		nil,
 	)
 
 	email := "test@test.com"
@@ -1954,7 +1953,7 @@ func TestUserSync_SyncUserHook_SCIMAuthModuleMismatch(t *testing.T) {
 		tracing.NewNoopTracerService(),
 		featuremgmt.WithFeatures(),
 		setting.NewCfg(),
-		nil, nil, nil, sort.ProvideService(),
+		nil,
 	)
 
 	email := "test@test.com"
@@ -2005,7 +2004,7 @@ func TestUserSync_SyncUserHook_SCIMUserAllowsGCOMLogin(t *testing.T) {
 		tracing.NewNoopTracerService(),
 		featuremgmt.WithFeatures(),
 		setting.NewCfg(),
-		nil, nil, nil, sort.ProvideService(),
+		nil,
 	)
 
 	email := "test@test.com"

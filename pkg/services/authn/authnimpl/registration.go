@@ -26,12 +26,9 @@ import (
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/quota"
 	"github.com/grafana/grafana/pkg/services/rendering"
-	"github.com/grafana/grafana/pkg/services/search/sort"
 	tempuser "github.com/grafana/grafana/pkg/services/temp_user"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/storage/legacysql/dualwrite"
-	"github.com/grafana/grafana/pkg/storage/unified/resource"
 )
 
 type Registration struct{}
@@ -48,8 +45,7 @@ func ProvideRegistration(
 	socialService social.Service, cache *remotecache.RemoteCache,
 	ldapService service.LDAP, settingsProviderService setting.Provider,
 	tracer tracing.Tracer, tempUserService tempuser.Service, notificationService notifications.Service,
-	restConfigProvider apiserver.RestConfigProvider, resourceClient resource.ResourceClient,
-	dualWriteService dualwrite.Service, sortService sort.Service,
+	restConfigProvider apiserver.RestConfigProvider,
 ) Registration {
 	logger := log.New("authn.registration")
 
@@ -135,7 +131,7 @@ func ProvideRegistration(
 	}
 
 	// FIXME (jguer): move to User package
-	userSync := sync.ProvideUserSync(userService, userProtectionService, authInfoService, quotaService, tracer, features, cfg, restConfigProvider, resourceClient, dualWriteService, sortService)
+	userSync := sync.ProvideUserSync(userService, userProtectionService, authInfoService, quotaService, tracer, features, cfg, restConfigProvider)
 	orgSync := sync.ProvideOrgSync(userService, orgService, accessControlService, cfg, tracer)
 	authnSvc.RegisterPostAuthHook(userSync.SyncUserHook, 10)
 	authnSvc.RegisterPostAuthHook(userSync.EnableUserHook, 20)

@@ -15,24 +15,18 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"golang.org/x/sync/singleflight"
 
-	iamv0 "github.com/grafana/grafana/apps/iam/pkg/apis/iam/v0alpha1"
 	"github.com/grafana/grafana/pkg/apimachinery/errutil"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/services/apiserver"
-	"github.com/grafana/grafana/pkg/services/apiserver/client"
-	"github.com/grafana/grafana/pkg/services/apiserver/endpoints/request"
 	"github.com/grafana/grafana/pkg/services/authn"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/quota"
 	"github.com/grafana/grafana/pkg/services/scimutil"
-	"github.com/grafana/grafana/pkg/services/search/sort"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/storage/legacysql/dualwrite"
-	"github.com/grafana/grafana/pkg/storage/unified/resource"
 )
 
 var (
@@ -104,8 +98,7 @@ type StaticSCIMConfig struct {
 
 func ProvideUserSync(userService user.Service, userProtectionService login.UserProtectionService, authInfoService login.AuthInfoService,
 	quotaService quota.Service, tracer tracing.Tracer, features featuremgmt.FeatureToggles, cfg *setting.Cfg,
-	restConfigProvider apiserver.RestConfigProvider, resourceClient resource.ResourceClient, dualWriteService dualwrite.Service, sortService sort.Service,
-) *UserSync {
+	restConfigProvider apiserver.RestConfigProvider) *UserSync {
 	scimSection := cfg.Raw.Section("auth.scim")
 	staticConfig := &StaticSCIMConfig{
 		IsUserProvisioningEnabled: scimSection.Key("user_sync_enabled").MustBool(false),
@@ -115,39 +108,20 @@ func ProvideUserSync(userService user.Service, userProtectionService login.UserP
 	logger := log.New("user.sync")
 
 	var userProxy UserProxy
-	var k8sHandlerForSCIM client.K8sHandler
 
 	ctx := context.Background()
 	ofClient := openfeature.NewDefaultClient()
 	useK8sUserService := ofClient.Boolean(ctx, featuremgmt.FlagKubernetesUserSync, false, openfeature.TransactionContext(ctx)) &&
-		restConfigProvider != nil && resourceClient != nil && dualWriteService != nil
+		restConfigProvider != nil
 
 	if useK8sUserService {
-		iamUserK8sClient := client.NewK8sHandler(
-			dualWriteService,
-			request.GetNamespaceMapper(cfg),
-			iamv0.UserResourceInfo.GroupVersionResource(),
-			restConfigProvider.GetRestConfig,
-			nil,
-			userService,
-			resourceClient,
-			sortService,
-			features,
-		)
-		clientGenerator := apiserver.ProvideClientGenerator(restConfigProvider)
-		iamUserClient, err := iamv0.NewUserClientFromGenerator(clientGenerator)
-		if err != nil {
-			logger.Error("Failed to create user client", "error", err)
-			userProxy = NewLegacyUserProxy(userService)
-		} else {
-			userProxy = NewK8sUserService(iamUserClient, iamUserK8sClient)
-			k8sHandlerForSCIM = iamUserK8sClient
-		}
+		userProxy = NewK8sUserService(logger, cfg, restConfigProvider)
 	} else {
 		userProxy = NewLegacyUserProxy(userService)
 	}
 
 	return &UserSync{
+		cfg:                       cfg,
 		isUserProvisioningEnabled: staticConfig.IsUserProvisioningEnabled,
 		rejectNonProvisionedUsers: staticConfig.RejectNonProvisionedUsers,
 		userService:               userProxy,
@@ -158,12 +132,13 @@ func ProvideUserSync(userService user.Service, userProtectionService login.UserP
 		tracer:                    tracer,
 		features:                  features,
 		lastSeenSF:                &singleflight.Group{},
-		scimUtil:                  scimutil.NewSCIMUtil(k8sHandlerForSCIM),
+		scimUtil:                  scimutil.NewSCIMUtil(nil),
 		staticConfig:              staticConfig,
 	}
 }
 
 type UserSync struct {
+	cfg                       *setting.Cfg
 	isUserProvisioningEnabled bool
 	rejectNonProvisionedUsers bool
 	userService               UserProxy
@@ -405,7 +380,7 @@ func (s *UserSync) FetchSyncedUserHook(ctx context.Context, id *authn.Identity, 
 		return nil
 	}
 
-	usr, err := s.userService.GetSignedInUser(ctx, &user.GetSignedInUserQuery{UserID: userID, OrgID: r.OrgID, UserUID: id.UID})
+	usr, err := s.userService.GetSignedInUser(ctx, &user.GetSignedInUserQuery{UserID: userID, OrgID: s.getOrgID(r.OrgID), UserUID: id.UID})
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			return errFetchingSignedInUserNotFound.Errorf("%w", err)
@@ -446,7 +421,7 @@ func (s *UserSync) SyncLastSeenHook(ctx context.Context, id *authn.Identity, r *
 	goCtx := context.WithoutCancel(ctx)
 	// nolint:dogsled
 	_, _, _ = s.lastSeenSF.Do(fmt.Sprintf("%d-%d", id.GetOrgID(), userID), func() (interface{}, error) {
-		err := s.userService.UpdateLastSeenAt(goCtx, &user.UpdateUserLastSeenAtCommand{UserID: userID, UserUID: id.UID, OrgID: id.GetOrgID()})
+		err := s.userService.UpdateLastSeenAt(goCtx, &user.UpdateUserLastSeenAtCommand{UserID: userID, UserUID: id.UID, OrgID: s.getOrgID(id.GetOrgID())})
 		if err != nil && !errors.Is(err, user.ErrLastSeenUpToDate) {
 			s.log.Error("Failed to update last_seen_at", "err", err, "userId", userID)
 		}
@@ -693,7 +668,7 @@ func (s *UserSync) getUser(ctx context.Context, identity *authn.Identity) (*user
 		}
 
 		if !errors.Is(errGetAuthInfo, user.ErrUserNotFound) {
-			usr, errGetByID := s.userService.GetByUserAuth(ctx, authInfo, identity.OrgID)
+			usr, errGetByID := s.userService.GetByUserAuth(ctx, authInfo, s.getOrgID(identity.OrgID))
 			if errGetByID == nil {
 				return usr, authInfo, nil
 			}
@@ -712,7 +687,7 @@ func (s *UserSync) getUser(ctx context.Context, identity *authn.Identity) (*user
 	}
 
 	// Check user table to grab existing user
-	usr, err := s.lookupByOneOf(ctx, identity.ClientParams.LookUpParams, identity.OrgID)
+	usr, err := s.lookupByOneOf(ctx, identity.ClientParams.LookUpParams, s.getOrgID(identity.OrgID))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -789,4 +764,12 @@ func syncSignedInUserToIdentity(usr *user.SignedInUser, id *authn.Identity) {
 	id.IsDisabled = usr.IsDisabled
 	id.IsGrafanaAdmin = &usr.IsGrafanaAdmin
 	id.EmailVerified = usr.EmailVerified
+}
+
+func (s *UserSync) getOrgID(orgID int64) int64 {
+	if orgID > 0 {
+		return orgID
+	}
+
+	return s.cfg.DefaultOrgID()
 }
