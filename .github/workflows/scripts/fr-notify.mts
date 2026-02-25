@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 
 import {
   loadConfig, requireEnv, log, setOutput,
-  sanitizeForSlack, isValidGitHubUsername, sendSlackMessage,
+  sanitizeForSlack, isValidGitHubUsername, sendSlackMessage, teamChannelEnv,
   type TeamConfig,
 } from './utils.mts';
 
@@ -110,9 +110,9 @@ async function sendNotifications(): Promise<void> {
     console.log(`Matched area label for team ${team.name}: ${matchedLabel}`);
     matchedTeams++;
 
-    const channelId = team.slack_channels?.fr ?? '';
+    const channelId = teamChannelEnv(team.name, 'fr');
     if (!channelId) {
-      log.warning(`No Slack channel ID configured for team ${team.name} (slack_channels.fr)`);
+      log.warning(`No Slack channel resolved for team ${team.name}`);
       log.groupEnd();
       continue;
     }
@@ -148,7 +148,7 @@ async function sendNotifications(): Promise<void> {
     });
 
     if (ok) {
-      log.notice(`Slack notification sent to ${team.name} (channel: ${channelId})`);
+      log.notice(`Slack notification sent to ${team.name}`);
       notificationSent = true;
     } else {
       log.warning(`Slack failed for ${team.name}`);

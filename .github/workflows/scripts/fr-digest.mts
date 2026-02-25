@@ -1,7 +1,7 @@
 import {
   loadConfig, requireEnv, log, sleep,
   sanitizeInput, stripMarkdown, sanitizeForSlack, isValidIssueNumber,
-  validateFRClusterResponse, callOpenAI, sendSlackMessage,
+  validateFRClusterResponse, callOpenAI, sendSlackMessage, teamChannelEnv,
   issueLink, buildLinks, ghGraphQL,
   type Config, type TeamConfig, type FeatureRequest, type ClusterResult, type SlackBlock,
 } from './utils.mts';
@@ -291,7 +291,7 @@ async function sendSlackDigest(params: DigestParams): Promise<void> {
   });
 
   if (ok) {
-    log.notice(`Slack notification sent successfully to ${teamName} (channel: ${channelId})`);
+    log.notice(`Slack notification sent successfully to ${teamName}`);
   } else {
     log.warning(`Slack notification failed for ${teamName}`);
   }
@@ -325,9 +325,9 @@ async function main(): Promise<void> {
     log.groupStart(`Processing team: ${teamName}`);
     console.log(`Area labels: ${areaLabels.join(' ')}`);
 
-    const channelId = team.slack_channels?.fr ?? '';
+    const channelId = teamChannelEnv(team.name, 'fr');
     if (!channelId && !env.dryRun) {
-      log.warning(`No Slack channel ID (slack_channels.fr) configured for team ${teamName}`);
+      log.warning(`No Slack channel resolved for team ${teamName}`);
     }
 
     const adoptionDate = team.adoption_date ?? '';

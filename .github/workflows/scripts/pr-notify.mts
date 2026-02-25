@@ -4,7 +4,7 @@ import {
   loadConfig, requireEnv, log, setOutput,
   sanitizeForSlack, isValidGitHubUsername,
   parseCodeowners, matchFilesToCodeownersTeams,
-  sendSlackMessage, callOpenAI,
+  sendSlackMessage, callOpenAI, teamChannelEnv,
   type TeamConfig,
 } from './utils.mts';
 
@@ -316,9 +316,9 @@ async function sendNotifications(): Promise<void> {
     matchedTeamCount++;
     matchedTeamNames.push(team.name);
 
-    const channelId = team.slack_channels?.pr ?? '';
+    const channelId = teamChannelEnv(team.name, 'pr');
     if (!channelId) {
-      log.warning(`No Slack channel ID configured for team ${team.name} (slack_channels.pr)`);
+      log.warning(`No Slack channel resolved for team ${team.name}`);
       log.groupEnd();
       continue;
     }
@@ -354,7 +354,7 @@ async function sendNotifications(): Promise<void> {
     });
 
     if (ok) {
-      log.notice(`Slack notification sent to ${team.name} (channel: ${channelId})`);
+      log.notice(`Slack notification sent to ${team.name}`);
       notificationSent = true;
     } else {
       log.warning(`Slack failed for ${team.name}`);

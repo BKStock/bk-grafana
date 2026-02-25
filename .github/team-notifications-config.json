@@ -1,5 +1,5 @@
 {
-  "_docs": "Team notifications configuration. To onboard a team: add an entry below with codeowners_teams, area_labels (main parent area label), Slack channel IDs, and invite the bot to each channel.",
+  "_docs": "Team notifications configuration.",
   "teams": [
     {
       "name": "alerting",
@@ -10,10 +10,6 @@
         "@grafana/alerting-squad"
       ],
       "area_labels": ["area/alerting"],
-      "slack_channels": {
-        "pr": "REPLACE_WITH_CHANNEL_ID",
-        "fr": "REPLACE_WITH_CHANNEL_ID"
-      },
       "enabled": {
         "pr_notify": true,
         "pr_weekly": true,
@@ -28,10 +24,6 @@
         "@grafana/dataviz-squad"
       ],
       "area_labels": ["area/panel"],
-      "slack_channels": {
-        "pr": "REPLACE_WITH_CHANNEL_ID",
-        "fr": "REPLACE_WITH_CHANNEL_ID"
-      },
       "enabled": {
         "pr_notify": true,
         "pr_weekly": true,

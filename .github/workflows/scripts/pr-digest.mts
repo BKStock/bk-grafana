@@ -4,7 +4,7 @@ import {
   loadConfig, requireEnv, log, setOutput, setOutputMultiline,
   sanitizeInput, sanitizeForSlack, isValidIssueNumber,
   parseCodeowners, matchFilesToCodeownersTeams,
-  validatePRClusterResponse, callOpenAI, sendSlackMessage,
+  validatePRClusterResponse, callOpenAI, sendSlackMessage, teamChannelEnv,
   prLink, buildLinks, sleep,
   type PRClusterResult, type SlackBlock,
 } from './utils.mts';
@@ -261,9 +261,9 @@ async function processTeams(): Promise<void> {
 
     prListItems.sort((a, b) => a.sizePriority - b.sizePriority || b.number - a.number);
 
-    const channelId = team.slack_channels?.pr ?? '';
+    const channelId = teamChannelEnv(team.name, 'pr');
     if (!channelId) {
-      log.warning(`No Slack channel ID configured for team ${teamName} (slack_channels.pr)`);
+      log.warning(`No Slack channel resolved for team ${teamName}`);
       log.groupEnd();
       continue;
     }
@@ -399,7 +399,7 @@ async function processTeams(): Promise<void> {
     });
 
     if (ok) {
-      log.notice(`Weekly PR report sent to ${teamName} (channel: ${channelId})`);
+      log.notice(`Weekly PR report sent to ${teamName}`);
     } else {
       log.warning(`Slack failed for ${teamName}`);
     }
