@@ -177,7 +177,7 @@ function VariablesSection({
                     </div>
                     {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
                     <span className={styles.variableName} onClick={() => onClickVariable(variable)}>
-                      <Text color="primary">{variable.state.name}</Text>
+                      {variable.state.name}
                     </span>
                   </li>
                 )}
@@ -278,18 +278,26 @@ function getStyles(theme: GrafanaTheme2) {
       flexDirection: 'row',
       gap: theme.spacing(0.5),
       alignItems: 'center',
-      '&:hover span, &:hover svg': {
-        color: theme.colors.text.link,
-      },
     }),
     variableName: css({
       cursor: 'pointer',
+      [theme.transitions.handleMotion('no-preference', 'reduce')]: {
+        transition: theme.transitions.create(['color'], {
+          duration: theme.transitions.duration.short,
+        }),
+      },
+      '&:hover': {
+        color: theme.colors.text.link,
+      },
     }),
     dragHandle: css({
       display: 'flex',
       alignItems: 'center',
       cursor: 'grab',
       color: theme.colors.text.secondary,
+      '&:hover': {
+        color: theme.colors.text.primary,
+      },
       '&:active': {
         cursor: 'grabbing',
       },
