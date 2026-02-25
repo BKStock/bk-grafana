@@ -2,6 +2,17 @@ import { config } from '@grafana/runtime';
 
 import { getPresetsForPanel } from './getPresets';
 
+jest.mock('app/features/plugins/importPanelPlugin', () => ({
+  importPanelPlugin: jest.fn((pluginId: string) => {
+    if (pluginId === 'timeseries') {
+      return Promise.resolve({
+        getPresets: () => [{ name: 'Default', pluginId: 'timeseries', options: {}, fieldConfig: {} }],
+      });
+    }
+    return Promise.resolve({ getPresets: () => undefined });
+  }),
+}));
+
 config.featureToggles.vizPresets = true;
 
 describe('getPresetsForPanel', () => {
