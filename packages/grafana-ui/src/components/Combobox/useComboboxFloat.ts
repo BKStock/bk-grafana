@@ -5,6 +5,7 @@ import { BOUNDARY_ELEMENT_ID } from '../../utils/floating';
 import { measureText } from '../../utils/measureText';
 
 import {
+  MENU_ITEM_DESCRIPTION_FONT_SIZE,
   MENU_ITEM_FONT_SIZE,
   MENU_ITEM_FONT_WEIGHT,
   MENU_ITEM_PADDING,
@@ -63,17 +64,27 @@ export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, 
   });
 
   const longestItemWidth = useMemo(() => {
-    let longestItem = '';
+    let longestLabel = '';
+    let longestDescription = '';
     const itemsToLookAt = Math.min(items.length, WIDTH_CALCULATION_LIMIT_ITEMS);
 
     for (let i = 0; i < itemsToLookAt; i++) {
       const itemLabel = items[i].label ?? items[i].value.toString();
-      longestItem = itemLabel.length > longestItem.length ? itemLabel : longestItem;
+      if (itemLabel.length > longestLabel.length) {
+        longestLabel = itemLabel;
+      }
+      const itemDescription = items[i].description ?? '';
+      if (itemDescription.length > longestDescription.length) {
+        longestDescription = itemDescription;
+      }
     }
 
-    const size = measureText(longestItem, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width;
+    const labelWidth = measureText(longestLabel, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width;
+    const descriptionWidth = longestDescription
+      ? measureText(longestDescription, MENU_ITEM_DESCRIPTION_FONT_SIZE).width
+      : 0;
 
-    return size + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth;
+    return Math.max(labelWidth, descriptionWidth) + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth;
   }, [items, scrollbarWidth]);
 
   const floatStyles = {
