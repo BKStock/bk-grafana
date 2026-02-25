@@ -394,20 +394,7 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 				// This means that the configuration is gone but the organization, as well as the Alertmanager, exists.
 				moa.logger.Warn("Alertmanager exists for org but the configuration is gone. Applying the default configuration", "org", orgID)
 			}
-			err := moa.configStore.SaveAlertmanagerConfigurationWithCallback(ctx, &models.SaveAlertmanagerConfigurationCmd{
-				AlertmanagerConfiguration: moa.settings.UnifiedAlerting.DefaultConfiguration,
-				Default:                   true,
-				ConfigurationVersion:      fmt.Sprintf("v%d", models.AlertConfigurationVersion),
-				OrgID:                     orgID,
-				LastApplied:               time.Now().UTC().Unix(),
-			}, func(alertConfig models.AlertConfiguration) error {
-				preparedCfg, err := moa.prepareApplyConfig(ctx, orgID, &alertConfig, ErrorOnInvalidReceivers)
-				if err != nil {
-					return err
-				}
-				_, err = am.ApplyConfig(ctx, preparedCfg)
-				return err
-			})
+			err := moa.saveAndApplyDefaultConfig(ctx, am, orgID)
 			if err != nil {
 				moa.logger.Error("Failed to apply the default Alertmanager configuration", "org", orgID)
 				continue
@@ -416,23 +403,9 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 			continue
 		}
 
-		preparedCfg, err := moa.prepareApplyConfig(ctx, orgID, dbConfig, LogInvalidReceivers)
-		if err != nil {
-			moa.logger.Error("Failed to prepare Alertmanager config", "org", orgID, "id", dbConfig.ID, "error", err)
-			continue
-		}
-		configChanged, err := am.ApplyConfig(ctx, preparedCfg)
-		if err != nil {
+		if err := moa.applyConfig(ctx, am, dbConfig); err != nil {
 			moa.logger.Error("Failed to apply Alertmanager config for org", "org", orgID, "id", dbConfig.ID, "error", err)
 			continue
-		}
-		if configChanged {
-			if err = moa.configStore.MarkConfigurationAsApplied(ctx, &models.MarkConfigurationAsAppliedCmd{
-				OrgID:             orgID,
-				ConfigurationHash: dbConfig.ConfigurationHash,
-			}); err != nil {
-				moa.logger.Error("Failed to mark Alertmanager configuration as applied", "org", orgID, "hash", dbConfig.ConfigurationHash, "error", err)
-			}
 		}
 
 		moa.alertmanagers[orgID] = am
