@@ -95,7 +95,8 @@ export const SidebarCard = ({
         aria-pressed={isSelected}
       >
         <div className={cx(styles.cardContent, { [styles.hidden]: item.isHidden })}>{children}</div>
-        {/** Alerts don't have actions and cannot be hidden so we don't need to show the hidden icon or hover actions. hasActions is basically indicating if this is an alert card or a query/transformation card. */}
+        {/** Alerts don't have actions and cannot be hidden so we don't need to show the hidden icon or hover actions. */}
+        {/** hasActions is indicating if this is an alert card or a query/transformation card. */}
         {hasActions && (
           <div>
             {item.isHidden && <Icon name="eye-slash" size="sm" color="primary" className={styles.hiddenIcon} />}
