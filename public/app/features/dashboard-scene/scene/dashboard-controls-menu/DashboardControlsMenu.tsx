@@ -6,7 +6,9 @@ import { SceneDataLayerProvider, SceneVariable } from '@grafana/scenes';
 import { DashboardLink } from '@grafana/schema';
 import { Box, Menu, useStyles2 } from '@grafana/ui';
 
+import { openLinkEditPane } from '../../settings/links/LinkAddEditableElement';
 import { DashboardLinkRenderer } from '../DashboardLinkRenderer';
+import { DashboardScene } from '../DashboardScene';
 import { DataLayerControl } from '../DataLayerControl';
 import { VariableValueSelectWrapper } from '../VariableControls';
 
@@ -16,6 +18,7 @@ interface DashboardControlsMenuProps {
   annotations: SceneDataLayerProvider[];
   dashboardUID?: string;
   isEditing?: boolean;
+  dashboard?: DashboardScene;
 }
 
 export function DashboardControlsMenu({
@@ -24,8 +27,11 @@ export function DashboardControlsMenu({
   annotations,
   dashboardUID,
   isEditing,
+  dashboard,
 }: DashboardControlsMenuProps) {
   const isEditingNewLayouts = isEditing && config.featureToggles.dashboardNewLayouts;
+  const fullLinks = dashboard?.state.links ?? [];
+
   return (
     <Box
       minWidth={32}
@@ -63,11 +69,23 @@ export function DashboardControlsMenu({
       {links.length > 0 && dashboardUID && (
         <>
           {(variables.length > 0 || annotations.length > 0) && <MenuDivider />}
-          {links.map((link, index) => (
-            <div key={`${link.title}-${index}`}>
-              <DashboardLinkRenderer link={link} dashboardUID={dashboardUID} inMenu />
-            </div>
-          ))}
+          {links.map((link, index) => {
+            const linkIndex = fullLinks.indexOf(link);
+            return (
+              <div key={`${link.title}-${index}`}>
+                <DashboardLinkRenderer
+                  link={link}
+                  dashboardUID={dashboardUID}
+                  inMenu
+                  onEditClick={
+                    isEditingNewLayouts && dashboard && linkIndex >= 0
+                      ? () => openLinkEditPane(dashboard, linkIndex)
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          })}
         </>
       )}
     </Box>

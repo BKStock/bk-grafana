@@ -2,7 +2,7 @@ import { css } from '@emotion/css';
 import * as React from 'react';
 
 import { SelectableValue } from '@grafana/data';
-import { Trans, t } from '@grafana/i18n';
+import { t } from '@grafana/i18n';
 import { DashboardLink } from '@grafana/schema';
 import { CollapsableSection, TagsInput, Select, Field, Input, Checkbox, Button, Stack, useStyles2 } from '@grafana/ui';
 
@@ -14,9 +14,11 @@ interface DashboardLinkFormProps {
   link: DashboardLink;
   onUpdate: (link: DashboardLink) => void;
   onGoBack: () => void;
+  /** When set, shows "Add link" (primary) and "Cancel" instead of "Back to list" (e.g. for inline add from side pane) */
+  onAdd?: () => void;
 }
 
-export function DashboardLinkForm({ link, onUpdate, onGoBack }: DashboardLinkFormProps) {
+export function DashboardLinkForm({ link, onUpdate, onGoBack, onAdd }: DashboardLinkFormProps) {
   const styles = useStyles2(getStyles);
   const linkTypeOptions = [
     {
@@ -175,9 +177,16 @@ export function DashboardLinkForm({ link, onUpdate, onGoBack }: DashboardLinkFor
           </Stack>
         </CollapsableSection>
 
-        <div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onAdd && (
+            <Button variant="primary" onClick={onAdd}>
+              {t('dashboard-scene.dashboard-link-form.add-link', 'Add link')}
+            </Button>
+          )}
           <Button variant="secondary" onClick={onGoBack}>
-            <Trans i18nKey="dashboard-scene.dashboard-link-form.back-to-list">Back to list</Trans>
+            {onAdd
+              ? t('dashboard-scene.dashboard-link-form.cancel', 'Cancel')
+              : t('dashboard-scene.dashboard-link-form.back-to-list', 'Back to list')}
           </Button>
         </div>
       </Stack>

@@ -5,6 +5,8 @@ import { sceneGraph } from '@grafana/scenes';
 import { DashboardLink } from '@grafana/schema';
 import { useStyles2 } from '@grafana/ui';
 
+import { openLinkEditPane } from '../settings/links/LinkAddEditableElement';
+
 import { DashboardLinkRenderer } from './DashboardLinkRenderer';
 import { DashboardScene } from './DashboardScene';
 
@@ -15,7 +17,7 @@ export interface Props {
 
 export function DashboardLinksControls({ links, dashboard }: Props) {
   sceneGraph.getTimeRange(dashboard).useState();
-  const uid = dashboard.state.uid;
+  const { uid, isEditing } = dashboard.useState();
   const styles = useStyles2(getStyles);
   const linksToDisplay = excludeControlMenuLinks(links);
 
@@ -25,9 +27,17 @@ export function DashboardLinksControls({ links, dashboard }: Props) {
 
   return (
     <div className={styles.linksContainer}>
-      {linksToDisplay.map((link: DashboardLink, index: number) => (
-        <DashboardLinkRenderer link={link} dashboardUID={uid} key={`${link.title}-$${index}`} />
-      ))}
+      {linksToDisplay.map((link: DashboardLink, index: number) => {
+        const linkIndex = links.indexOf(link);
+        return (
+          <DashboardLinkRenderer
+            link={link}
+            dashboardUID={uid}
+            key={`${link.title}-$${index}`}
+            onEditClick={isEditing && linkIndex >= 0 ? () => openLinkEditPane(dashboard, linkIndex) : undefined}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -45,10 +55,13 @@ function getStyles(theme: GrafanaTheme2) {
     linksContainer: css({
       label: 'dashboard-links-controls',
       display: 'inline-flex',
+      alignItems: 'center',
       gap: theme.spacing(1),
       marginRight: theme.spacing(1),
       marginBottom: theme.spacing(1),
       flexWrap: 'wrap',
+      // Match variable/annotation alignment in the controls row
+      alignSelf: 'flex-start',
     }),
   };
 }

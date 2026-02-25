@@ -6394,6 +6394,10 @@
     "add-variable": {
       "label-variable": "Variable"
     },
+    "add-link": {
+      "label-link": "Link",
+      "tooltip": "Add link to another dashboard or external site"
+    },
     "annotation-control": {
       "description-add-event-data-to-graphs": "Add event data to graphs",
       "label-annotation-query": "Annotation query"
@@ -6508,7 +6512,9 @@
       "title-feedback-dashboard-editing-experience": "Give feedback on the new dashboard editing experience"
     },
     "dashboard-link-form": {
+      "add-link": "Add link",
       "back-to-list": "Back to list",
+      "cancel": "Cancel",
       "label-icon": "Icon",
       "label-include-current-template-variable-values": "Include current template variable values",
       "label-include-current-time-range": "Include current time range",
