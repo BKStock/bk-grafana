@@ -162,12 +162,13 @@ describe('ShareExportTab', () => {
   });
 
   describe('V2Resource export mode', () => {
-    it('should default to V2Resource for V2 dashboards', async () => {
+    it('should default to V2Resource export format', async () => {
       const tab = buildV2DashboardScenario();
+
+      expect(tab.state.exportFormat).toBe(ExportFormat.V2Resource);
 
       const result = await tab.getExportableDashboardJson();
 
-      expect(tab.state.exportFormat).toBe(ExportFormat.V2Resource);
       expect(result.json).toMatchObject({
         apiVersion: 'dashboard.grafana.app/v2beta1',
         kind: 'Dashboard',
@@ -176,20 +177,14 @@ describe('ShareExportTab', () => {
       expect(result.json).not.toHaveProperty('access');
     });
 
-    it('should fetch V2 resource from API with correct metadata', async () => {
+    it('should fetch Classic when user switches to Classic mode', async () => {
       const tab = buildV2DashboardScenario();
-      tab.setState({ exportFormat: ExportFormat.V2Resource });
+      tab.setState({ exportFormat: ExportFormat.Classic });
 
       const result = await tab.getExportableDashboardJson();
 
-      expect(result.json).toMatchObject({
-        apiVersion: 'dashboard.grafana.app/v2beta1',
-        kind: 'Dashboard',
-        metadata: expect.objectContaining({ name: 'test-uid-v2' }),
-        spec: expect.objectContaining({ title: 'Test Dashboard V2' }),
-      });
-      expect(result.json).not.toHaveProperty('status');
-      expect(result.json).not.toHaveProperty('access');
+      expect(dashboardApiModule.getDashboardAPI).toHaveBeenCalledWith('v1');
+      expect(result.json).toMatchObject({ title: 'Test Dashboard V1', uid: 'test-uid-v1' });
       expect(result.initialSaveModelVersion).toBe('v2');
     });
 

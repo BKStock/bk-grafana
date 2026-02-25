@@ -49,6 +49,7 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       ...state,
       isSharingExternally: false,
       isViewingJSON: false,
+      exportFormat: ExportFormat.V2Resource,
     });
   }
 
@@ -126,14 +127,7 @@ export class ShareExportTab extends SceneObjectBase<ShareExportTabState> impleme
       };
     }
 
-    const effectiveFormat =
-      exportFormat ?? (initialSaveModelVersion === 'v2' ? ExportFormat.V2Resource : ExportFormat.Classic);
-
-    if (exportFormat === undefined) {
-      this.setState({ exportFormat: effectiveFormat });
-    }
-
-    if (effectiveFormat === ExportFormat.V2Resource) {
+    if (exportFormat === ExportFormat.V2Resource) {
       return this.fetchV2Resource(uid, isSharingExternally, initialSaveModelVersion);
     }
 
@@ -308,8 +302,7 @@ function ShareExportTabRenderer({ model }: SceneComponentProps<ShareExportTab>) 
   const { isSharingExternally, isViewingJSON, modalRef, exportFormat, isViewingYAML } = model.useState();
 
   const dashboardJson = useAsync(async () => {
-    const json = await model.getExportableDashboardJson();
-    return json;
+    return model.getExportableDashboardJson();
   }, [isViewingJSON, isSharingExternally, exportFormat]);
 
   const stringifiedDashboardJson = JSON.stringify(dashboardJson.value?.json, null, 2);
