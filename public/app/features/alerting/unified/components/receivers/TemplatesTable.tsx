@@ -142,6 +142,16 @@ function TemplateRow({ notificationTemplate, idx, alertManagerName, onDeleteClic
         </td>
         <td>
           {name} {isProvisioned && <ProvisioningBadge tooltip provenance={provenance} />}{' '}
+          {notificationTemplate.kind === 'mimir' && (
+            <Badge
+              text={t('alerting.templates.legacy-badge-text', 'Legacy')}
+              color="orange"
+              tooltip={t(
+                'alerting.templates.legacy-badge-tooltip',
+                'This template was imported from a Mimir Alertmanager and uses a legacy format.'
+              )}
+            />
+          )}{' '}
           {missing && !isGrafanaAlertmanager && (
             <Tooltip
               content={

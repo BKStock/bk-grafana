@@ -129,6 +129,7 @@ export const TemplateForm = ({ originalTemplate, prefill, alertmanager }: Props)
   const { provenance } = useNotificationTemplateMetadata(originalTemplate);
   const isProvisioned = isProvisionedResource(provenance);
   const isImported = provenance === KnownProvenance.ConvertedPrometheus;
+  const isLegacy = originalTemplate?.kind === 'mimir';
   const originalTemplatePrefill: TemplateFormValues | undefined = originalTemplate
     ? { title: originalTemplate.title, content: originalTemplate.content }
     : undefined;
@@ -222,6 +223,18 @@ export const TemplateForm = ({ originalTemplate, prefill, alertmanager }: Props)
           {isProvisioned && !isImported && (
             <Box grow={0}>
               <ProvisioningAlert resource={ProvisionedResource.Template} />
+            </Box>
+          )}
+          {isLegacy && (
+            <Box grow={0}>
+              <Alert
+                title={t('alerting.template-form.title-legacy', 'This template uses a legacy format')}
+                severity="warning"
+              >
+                <Trans i18nKey="alerting.template-form.body-legacy">
+                  This template was imported from a Mimir Alertmanager and uses a legacy format.
+                </Trans>
+              </Alert>
             </Box>
           )}
 
