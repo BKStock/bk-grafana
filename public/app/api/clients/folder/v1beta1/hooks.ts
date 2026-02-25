@@ -1,5 +1,5 @@
 import { QueryStatus, skipToken } from '@reduxjs/toolkit/query';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { AppEvents } from '@grafana/data';
 import { t } from '@grafana/i18n';
@@ -372,67 +372,71 @@ export function useCreateFolder() {
   const legacyHook = useLegacyNewFolderMutation();
   const refresh = useRefreshFolders();
 
+  const createFolderAppPlatform = useCallback(
+    async (
+      payload: NewFolder & {
+        /**
+         * UIDs of teams to add as owner references to the new folder
+         */
+        teamOwnerReferences?: Array<{ uid: string; name: string }>;
+      }
+    ) => {
+      const { teamOwnerReferences: teamOwnerReferenceUids, ...folder } = payload;
+
+      /**
+       * Additional metadata to use for the folder
+       *
+       * If team details are included, add them as owner references to the folder
+       */
+      const partialMetadata: ObjectMeta =
+        teamOwnerReferenceUids && teamOwnerReferenceUids.length > 0
+          ? {
+              ownerReferences: [
+                ...teamOwnerReferenceUids.map(({ uid, name }) => ({
+                  apiVersion: `${IAM_API_GROUP}/${IAM_API_VERSION}`,
+                  kind: 'Team',
+                  name,
+                  uid,
+                  controller: true,
+                  blockOwnerDeletion: false,
+                })),
+              ],
+            }
+          : {};
+
+      const apiPayload: CreateFolderApiArg = {
+        folder: {
+          spec: {
+            title: folder.title,
+          },
+          metadata: {
+            ...partialMetadata,
+            generateName: 'f',
+            annotations: {
+              ...(folder.parentUid && { [AnnoKeyFolder]: folder.parentUid }),
+            },
+          },
+        },
+      };
+
+      const result = await createFolder(apiPayload);
+      refresh({ childrenOf: folder.parentUid });
+      deletedDashboardsCache.clear();
+
+      return {
+        ...result,
+        data: result.data ? appPlatformFolderToLegacyFolder(result.data) : undefined,
+      };
+    },
+    [createFolder, refresh]
+  );
+
+  const appPlatformHook = useMemo(() => [createFolderAppPlatform, result] as const, [createFolderAppPlatform, result]);
+
   if (!config.featureToggles.foldersAppPlatformAPI) {
     return legacyHook;
   }
-
-  const createFolderAppPlatform = async (
-    payload: NewFolder & {
-      /**
-       * UIDs of teams to add as owner references to the new folder
-       */
-      teamOwnerReferences?: Array<{ uid: string; name: string }>;
-    }
-  ) => {
-    const { teamOwnerReferences: teamOwnerReferenceUids, ...folder } = payload;
-
-    /**
-     * Additional metadata to use for the folder
-     *
-     * If team details are included, add them as owner references to the folder
-     */
-    const partialMetadata: ObjectMeta =
-      teamOwnerReferenceUids && teamOwnerReferenceUids.length > 0
-        ? {
-            ownerReferences: [
-              ...teamOwnerReferenceUids.map(({ uid, name }) => ({
-                apiVersion: `${IAM_API_GROUP}/${IAM_API_VERSION}`,
-                kind: 'Team',
-                name,
-                uid,
-                controller: true,
-                blockOwnerDeletion: false,
-              })),
-            ],
-          }
-        : {};
-
-    const apiPayload: CreateFolderApiArg = {
-      folder: {
-        spec: {
-          title: folder.title,
-        },
-        metadata: {
-          ...partialMetadata,
-          generateName: 'f',
-          annotations: {
-            ...(folder.parentUid && { [AnnoKeyFolder]: folder.parentUid }),
-          },
-        },
-      },
-    };
-
-    const result = await createFolder(apiPayload);
-    refresh({ childrenOf: folder.parentUid });
-    deletedDashboardsCache.clear();
-
-    return {
-      ...result,
-      data: result.data ? appPlatformFolderToLegacyFolder(result.data) : undefined,
-    };
-  };
-
-  return [createFolderAppPlatform, result] as const;
+  return appPlatformHook;
 }
 
 export function useUpdateFolder() {
@@ -504,20 +508,23 @@ export function useMoveFolderMutationFacade() {
 function useRefreshFolders() {
   const dispatch = useDispatch();
 
-  return (options: { parentsOf?: string[]; childrenOf?: string }) => {
-    if (options.parentsOf) {
-      dispatch(refreshParents(options.parentsOf));
-    }
-    // Refetch children even if we passed in `childrenOf: undefined`, as this corresponds to the root folder
-    if (options.childrenOf || 'childrenOf' in options) {
-      dispatch(
-        refetchChildren({
-          parentUID: options.childrenOf,
-          pageSize: PAGE_SIZE,
-        })
-      );
-    }
-  };
+  return useCallback(
+    (options: { parentsOf?: string[]; childrenOf?: string }) => {
+      if (options.parentsOf) {
+        dispatch(refreshParents(options.parentsOf));
+      }
+      // Refetch children even if we passed in `childrenOf: undefined`, as this corresponds to the root folder
+      if (options.childrenOf || 'childrenOf' in options) {
+        dispatch(
+          refetchChildren({
+            parentUID: options.childrenOf,
+            pageSize: PAGE_SIZE,
+          })
+        );
+      }
+    },
+    [dispatch]
+  );
 }
 
 export function useGetAffectedItems({ folder, dashboard }: Pick<DashboardTreeSelection, 'folder' | 'dashboard'>) {
