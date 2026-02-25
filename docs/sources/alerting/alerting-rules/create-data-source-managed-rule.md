@@ -145,7 +145,7 @@ Users will no longer be able to create alert rules in Mimir and Loki, and Cloud 
 
 Cloud users can import DMA rules into GMA rules with the import tool. See the [import data source-managed alerts to Grafana-managed alerts documentation](https://grafana.com/docs/grafana/latest/alerting/alerting-rules/alerting-migration/) for information on how to do this.
 
-Customers migrating from OSS or Enterprise to Grafana Cloud and require Datasource Alerts must open a [support ticket](https://grafana.com/contact) to request Datasource Alerts be re-enabled on their stack.
+Customers migrating from OSS or Enterprise to Grafana Cloud and require data source-managed alerts must open a [support ticket](https://grafana.com/contact) to request data source-managed alerts be re-enabled on their stack.
 {{< /admonition >}}
 
 # Configure data source-managed alert rules
