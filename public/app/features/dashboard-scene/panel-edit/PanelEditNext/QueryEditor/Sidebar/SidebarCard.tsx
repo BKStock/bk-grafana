@@ -154,6 +154,7 @@ function getStyles(
     paddingRight: theme.spacing(1),
     // increasing the left padding lets the gradient become transparent before the first button rather than behind the first button
     paddingLeft: theme.spacing(3),
+    borderRadius: `0 ${theme.shape.radius.default} ${theme.shape.radius.default} 0`,
     background: `linear-gradient(270deg, ${backgroundColor} 80%, rgba(32, 38, 47, 0.00) 100%)`,
     opacity: 0,
     transform: 'translateX(8px)',
@@ -225,7 +226,8 @@ function getStyles(
       borderRadius: theme.shape.radius.default,
       overflow: 'hidden',
 
-      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${theme.colors.border.weak} 75%, transparent)`}`,
+      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${item.isError ? `${QUERY_EDITOR_COLORS.error} 50%` : `${theme.colors.border.weak} 75%`}, transparent)`}`,
+      boxShadow: isSelected ? `0 0 4px 0 color-mix(in srgb, ${borderColor} 40%, transparent)` : 'none',
 
       '&::before': {
         content: '""',
@@ -245,7 +247,7 @@ function getStyles(
 
       // This transitions the background color of the card when it is hovered or selected.
       [theme.transitions.handleMotion('no-preference', 'reduce')]: {
-        transition: theme.transitions.create(['background-color'], {
+        transition: theme.transitions.create(['background-color', 'box-shadow'], {
           duration: theme.transitions.duration.standard,
         }),
       },
@@ -270,7 +272,7 @@ function getStyles(
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing(1),
-      padding: theme.spacing(0.5, 1),
+      padding: theme.spacing(0.5, 1, 0.5, 1.25),
       overflow: 'hidden',
       minWidth: 0,
       flex: 1,
