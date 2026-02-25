@@ -91,7 +91,13 @@ export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, 
       : 0;
     const iconSize = longestLabelIndex > -1 && items[longestLabelIndex].icon ? ICON_WIDTH : 0;
 
-    return Math.max(labelWidth, descriptionWidth) + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth + iconSize;
+    return (
+      Math.max(labelWidth, descriptionWidth) +
+      SCROLL_CONTAINER_PADDING +
+      MENU_ITEM_PADDING * 2 +
+      scrollbarWidth +
+      iconSize
+    );
   }, [items, scrollbarWidth]);
 
   const floatStyles = {
