@@ -915,6 +915,29 @@ func Test_isDefaultConfiguration(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "default config with ManagedInhibitionRules and FF disabled",
+			config: func() *apimodels.PostableUserConfig {
+				c := mustLoad(defaultGrafanaConfig)
+				c.ManagedInhibitionRules = map[string]*apimodels.InhibitionRule{
+					"imported": {Name: "imported"},
+				}
+				return c
+			}(),
+			expected: true,
+		},
+		{
+			name: "default config with ManagedInhibitionRules and FF enabled",
+			config: func() *apimodels.PostableUserConfig {
+				c := mustLoad(defaultGrafanaConfig)
+				c.ManagedInhibitionRules = map[string]*apimodels.InhibitionRule{
+					"imported": {Name: "imported"},
+				}
+				return c
+			}(),
+			features: featuremgmt.WithFeatures(featuremgmt.FlagAlertingMultiplePolicies),
+			expected: false,
+		},
+		{
 			name:   "default config with rule notification settings",
 			config: mustLoad(defaultGrafanaConfig),
 			notificationSettings: map[int64]map[ngmodels.AlertRuleKey]ngmodels.ContactPointRouting{

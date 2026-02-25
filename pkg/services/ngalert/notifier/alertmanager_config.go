@@ -84,21 +84,37 @@ func (moa *MultiOrgAlertmanager) prepareApplyConfig(ctx context.Context, orgID i
 	}
 	preparedConfig := mergeResult.Config
 
-	// Add extra route as managed route to the configuration.
+	// Add managed routes and extra route as managed route to the configuration.
+	// Also add extra inhibition rules to the configuration if extra route exists and doesn't conflict with existing
+	// route
 	//nolint:staticcheck // not yet migrated to OpenFeature
 	if moa.featureManager.IsEnabledGlobally(featuremgmt.FlagAlertingMultiplePolicies) {
-		managed := maps.Clone(prepared.ManagedRoutes)
-		if managed == nil {
-			managed = make(map[string]*definitions.Route)
+		managedRoutes := maps.Clone(prepared.ManagedRoutes)
+		if managedRoutes == nil {
+			managedRoutes = make(map[string]*definitions.Route)
 		}
+
+		managedInhibitionRules := maps.Clone(prepared.ManagedInhibitionRules)
+		if managedInhibitionRules == nil {
+			managedInhibitionRules = make(definitions.ManagedInhibitionRules)
+		}
+
 		if mergeResult.ExtraRoute != nil {
-			if _, ok := managed[mergeResult.Identifier]; ok {
+			if _, ok := managedRoutes[mergeResult.Identifier]; ok {
 				moa.logger.Warn("Imported configuration name conflicts with existing managed routes, skipping adding imported config.", "identifier", mergeResult.Identifier)
 			} else {
-				managed[mergeResult.Identifier] = mergeResult.ExtraRoute
+				managedRoutes[mergeResult.Identifier] = mergeResult.ExtraRoute
+
+				importedRules, err := legacy_storage.BuildManagedInhibitionRules(mergeResult.Identifier, mergeResult.ExtraInhibitRules)
+				if err != nil {
+					moa.logger.Warn("failed to build managed inhibition rules for imported configuration", "identifier", mergeResult.Identifier, "err", err)
+				} else {
+					maps.Copy(managedInhibitionRules, importedRules)
+				}
 			}
 		}
-		preparedConfig.Route = legacy_storage.WithManagedRoutes(preparedConfig.Route, managed)
+		preparedConfig.Route = legacy_storage.WithManagedRoutes(preparedConfig.Route, managedRoutes)
+		preparedConfig.InhibitRules = legacy_storage.WithManagedInhibitionRules(preparedConfig.InhibitRules, managedInhibitionRules)
 	}
 
 	if err := AddAutogenConfig(ctx, moa.logger, moa.configStore, orgID, &preparedConfig, onInvalid, moa.featureManager); err != nil {

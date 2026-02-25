@@ -22,5 +22,6 @@ func (am *alertmanager) GetStatus(_ context.Context) (apimodels.GettableStatus, 
 		return apimodels.GettableStatus{}, fmt.Errorf("unable to unmarshal alertmanager config: %w", err)
 	}
 
-	return *apimodels.NewGettableStatus(new(NotificationsConfigurationToPostableAPIConfig(config))), nil
+	amConfig := NotificationsConfigurationToPostableAPIConfig(config)
+	return *apimodels.NewGettableStatus(&amConfig), nil
 }
