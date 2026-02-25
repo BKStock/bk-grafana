@@ -107,7 +107,6 @@ type mysqlTableRenamer struct {
 	log          log.Logger
 	sess         *xorm.Session
 	mg           *migrator.Migrator
-	unlockTables func(context.Context) error
 	waitDeadline time.Duration // 0 means 1 minute
 }
 

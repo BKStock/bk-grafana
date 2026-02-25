@@ -33,17 +33,6 @@ func newTestEnv(t *testing.T) testEnv {
 	return testEnv{engine: dbstore.GetEngine(), store: dbstore}
 }
 
-func currentDriver() string {
-	switch {
-	case db.IsTestDbMySQL():
-		return migrator.MySQL
-	case db.IsTestDbPostgres():
-		return migrator.Postgres
-	default:
-		return migrator.SQLite
-	}
-}
-
 func uniqueTable(t *testing.T, engine *xorm.Engine) string {
 	t.Helper()
 	name := fmt.Sprintf("test_%s", uuid.New().String()[:8])
@@ -132,7 +121,8 @@ func TestIntegrationRun_Postgres_LocksOnSession(t *testing.T) {
 	}
 
 	table := uniqueTable(t, env.engine)
-	runner, _ := newRunner(t, &postgresTableLocker{}, &transactionalTableRenamer{log: logger}, testDef(dummyGR(), []string{table}, nil))
+	sqlProvider := legacysql.NewDatabaseProvider(env.store)
+	runner, _ := newRunner(t, &postgresTableLocker{sql: sqlProvider}, &transactionalTableRenamer{log: logger}, testDef(dummyGR(), []string{table}, nil))
 	runMigration(t, env.engine, runner, migrator.Postgres)
 }
 
