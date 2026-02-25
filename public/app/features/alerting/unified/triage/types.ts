@@ -5,6 +5,11 @@ export type WorkbenchRow = GenericGroupedRow | AlertRuleRow;
 
 export type TimelineEntry = [timestamp: number, state: 'firing' | 'pending'];
 
+export interface InstanceCounts {
+  firing: number;
+  pending: number;
+}
+
 export interface AlertRuleRow {
   type: 'alertRule';
   metadata: {
@@ -12,13 +17,18 @@ export interface AlertRuleRow {
     folder: string;
     ruleUID: string;
   };
+  instanceCounts: InstanceCounts;
 }
 
 export interface GenericGroupedRow {
   type: 'group';
   metadata: {
     label: string;
-    value: string;
+    value: LabelValue;
   };
   rows: WorkbenchRow[];
+  instanceCounts: InstanceCounts;
 }
+
+export type LabelValue = string | typeof EmptyLabelValue;
+export const EmptyLabelValue = Symbol('empty label value');

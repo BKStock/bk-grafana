@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/grafana/grafana/pkg/infra/tracing"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,8 +34,6 @@ var _ builder.APIGroupBuilder = (*APIBuilder)(nil)
 var _ builder.APIGroupRouteProvider = (*APIBuilder)(nil)
 var _ builder.APIGroupVersionProvider = (*APIBuilder)(nil)
 
-var tracer = otel.Tracer("github.com/grafana/grafana/pkg/registry/apis/ofrep")
-
 const ofrepPath = "/ofrep/v1/evaluate/flags"
 
 const namespaceMismatchMsg = "rejecting request with namespace mismatch"
@@ -47,7 +44,7 @@ var groupVersion = schema.GroupVersion{
 }
 
 type APIBuilder struct {
-	providerType    string
+	providerType    setting.OpenFeatureProviderType
 	url             *url.URL
 	insecure        bool
 	caFile          string
@@ -55,7 +52,7 @@ type APIBuilder struct {
 	logger          log.Logger
 }
 
-func NewAPIBuilder(providerType string, url *url.URL, insecure bool, caFile string, staticEvaluator featuremgmt.StaticFlagEvaluator) *APIBuilder {
+func NewAPIBuilder(providerType setting.OpenFeatureProviderType, url *url.URL, insecure bool, caFile string, staticEvaluator featuremgmt.StaticFlagEvaluator) *APIBuilder {
 	return &APIBuilder{
 		providerType:    providerType,
 		url:             url,
@@ -67,10 +64,6 @@ func NewAPIBuilder(providerType string, url *url.URL, insecure bool, caFile stri
 }
 
 func RegisterAPIService(apiregistration builder.APIRegistrar, cfg *setting.Cfg) (*APIBuilder, error) {
-	if !cfg.OpenFeature.APIEnabled {
-		return nil, nil
-	}
-
 	var staticEvaluator featuremgmt.StaticFlagEvaluator //  No static evaluator needed for non-static provider
 	var err error
 	if cfg.OpenFeature.ProviderType == setting.StaticProviderType {
@@ -246,19 +239,10 @@ func (b *APIBuilder) GetAPIRoutes(gv schema.GroupVersion) *builder.APIRoutes {
 }
 
 func (b *APIBuilder) oneFlagHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, span := tracer.Start(r.Context(), "ofrep.handler.evalFlag")
+	ctx, span := tracing.Start(r.Context(), "ofrep.handler.evalFlag")
 	defer span.End()
 
 	r = r.WithContext(ctx)
-
-	b.logger.Debug("validating namespace in oneFlagHandler handler")
-	if !b.validateNamespace(r) {
-		_ = tracing.Errorf(span, namespaceMismatchMsg)
-		span.SetAttributes(semconv.HTTPStatusCode(http.StatusUnauthorized))
-		b.logger.Error(namespaceMismatchMsg)
-		http.Error(w, namespaceMismatchMsg, http.StatusUnauthorized)
-		return
-	}
 
 	flagKey := mux.Vars(r)["flagKey"]
 	if flagKey == "" {
@@ -282,7 +266,17 @@ func (b *APIBuilder) oneFlagHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if b.providerType == setting.GOFFProviderType {
+	if b.providerType == setting.FeaturesServiceProviderType || b.providerType == setting.OFREPProviderType {
+		valid, ns := b.validateNamespace(r)
+		b.logger.Debug("validating namespace in oneFlagHandler handler", "namespace", ns, "valid", valid, "flag", flagKey)
+		if !valid {
+			_ = tracing.Errorf(span, namespaceMismatchMsg)
+			span.SetAttributes(semconv.HTTPStatusCode(http.StatusUnauthorized))
+			b.logger.Error(namespaceMismatchMsg)
+			http.Error(w, namespaceMismatchMsg, http.StatusUnauthorized)
+			return
+		}
+
 		b.proxyFlagReq(ctx, flagKey, isAuthedReq, w, r)
 		return
 	}
@@ -291,24 +285,26 @@ func (b *APIBuilder) oneFlagHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *APIBuilder) allFlagsHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, span := tracer.Start(r.Context(), "ofrep.handler.evalAllFlags")
+	ctx, span := tracing.Start(r.Context(), "ofrep.handler.evalAllFlags")
 	defer span.End()
 
 	r = r.WithContext(ctx)
 
-	b.logger.Debug("validating namespace in allFlagsHandler handler")
-	if !b.validateNamespace(r) {
-		_ = tracing.Errorf(span, namespaceMismatchMsg)
-		span.SetAttributes(semconv.HTTPStatusCode(http.StatusUnauthorized))
-		b.logger.Error(namespaceMismatchMsg)
-		http.Error(w, namespaceMismatchMsg, http.StatusUnauthorized)
-		return
-	}
-
 	isAuthedReq := b.isAuthenticatedRequest(r)
 	span.SetAttributes(attribute.Bool("authenticated", isAuthedReq))
 
-	if b.providerType == setting.GOFFProviderType {
+	if b.providerType == setting.FeaturesServiceProviderType || b.providerType == setting.OFREPProviderType {
+		valid, ns := b.validateNamespace(r)
+		b.logger.Debug("validating namespace in allFlagsHandler handler", "namespace", ns, "valid", valid)
+
+		if !valid {
+			_ = tracing.Errorf(span, namespaceMismatchMsg)
+			span.SetAttributes(semconv.HTTPStatusCode(http.StatusUnauthorized))
+			b.logger.Error(namespaceMismatchMsg)
+			http.Error(w, namespaceMismatchMsg, http.StatusUnauthorized)
+			return
+		}
+
 		b.proxyAllFlagReq(ctx, isAuthedReq, w, r)
 		return
 	}
@@ -327,8 +323,7 @@ func writeResponse(statusCode int, result any, logger log.Logger, w http.Respons
 
 func (b *APIBuilder) namespaceFromEvalCtx(body []byte) string {
 	// TODO: eval ctx should be added to span attributes, not log
-	// Adding it temporary for debugging
-	b.logger.Debug("evaluation context from request", "ctx", body)
+	b.logger.Debug("evaluation context from request", "ctx", string(body))
 
 	var evalCtx struct {
 		// Extract namespace from request body without consuming it
@@ -341,9 +336,6 @@ func (b *APIBuilder) namespaceFromEvalCtx(body []byte) string {
 		b.logger.Debug("Failed to unmarshal evaluation context", "error", err, "body", string(body))
 		return ""
 	}
-
-	// Adding it temporary for debugging
-	b.logger.Debug("evaluation context decoded", "namespace", evalCtx.Context.Namespace)
 
 	if evalCtx.Context.Namespace == "" {
 		b.logger.Debug("namespace missing from evaluation context", "namespace", evalCtx.Context.Namespace)
@@ -363,14 +355,14 @@ func (b *APIBuilder) isAuthenticatedRequest(r *http.Request) bool {
 }
 
 // validateNamespace checks if the namespace in the evaluation context matches the namespace in the request
-func (b *APIBuilder) validateNamespace(r *http.Request) bool {
-	_, span := tracer.Start(r.Context(), "ofrep.validateNamespace")
+func (b *APIBuilder) validateNamespace(r *http.Request) (bool, string) {
+	_, span := tracing.Start(r.Context(), "ofrep.validateNamespace")
 	defer span.End()
 
 	var namespace string
 	user, ok := types.AuthInfoFrom(r.Context())
 	if !ok {
-		return false
+		return false, ""
 	}
 
 	if user.GetNamespace() != "" {
@@ -385,19 +377,19 @@ func (b *APIBuilder) validateNamespace(r *http.Request) bool {
 		_ = tracing.Errorf(span, "failed to read request body: %w", err)
 		b.logger.Error("Error reading evaluation request body", "error", err)
 		span.SetAttributes(attribute.Bool("validation.success", false))
-		return false
+		return false, ""
 	}
 	r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	span.SetAttributes(attribute.String("request.body", string(body)))
 
 	evalCtxNamespace := b.namespaceFromEvalCtx(body)
-	// "default" namespace case can only occur in on-prem grafana
-	if (namespace == "default" && evalCtxNamespace == "") || (evalCtxNamespace == namespace) {
+	// Remote providers MUST include namespace in evaluation context
+	if evalCtxNamespace == namespace {
 		span.SetAttributes(attribute.Bool("validation.success", true))
-		return true
+		return true, evalCtxNamespace
 	}
 
 	span.SetAttributes(attribute.Bool("validation.success", false))
-	return false
+	return false, evalCtxNamespace
 }

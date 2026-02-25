@@ -39,7 +39,7 @@ func TestIntegrationDirectSQLStats(t *testing.T) {
 
 	dashStore, err := database.ProvideDashboardStore(db, cfg, featuremgmt.WithFeatures(), tagimpl.ProvideService(db))
 	require.NoError(t, err)
-	fStore := folderimpl.ProvideStore(db)
+	fStore := folderimpl.ProvideStore(db, cfg)
 	tempUser := &user.SignedInUser{UserID: 1, OrgID: 1, Permissions: map[int64]map[string][]string{}}
 
 	folder1UID := "test1"
@@ -79,8 +79,8 @@ func TestIntegrationDirectSQLStats(t *testing.T) {
 
 	ruleStore := ngalertstore.SetupStoreForTesting(t, db)
 	dashboardUID := "test"
-	_, err = ruleStore.InsertAlertRules(context.Background(), ngmodels.NewUserUID(tempUser), []ngmodels.AlertRule{
-		{
+	_, err = ruleStore.InsertAlertRules(context.Background(), ngmodels.NewUserUID(tempUser), []ngmodels.InsertRule{{
+		AlertRule: ngmodels.AlertRule{
 			DashboardUID: &dashboardUID,
 			UID:          "test",
 			Title:        "test",
@@ -102,7 +102,7 @@ func TestIntegrationDirectSQLStats(t *testing.T) {
 			ExecErrState:    ngmodels.ExecutionErrorState(ngmodels.Alerting),
 			NoDataState:     ngmodels.Alerting,
 			IntervalSeconds: 60,
-		}})
+		}}})
 	require.NoError(t, err)
 
 	_, err = dashStore.SaveDashboard(ctx, dashboards.SaveDashboardCommand{

@@ -85,9 +85,9 @@
         "tooltip-classic-query": "Prometheus 變數查詢編輯器的原始實作。輸入一個字串，其中包含如這些文件中所述正確的查詢類型和參數。例如：{{exampleQuery}}。",
         "tooltip-label": "除非有指定指標，否則會回傳所有指標中該標籤名稱的標籤值清單。",
         "tooltip-metric-regex": "回傳標籤名稱清單，選擇性地依據指定指標正規表達式篩選。",
-        "tooltip-query": "回傳此查詢的 Prometheus 查詢結果清單。這可能包括 Prometheus 功能，即{{exampleQuery}}。",
+        "tooltip-query": "回傳此查詢的 Prometheus 查詢結果清單。這可能包括 Prometheus 功能，即 {{exampleQuery}}。",
         "tooltip-query-type": "Prometheus 資料來源外掛程式為範本變數提供以下查詢類型。",
-        "tooltip-series-query": "輸入帶有標籤的指標、僅有指標或僅標籤，即 {{example1}}、{{example2}} 或 {{example3}}。回傳與輸入資料相關的時間序列清單。"
+        "tooltip-series-query": "輸入帶有標籤的指標、僅有指標或僅有標籤，即 {{example1}}、{{example2}} 或 {{example3}}。回傳與輸入資料相關的時間序列清單。"
       },
       "selector-actions": {
         "aria-label-selector": "選擇器",
@@ -413,11 +413,11 @@
         }
       },
       "prom-query-builder-options": {
-        "aria-label-exemplars": "",
-        "aria-label-format": "",
-        "aria-label-lower-limit-parameter": "",
+        "aria-label-exemplars": "範例切換。",
+        "aria-label-format": "格式化組合方塊",
+        "aria-label-lower-limit-parameter": "最小步驟文字方塊，設定步驟參數的下限",
         "aria-label-select-resolution": "選擇解決方案",
-        "aria-label-type": "",
+        "aria-label-type": "類型單選按鈕群組",
         "format-options": {
           "label-heatmap": "熱度圖",
           "label-table": "表格",
@@ -441,7 +441,7 @@
         "title-parsing-error-switch-builder": "剖析錯誤：要切換至編輯器模式嗎？"
       },
       "prom-query-legend-editor": {
-        "aria-label-legend": "",
+        "aria-label-legend": "圖例組合方塊",
         "label-legend": "圖例",
         "placeholder-select-legend-mode": "選擇圖例模式",
         "tooltip-legend": "序列名稱覆寫或範本。例如：{{templateExample}} 將替換為{{labelName}}的標籤值。"

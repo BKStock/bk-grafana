@@ -22,6 +22,7 @@ import (
 	dashboardsearch "github.com/grafana/grafana/pkg/services/dashboards/service/search"
 	"github.com/grafana/grafana/pkg/services/folder"
 	"github.com/grafana/grafana/pkg/services/user"
+	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
 	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 	"github.com/grafana/grafana/pkg/util"
@@ -34,17 +35,19 @@ type FolderUnifiedStoreImpl struct {
 	k8sclient   client.K8sHandler
 	userService user.Service
 	tracer      trace.Tracer
+	maxDepth    int
 }
 
 // sqlStore implements the store interface.
 var _ folder.Store = (*FolderUnifiedStoreImpl)(nil)
 
-func ProvideUnifiedStore(k8sHandler client.K8sHandler, userService user.Service, tracer trace.Tracer) *FolderUnifiedStoreImpl {
+func ProvideUnifiedStore(k8sHandler client.K8sHandler, userService user.Service, tracer trace.Tracer, cfg *setting.Cfg) *FolderUnifiedStoreImpl {
 	return &FolderUnifiedStoreImpl{
 		k8sclient:   k8sHandler,
 		log:         log.New("folder-store"),
 		userService: userService,
 		tracer:      tracer,
+		maxDepth:    cfg.MaxNestedFolderDepth,
 	}
 }
 
@@ -291,7 +294,7 @@ func (ss *FolderUnifiedStoreImpl) GetHeight(ctx context.Context, foldrUID string
 
 	height := -1
 	queue := []string{foldrUID}
-	for len(queue) > 0 && height <= folder.MaxNestedFolderDepth {
+	for len(queue) > 0 && height <= ss.maxDepth {
 		length := len(queue)
 		height++
 		for i := 0; i < length; i++ {
@@ -309,8 +312,8 @@ func (ss *FolderUnifiedStoreImpl) GetHeight(ctx context.Context, foldrUID string
 			}
 		}
 	}
-	if height > folder.MaxNestedFolderDepth {
-		ss.log.Warn("folder height exceeds the maximum allowed depth, You might have a circular reference", "uid", foldrUID, "orgId", orgID, "maxDepth", folder.MaxNestedFolderDepth)
+	if height > ss.maxDepth {
+		ss.log.Warn("folder height exceeds the maximum allowed depth, You might have a circular reference", "uid", foldrUID, "orgId", orgID, "maxDepth", ss.maxDepth)
 	}
 	return height, nil
 }
@@ -388,7 +391,9 @@ func (ss *FolderUnifiedStoreImpl) GetFolders(ctx context.Context, q folder.GetFo
 		}
 
 		if (q.WithFullpath || q.WithFullpathUIDs) && f.Fullpath == "" {
-			buildFolderFullPaths(f, relations, folderMap)
+			if err := buildFolderFullPaths(f, relations, folderMap); err != nil {
+				return nil, err
+			}
 		}
 
 		hits = append(hits, f)
@@ -437,7 +442,10 @@ func (ss *FolderUnifiedStoreImpl) GetDescendants(ctx context.Context, orgID int6
 	}
 
 	descendantsMap := map[string]*folder.Folder{}
-	getDescendants(nodes, tree, ancestor_uid, descendantsMap)
+	err = getDescendants(nodes, tree, ancestor_uid, descendantsMap, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	descendants := []*folder.Folder{}
 	for _, f := range descendantsMap {
@@ -447,11 +455,27 @@ func (ss *FolderUnifiedStoreImpl) GetDescendants(ctx context.Context, orgID int6
 	return descendants, nil
 }
 
-func getDescendants(nodes map[string]*folder.Folder, tree map[string]map[string]*folder.Folder, ancestor_uid string, descendantsMap map[string]*folder.Folder) {
-	for uid := range tree[ancestor_uid] {
-		descendantsMap[uid] = nodes[uid]
-		getDescendants(nodes, tree, uid, descendantsMap)
+func getDescendants(
+	nodes map[string]*folder.Folder,
+	tree map[string]map[string]*folder.Folder,
+	ancestorUID string,
+	descendantsMap map[string]*folder.Folder,
+	seen map[string]bool,
+) error {
+	if seen == nil {
+		seen = map[string]bool{}
 	}
+	if seen[ancestorUID] {
+		return folder.ErrCircularReference.Errorf("circular reference detected at folder uid: %s", ancestorUID)
+	}
+	seen[ancestorUID] = true
+	for uid := range tree[ancestorUID] {
+		descendantsMap[uid] = nodes[uid]
+		if err := getDescendants(nodes, tree, uid, descendantsMap, seen); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (ss *FolderUnifiedStoreImpl) CountFolderContent(ctx context.Context, orgID int64, ancestor_uid string) (folder.DescendantCounts, error) {
@@ -559,15 +583,20 @@ func computeFullPath(parents []*folder.Folder) (string, string) {
 	return strings.Join(fullpath, "/"), strings.Join(fullpathUIDs, "/")
 }
 
-func buildFolderFullPaths(f *folder.Folder, relations map[string]string, folderMap map[string]*folder.Folder) {
+func buildFolderFullPaths(f *folder.Folder, relations map[string]string, folderMap map[string]*folder.Folder) error {
 	titles := make([]string, 0)
 	uids := make([]string, 0)
 
 	titles = append(titles, f.Title)
 	uids = append(uids, f.UID)
 
+	seen := make(map[string]bool)
 	currentUID := f.UID
 	for currentUID != "" {
+		if seen[currentUID] {
+			return folder.ErrCircularReference.Errorf("circular reference detected for folder %s", currentUID)
+		}
+		seen[currentUID] = true
 		parentUID, exists := relations[currentUID]
 		if !exists {
 			break
@@ -588,6 +617,7 @@ func buildFolderFullPaths(f *folder.Folder, relations map[string]string, folderM
 
 	f.Fullpath = strings.Join(util.Reverse(titles), "/")
 	f.FullpathUIDs = strings.Join(util.Reverse(uids), "/")
+	return nil
 }
 
 func shouldSkipFolder(f *folder.Folder, filterUIDs map[string]struct{}) bool {

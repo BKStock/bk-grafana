@@ -1,10 +1,10 @@
 import { css } from '@emotion/css';
 import uFuzzy from '@leeoniya/ufuzzy';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import * as React from 'react';
 import { useMeasure } from 'react-use';
 
-import { DataFrame, GrafanaTheme2 } from '@grafana/data';
+import { DataFrame, GrafanaTheme2, escapeStringForRegex } from '@grafana/data';
 import { ThemeContext } from '@grafana/ui';
 
 import FlameGraph from './FlameGraph/FlameGraph';
@@ -117,6 +117,15 @@ const FlameGraphContainer = ({
   const [collapsedMap, setCollapsedMap] = useState(new CollapsedMap());
 
   const theme = useMemo(() => getTheme(), [getTheme]);
+
+  // Use refs to hold the latest callback values to prevent unnecessary re-renders
+  const onTableSymbolClickRef = useRef(onTableSymbolClick);
+  const onTableSortRef = useRef(onTableSort);
+
+  // Update refs when props change
+  onTableSymbolClickRef.current = onTableSymbolClick;
+  onTableSortRef.current = onTableSort;
+
   const dataContainer = useMemo((): FlameGraphDataContainer | undefined => {
     if (!data) {
       return;
@@ -189,16 +198,40 @@ const FlameGraphContainer = ({
 
   const onSymbolClick = useCallback(
     (symbol: string) => {
-      if (search === symbol) {
+      const anchored = `^${escapeStringForRegex(symbol)}$`;
+
+      if (search === anchored) {
         setSearch('');
       } else {
-        onTableSymbolClick?.(symbol);
-        setSearch(symbol);
+        onTableSymbolClickRef.current?.(symbol);
+        setSearch(anchored);
         resetFocus();
       }
     },
-    [setSearch, resetFocus, onTableSymbolClick, search]
+    [setSearch, resetFocus, search]
   );
+
+  // Memoize methods to prevent unnecessary re-renders of FlameGraphTopTableContainer
+  const onSearch = useCallback(
+    (str: string) => {
+      if (!str) {
+        setSearch('');
+        return;
+      }
+      setSearch(`^${escapeStringForRegex(str)}$`);
+    },
+    [setSearch]
+  );
+  const onSandwich = useCallback(
+    (label: string) => {
+      resetFocus();
+      setSandwichItem(label);
+    },
+    [resetFocus, setSandwichItem]
+  );
+  const onTableSortStable = useCallback((sort: string) => {
+    onTableSortRef.current?.(sort);
+  }, []);
 
   if (!dataContainer) {
     return null;
@@ -216,10 +249,7 @@ const FlameGraphContainer = ({
       focusedItemData={focusedItemData}
       textAlign={textAlign}
       sandwichItem={sandwichItem}
-      onSandwich={(label: string) => {
-        resetFocus();
-        setSandwichItem(label);
-      }}
+      onSandwich={onSandwich}
       onFocusPillClick={resetFocus}
       onSandwichPillClick={resetSandwich}
       colorScheme={colorScheme}
@@ -241,8 +271,8 @@ const FlameGraphContainer = ({
       matchedLabels={matchedLabels}
       sandwichItem={sandwichItem}
       onSandwich={setSandwichItem}
-      onSearch={setSearch}
-      onTableSort={onTableSort}
+      onSearch={onSearch}
+      onTableSort={onTableSortStable}
       colorScheme={colorScheme}
     />
   );

@@ -5,8 +5,9 @@ import { getPanelPlugin } from '@grafana/data/test';
 import { selectors } from '@grafana/e2e-selectors';
 import { setPluginImportUtils } from '@grafana/runtime';
 import { SceneVariableSet, VizPanel } from '@grafana/scenes';
-import { ElementSelectionContext } from '@grafana/ui';
+import { ElementSelectionContext, Sidebar, useSidebar } from '@grafana/ui';
 
+import { DashboardDataLayerSet } from '../scene/DashboardDataLayerSet';
 import { DashboardScene } from '../scene/DashboardScene';
 import { AutoGridItem } from '../scene/layout-auto-grid/AutoGridItem';
 import { AutoGridLayout } from '../scene/layout-auto-grid/AutoGridLayout';
@@ -33,6 +34,7 @@ setPluginImportUtils({
 const testScene = new DashboardScene({
   title: 'Test Dashboard',
   $variables: new SceneVariableSet({ variables: [] }),
+  $data: new DashboardDataLayerSet({ annotationLayers: [] }),
   body: new RowsLayoutManager({
     rows: [
       new RowItem({
@@ -86,6 +88,12 @@ function buildTestScene() {
   return testScene;
 }
 
+function WrapSidebar({ children }: { children: React.ReactElement }) {
+  const sidebarContext = useSidebar({});
+
+  return <Sidebar contextValue={sidebarContext}>{children}</Sidebar>;
+}
+
 describe('DashboardOutline', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -101,13 +109,15 @@ describe('DashboardOutline', () => {
 
       render(
         <ElementSelectionContext.Provider value={scene.state.editPane.state.selectionContext}>
-          <DashboardOutline editPane={scene.state.editPane} />
+          <WrapSidebar>
+            <DashboardOutline editPane={scene.state.editPane} isEditing={true} />
+          </WrapSidebar>
         </ElementSelectionContext.Provider>
       );
-      // select Row lvl 1
+      // select Row lvl 1 (index 2 because Annotations section is at index 1)
       await user.click(screen.getByTestId(selectors.components.PanelEditor.Outline.item('Row level 1')));
       expect(DashboardInteractions.outlineItemClicked).toHaveBeenNthCalledWith(1, {
-        index: 1,
+        index: 2,
         depth: 1,
       });
       // click on caret to expand Row lvl 1

@@ -13,10 +13,11 @@ import (
 	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/ring"
 	ringclient "github.com/grafana/dskit/ring/client"
+	"github.com/grafana/dskit/services"
+	"github.com/grafana/grafana/pkg/storage/unified"
+	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
-
-	"github.com/grafana/dskit/services"
 
 	"github.com/grafana/grafana/pkg/api"
 	"github.com/grafana/grafana/pkg/infra/log"
@@ -26,10 +27,13 @@ import (
 	"github.com/grafana/grafana/pkg/services/authz"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/frontend"
+	"github.com/grafana/grafana/pkg/services/grpcserver"
+	"github.com/grafana/grafana/pkg/services/hooks"
 	"github.com/grafana/grafana/pkg/services/licensing"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
 	"github.com/grafana/grafana/pkg/storage/unified/sql"
+	"go.opentelemetry.io/otel"
 )
 
 // NewModule returns an instance of a ModuleServer, responsible for managing
@@ -46,8 +50,9 @@ func NewModule(opts Options,
 	license licensing.Licensing,
 	moduleRegisterer ModuleRegisterer,
 	storageBackend resource.StorageBackend, // Ensures unified storage backend is initialized
+	hooksService *hooks.HooksService,
 ) (*ModuleServer, error) {
-	s, err := newModuleServer(opts, apiOpts, features, cfg, storageMetrics, indexMetrics, reg, promGatherer, license, moduleRegisterer, storageBackend)
+	s, err := newModuleServer(opts, apiOpts, features, cfg, storageMetrics, indexMetrics, reg, promGatherer, license, moduleRegisterer, storageBackend, hooksService)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +75,15 @@ func newModuleServer(opts Options,
 	license licensing.Licensing,
 	moduleRegisterer ModuleRegisterer,
 	storageBackend resource.StorageBackend,
+	hooksService *hooks.HooksService,
 ) (*ModuleServer, error) {
 	rootCtx, shutdownFn := context.WithCancel(context.Background())
+
+	searchClient, err := unified.NewStorageApiSearchClient(cfg, features)
+	if err != nil {
+		shutdownFn()
+		return nil, fmt.Errorf("failed to create storage api search client: %w", err)
+	}
 
 	s := &ModuleServer{
 		opts:             opts,
@@ -93,6 +105,9 @@ func newModuleServer(opts Options,
 		license:          license,
 		moduleRegisterer: moduleRegisterer,
 		storageBackend:   storageBackend,
+		hooksService:     hooksService,
+		searchClient:     searchClient,
+		healthNotifier:   NewHealthNotifier(),
 	}
 
 	return s, nil
@@ -115,6 +130,7 @@ type ModuleServer struct {
 	isInitialized    bool
 	mtx              sync.Mutex
 	storageBackend   resource.StorageBackend
+	searchClient     resourcepb.ResourceIndexClient
 	storageMetrics   *resource.StorageMetrics
 	indexMetrics     *resource.BleveIndexMetrics
 	license          licensing.Licensing
@@ -132,8 +148,20 @@ type ModuleServer struct {
 	searchServerRing           *ring.Ring
 	searchServerRingClientPool *ringclient.Pool
 
+	// grpcService a shared gRPC service/server used by modules to register their gRPC endpoints.
+	grpcService *grpcserver.DSKitService
+
 	// moduleRegisterer allows registration of modules provided by other builds (e.g. enterprise).
 	moduleRegisterer ModuleRegisterer
+	hooksService     *hooks.HooksService
+
+	// healthNotifier is shared between the InstrumentationServer and the OperatorServer
+	// so that operators can signal readiness to the /readyz endpoint.
+	healthNotifier *HealthNotifier
+
+	// StorageServiceOptions allows injecting extra sql.ServiceOption values into the
+	// StorageServer and SearchServer module registrations. This is intended for tests.
+	StorageServiceOptions []sql.ServiceOption
 }
 
 // init initializes the server and its services.
@@ -175,9 +203,36 @@ func (s *ModuleServer) Run() error {
 		return s.initInstrumentationServer()
 	})
 
+	m.RegisterInvisibleModule(modules.GRPCServer, func() (services.Service, error) {
+		var err error
+		s.grpcService, err = grpcserver.ProvideDSKitService(s.cfg, s.features, otel.Tracer("grpc-server"), s.registerer, modules.GRPCServer)
+		if err != nil {
+			return nil, err
+		}
+		return s.grpcService, nil
+	})
+
+	m.RegisterInvisibleModule(modules.UnifiedBackend, func() (services.Service, error) {
+		var err error
+		if s.storageBackend == nil {
+			// If storage server not being used, disable GC, pruner, and RV manager
+			disableStorageServices := !m.IsModuleEnabled(modules.StorageServer)
+			s.storageBackend, err = sql.NewStorageBackend(s.cfg, nil, s.registerer, s.storageMetrics, otel.Tracer("unified-backend"), disableStorageServices)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if backendService, ok := s.storageBackend.(services.Service); ok {
+			return backendService, nil
+		}
+		return services.NewIdleService(nil, nil).WithName(modules.UnifiedBackend), nil
+	})
+
 	m.RegisterModule(modules.MemberlistKV, s.initMemberlistKV)
 	m.RegisterModule(modules.SearchServerRing, s.initSearchServerRing)
-	m.RegisterModule(modules.SearchServerDistributor, s.initSearchServerDistributor)
+	m.RegisterModule(modules.SearchServerDistributor, func() (services.Service, error) {
+		return resource.ProvideSearchDistributorServer(otel.Tracer("index-server-distributor"), s.cfg, s.searchServerRing, s.searchServerRingClientPool, s.grpcService)
+	})
 
 	m.RegisterModule(modules.Core, func() (services.Service, error) {
 		return NewService(s.cfg, s.opts, s.apiOpts)
@@ -193,11 +248,27 @@ func (s *ModuleServer) Run() error {
 	//}
 
 	m.RegisterModule(modules.StorageServer, func() (services.Service, error) {
+		// Only set docBuilders and indexMetrics if enable_search is true
+		var docBuilders resource.DocumentBuilderSupplier
+		var indexMetrics *resource.BleveIndexMetrics
+		if s.cfg.EnableSearch {
+			s.log.Warn("Support for 'enable_search' config with 'storage-server' target is deprecated and will be removed in a future release. Please use the 'search-server' target instead.")
+			var err error
+			docBuilders, err = InitializeDocumentBuilders(s.cfg)
+			if err != nil {
+				return nil, err
+			}
+			indexMetrics = s.indexMetrics
+		}
+		return sql.ProvideUnifiedStorageGrpcService(s.cfg, s.features, s.log, s.registerer, docBuilders, s.storageMetrics, indexMetrics, s.searchServerRing, s.MemberlistKVConfig, s.httpServerRouter, s.storageBackend, s.searchClient, s.grpcService, s.StorageServiceOptions...)
+	})
+
+	m.RegisterModule(modules.SearchServer, func() (services.Service, error) {
 		docBuilders, err := InitializeDocumentBuilders(s.cfg)
 		if err != nil {
 			return nil, err
 		}
-		return sql.ProvideUnifiedStorageGrpcService(s.cfg, s.features, nil, s.log, s.registerer, docBuilders, s.storageMetrics, s.indexMetrics, s.searchServerRing, s.MemberlistKVConfig, s.httpServerRouter, s.storageBackend)
+		return sql.ProvideSearchGRPCService(s.cfg, s.features, s.log, s.registerer, docBuilders, s.indexMetrics, s.searchServerRing, s.MemberlistKVConfig, s.httpServerRouter, s.storageBackend, s.grpcService, s.StorageServiceOptions...)
 	})
 
 	m.RegisterModule(modules.ZanzanaServer, func() (services.Service, error) {
@@ -205,7 +276,7 @@ func (s *ModuleServer) Run() error {
 	})
 
 	m.RegisterModule(modules.FrontendServer, func() (services.Service, error) {
-		return frontend.ProvideFrontendService(s.cfg, s.features, s.promGatherer, s.registerer, s.license)
+		return frontend.ProvideFrontendService(s.cfg, s.features, s.promGatherer, s.registerer, s.license, s.hooksService)
 	})
 
 	m.RegisterModule(modules.OperatorServer, s.initOperatorServer)
@@ -237,9 +308,10 @@ func (s *ModuleServer) initOperatorServer() (services.Service, error) {
 							Commit:      s.commit,
 							BuildBranch: s.buildBranch,
 						},
-						CLIContext: cliContext,
-						Config:     s.cfg,
-						Registerer: s.registerer,
+						CLIContext:     cliContext,
+						Config:         s.cfg,
+						Registerer:     s.registerer,
+						HealthNotifier: s.healthNotifier,
 					}
 					return op.RunFunc(deps)
 				},

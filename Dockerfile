@@ -14,10 +14,10 @@ ARG JS_SRC=js-builder
 
 # Dependabot cannot update dependencies listed in ARGs
 # By using FROM instructions we can delegate dependency updates to dependabot
-FROM alpine:3.22.2 AS alpine-base
+FROM alpine:3.23.3 AS alpine-base
 FROM ubuntu:22.04 AS ubuntu-base
-FROM golang:1.25.3-alpine AS go-builder-base
-FROM --platform=${JS_PLATFORM} node:22-alpine AS js-builder-base
+FROM golang:1.25.7-alpine AS go-builder-base
+FROM --platform=${JS_PLATFORM} node:24-alpine AS js-builder-base
 # Javascript build stage
 FROM --platform=${JS_PLATFORM} ${JS_IMAGE} AS js-builder
 ARG JS_NODE_ENV=production
@@ -88,32 +88,38 @@ COPY pkg/build pkg/build
 COPY pkg/build/wire pkg/build/wire
 COPY pkg/promlib pkg/promlib
 COPY pkg/storage/unified/resource pkg/storage/unified/resource
+COPY pkg/storage/unified/resource/kv/go.* pkg/storage/unified/resource/kv
 COPY pkg/storage/unified/resourcepb pkg/storage/unified/resourcepb
 COPY pkg/storage/unified/apistore pkg/storage/unified/apistore
 COPY pkg/semconv pkg/semconv
+COPY pkg/plugins pkg/plugins
 COPY pkg/aggregator pkg/aggregator
 COPY apps/playlist apps/playlist
+COPY apps/quotas apps/quotas
 COPY apps/plugins apps/plugins
 COPY apps/shorturl apps/shorturl
+COPY apps/annotation apps/annotation
 COPY apps/correlations apps/correlations
 COPY apps/preferences apps/preferences
+COPY apps/collections apps/collections
 COPY apps/provisioning apps/provisioning
 COPY apps/secret apps/secret
 COPY apps/scope apps/scope
-COPY apps/investigations apps/investigations
 COPY apps/logsdrilldown apps/logsdrilldown
 COPY apps/advisor apps/advisor
 COPY apps/dashboard apps/dashboard
+COPY apps/dashvalidator apps/dashvalidator
 COPY apps/folder apps/folder
-COPY apps/preferences apps/preferences
 COPY apps/iam apps/iam
 COPY apps apps
 COPY kindsv2 kindsv2
 COPY apps/alerting/alertenrichment apps/alerting/alertenrichment
+COPY apps/alerting/historian apps/alerting/historian
 COPY apps/alerting/notifications apps/alerting/notifications
 COPY apps/alerting/rules apps/alerting/rules
 COPY pkg/codegen pkg/codegen
 COPY pkg/plugins/codegen pkg/plugins/codegen
+COPY apps/example apps/example
 
 RUN go mod download
 
@@ -134,6 +140,8 @@ ENV BUILD_BRANCH=${BUILD_BRANCH}
 
 RUN make build-go GO_BUILD_TAGS=${GO_BUILD_TAGS} WIRE_TAGS=${WIRE_TAGS}
 
+RUN mkdir -p data/plugins-bundled
+
 # From-tarball build stage
 FROM ${BASE_IMAGE} AS tgz-builder
 
@@ -145,6 +153,8 @@ COPY ${GRAFANA_TGZ} /tmp/grafana.tar.gz
 
 # add -v to make tar print every file it extracts
 RUN tar x -z -f /tmp/grafana.tar.gz --strip-components=1
+
+RUN mkdir -p data/plugins-bundled
 
 # helpers for COPY --from
 FROM ${GO_SRC} AS go-src
@@ -171,7 +181,7 @@ WORKDIR $GF_PATHS_HOME
 
 # Install dependencies
 RUN if grep -i -q alpine /etc/issue; then \
-  apk add --no-cache ca-certificates bash curl tzdata musl-utils && \
+  apk add --no-cache ca-certificates bash bubblewrap curl tzdata musl-utils && \
   apk info -vv | sort; \
   elif grep -i -q ubuntu /etc/issue; then \
   DEBIAN_FRONTEND=noninteractive && \
@@ -233,6 +243,10 @@ RUN if [ ! $(getent group "$GF_GID") ]; then \
 COPY --from=go-src /tmp/grafana/bin/grafana* /tmp/grafana/bin/*/grafana* ./bin/
 COPY --from=js-src /tmp/grafana/public ./public
 COPY --from=js-src /tmp/grafana/LICENSE ./
+COPY --from=go-src /tmp/grafana/data/plugins-bundled ./data/plugins-bundled
+
+RUN grafana server -v | sed -e 's/Version //' > /.grafana-version
+RUN chmod 644 /.grafana-version
 
 EXPOSE 3000
 

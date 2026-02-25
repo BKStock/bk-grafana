@@ -18,6 +18,7 @@ jobs:
       contents: read
     outputs:
       changed: ${{ steps.detect-changes.outputs.frontend }}
+      devenv-changed: ${{ steps.detect-changes.outputs.devenv }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -29,12 +30,43 @@ jobs:
         with:
           self: .github/workflows/pr-frontend-unit-tests.yml
 
+  generate-golden-files:
+    permissions:
+      contents: read
+    needs:
+      - detect-changes
+    if: needs.detect-changes.outputs.changed == 'true'
+    runs-on: ubuntu-x64-small
+    name: Generate golden files
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+    - name: Setup Go
+      uses: actions/setup-go@v6.0.0
+      with:
+        go-version-file: go.mod
+    - name: Generate golden files
+      run: make generate-golden-files
+      working-directory: apps/dashboard
+    - name: Upload golden files
+      uses: actions/upload-artifact@v4
+      with:
+        name: golden-files
+        retention-days: 1
+        path: |
+          apps/dashboard/pkg/migration/testdata/output/
+          apps/dashboard/pkg/migration/testdata/dev-dashboards-output/
+          apps/dashboard/pkg/migration/conversion/testdata/output/
+          apps/dashboard/pkg/migration/conversion/testdata/migrated_dashboards_output/
+
   frontend-unit-tests:
     permissions:
       contents: read
       id-token: write
     needs:
       - detect-changes
+      - generate-golden-files
     # Run this workflow only for PRs from forks; if it gets merged into `main` or `release-*`,
     # the `frontend-unit-tests-enterprise` workflow will run instead
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true && needs.detect-changes.outputs.changed == 'true'
@@ -49,6 +81,11 @@ jobs:
     - uses: actions/checkout@v5
       with:
         persist-credentials: false
+    - name: Download golden files
+      uses: actions/download-artifact@v4
+      with:
+        name: golden-files
+        path: apps/dashboard/pkg/migration
     - name: Setup Node.js
       uses: ./.github/actions/setup-node
     - name: Yarn install
@@ -68,6 +105,7 @@ jobs:
       id-token: write
     needs:
       - detect-changes
+      - generate-golden-files
     # Run this workflow for non-PR events (like pushes to `main` or `release-*`) OR for internal PRs (PRs not from forks)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false && needs.detect-changes.outputs.changed == 'true'
     runs-on: ubuntu-x64-large
@@ -85,6 +123,11 @@ jobs:
       uses: ./.github/actions/setup-enterprise
       with:
         github-app-name: 'grafana-ci-bot'
+    - name: Download golden files
+      uses: actions/download-artifact@v4
+      with:
+        name: golden-files
+        path: apps/dashboard/pkg/migration
     - name: Setup Node.js
       uses: ./.github/actions/setup-node
     - name: Yarn install
@@ -148,6 +191,7 @@ jobs:
   #   so they won't be accepted by a ruleset.
   required-frontend-unit-tests:
     needs:
+      - generate-golden-files
       - frontend-unit-tests
       - frontend-unit-tests-enterprise
       - frontend-decoupled-plugin-tests
@@ -169,3 +213,26 @@ jobs:
           needs: ${{ toJson(needs) }}
           failure-message: "One or more unit test jobs have failed"
           success-message: "All unit tests completed successfully"
+
+  devenv:
+    needs:
+      - detect-changes
+    if: needs.detect-changes.outputs.devenv-changed == 'true'
+    runs-on: ubuntu-x64-large
+    name: "Devenv frontend-service build"
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+    - name: Setup Docker
+      uses: docker/setup-docker-action@3fb92d6d9c634363128c8cce4bc3b2826526370a # v4
+    - name: Setup Node.js
+      uses: ./.github/actions/setup-node
+    - name: Install Tilt
+      run: curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
+    - name: Create empty config files # TODO: the tiltfile should conditionally mount these only if they exist, like the enterprise license
+      run: |
+        touch devenv/frontend-service/configs/grafana-api.local.ini
+        touch devenv/frontend-service/configs/frontend-service.local.ini
+    - name: Test frontend-service Tiltfile
+      run: tilt ci --file devenv/frontend-service/Tiltfile

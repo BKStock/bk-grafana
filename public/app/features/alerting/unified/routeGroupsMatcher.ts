@@ -1,4 +1,4 @@
-import { InstanceMatchResult, matchInstancesToRoute } from '@grafana/alerting/unstable';
+import { InstanceMatchResult, matchInstancesToRoute } from '@grafana/alerting';
 
 import { AlertmanagerGroup, RouteWithID } from '../../../plugins/datasource/alertmanager/types';
 import { Labels } from '../../../types/unified-alerting-dto';
@@ -52,7 +52,7 @@ export const routeGroupsMatcher = {
           .map((matchDetails) => ({
             route,
             routeTree: {
-              metadata: { name: 'user-defined' },
+              metadata: { name: routeTree.name },
               expandedSpec: expandedTree,
             },
             matchDetails,

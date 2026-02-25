@@ -10,28 +10,89 @@ import (
 	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/grafana/grafana/pkg/apiserver/rest"
 	"github.com/grafana/grafana/pkg/infra/kvstore"
+	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/setting"
+	unifiedmigrations "github.com/grafana/grafana/pkg/storage/unified/migrations/contract"
 )
+
+var logger = log.New("dualwrite.service")
+
+// fakeMigrator is a no-op implementation of UnifiedStorageMigrationService
+type fakeMigrator struct{}
+
+func (f *fakeMigrator) Run(ctx context.Context) error {
+	return nil
+}
+
+var _ unifiedmigrations.UnifiedStorageMigrationService = (*fakeMigrator)(nil)
+
+func NewFakeMigrator() unifiedmigrations.UnifiedStorageMigrationService {
+	return &fakeMigrator{}
+}
+
+// fakeMigrationStatusReader is a configurable implementation of MigrationStatusReader for tests.
+type fakeMigrationStatusReader struct {
+	modes map[string]unifiedmigrations.StorageMode
+}
+
+var _ unifiedmigrations.MigrationStatusReader = (*fakeMigrationStatusReader)(nil)
+
+func (f *fakeMigrationStatusReader) GetStorageMode(_ context.Context, gr schema.GroupResource) (unifiedmigrations.StorageMode, error) {
+	mode, ok := f.modes[gr.String()]
+	if !ok {
+		return unifiedmigrations.StorageModeLegacy, nil
+	}
+	return mode, nil
+}
+
+// NewFakeMigrationStatusReader creates a MigrationStatusReader for tests.
+// Accepts pairs of (GroupResource string, StorageMode). Resources not listed default to Legacy.
+// Example: NewFakeMigrationStatusReader("dashboards.dashboard.grafana.app", contract.StorageModeUnified)
+func NewFakeMigrationStatusReader(resourceModes ...interface{}) unifiedmigrations.MigrationStatusReader {
+	m := make(map[string]unifiedmigrations.StorageMode)
+	for i := 0; i+1 < len(resourceModes); i += 2 {
+		key, _ := resourceModes[i].(string)
+		mode, _ := resourceModes[i+1].(unifiedmigrations.StorageMode)
+		m[key] = mode
+	}
+	return &fakeMigrationStatusReader{modes: m}
+}
+
+func NewFakeConfig() *setting.Cfg {
+	return &setting.Cfg{
+		UnifiedStorage: make(map[string]setting.UnifiedStorageConfig),
+	}
+}
 
 func ProvideStaticServiceForTests(cfg *setting.Cfg) Service {
 	if cfg == nil {
 		cfg = &setting.Cfg{}
 	}
-	return &staticService{cfg}
+	return &staticService{cfg: cfg}
 }
 
 func ProvideService(
 	features featuremgmt.FeatureToggles,
 	kv kvstore.KVStore,
 	cfg *setting.Cfg,
+	migrator unifiedmigrations.UnifiedStorageMigrationService,
+	statusReader unifiedmigrations.MigrationStatusReader,
+	metrics *Metrics,
 ) (Service, error) {
+	// Ensure migrations have run before starting dualwrite
+	err := migrator.Run(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("unable to start dualwrite service due to migration error: %w", err)
+	}
+
+	//nolint:staticcheck // not yet migrated to OpenFeature
 	enabled := features.IsEnabledGlobally(featuremgmt.FlagManagedDualWriter) ||
 		features.IsEnabledGlobally(featuremgmt.FlagProvisioning) // required for git provisioning
 
 	if cfg != nil {
 		if !enabled {
-			return &staticService{cfg}, nil
+			return &staticService{cfg: cfg, statusReader: statusReader, metrics: metrics}, nil
 		}
 
 		if cfg != nil {
@@ -40,7 +101,7 @@ func ProvideService(
 
 			// If both are fully on unified (Mode5), the dynamic service is not needed.
 			if foldersMode == rest.Mode5 && dashboardsMode == rest.Mode5 {
-				return &staticService{cfg}, nil
+				return &staticService{cfg: cfg, statusReader: statusReader, metrics: metrics}, nil
 			}
 
 			if (foldersMode >= rest.Mode4 || dashboardsMode >= rest.Mode4) && foldersMode != dashboardsMode {
@@ -54,13 +115,50 @@ func ProvideService(
 			db:     kv,
 			logger: logging.DefaultLogger.With("logger", "dualwrite.kv"),
 		},
-		enabled: enabled,
+		enabled:      enabled,
+		statusReader: statusReader,
+		metrics:      metrics,
 	}, nil
 }
 
 type service struct {
-	db      *keyvalueDB
-	enabled bool
+	db           *keyvalueDB
+	enabled      bool
+	statusReader unifiedmigrations.MigrationStatusReader
+	metrics      *Metrics
+}
+
+func (m *service) NewStorage(gr schema.GroupResource, legacy rest.Storage, unified rest.Storage) (rest.Storage, error) {
+	status, err := m.Status(context.Background(), gr)
+	if err != nil {
+		return nil, err
+	}
+
+	logModeComparison(m.statusReader, m.metrics, gr, storageModeFromStatus(status))
+
+	if m.enabled && status.Runtime {
+		// Dynamic storage behavior
+		return &runtimeDualWriter{
+			service:   m,
+			legacy:    legacy,
+			unified:   unified,
+			dualwrite: &dualWriter{legacy: legacy, unified: unified}, // not used for read
+			gr:        gr,
+		}, nil
+	}
+
+	if status.ReadUnified {
+		if status.WriteLegacy {
+			// Write both, read unified
+			return &dualWriter{legacy: legacy, unified: unified, readUnified: true}, nil
+		}
+		return unified, nil
+	}
+	if status.WriteUnified {
+		// Write both, read legacy
+		return &dualWriter{legacy: legacy, unified: unified}, nil
+	}
+	return legacy, nil
 }
 
 // Hardcoded list of resources that should be controlled by the database (eventually everything?)
@@ -171,4 +269,44 @@ func (m *service) Update(ctx context.Context, status StorageStatus) (StorageStat
 	}
 	status.UpdateKey++
 	return status, m.db.set(ctx, status)
+}
+
+// LogStorageModeComparison implements Service.
+func (m *service) LogStorageModeComparison(gr schema.GroupResource, configMode rest.DualWriterMode) {
+	logModeComparison(m.statusReader, m.metrics, gr, storageModeFromConfigMode(configMode))
+}
+
+// logModeComparison compares currentMode with the mode from MigrationStatusReader
+// and emits metrics/logs for observability.
+func logModeComparison(statusReader unifiedmigrations.MigrationStatusReader, metrics *Metrics, gr schema.GroupResource, currentMode unifiedmigrations.StorageMode) {
+	if statusReader == nil {
+		return
+	}
+	newMode, err := statusReader.GetStorageMode(context.Background(), gr)
+	if err != nil {
+		logger.Warn("Failed to get storage mode from MigrationStatusReader",
+			"resource", gr.String(), "error", err)
+		return
+	}
+
+	if currentMode != newMode && metrics != nil {
+		metrics.ModeMismatchCounter.WithLabelValues(gr.String(), currentMode.String(), newMode.String()).Inc()
+	}
+
+	logger.Info("Storage mode comparison",
+		"resource", gr.String(),
+		"newMode", newMode.String(),
+		"currentMode", currentMode.String(),
+	)
+}
+
+// storageModeFromStatus derives a StorageMode from the current StorageStatus.
+func storageModeFromStatus(status StorageStatus) unifiedmigrations.StorageMode {
+	if status.ReadUnified && status.WriteUnified && !status.WriteLegacy {
+		return unifiedmigrations.StorageModeUnified
+	}
+	if status.WriteUnified {
+		return unifiedmigrations.StorageModeDualWrite
+	}
+	return unifiedmigrations.StorageModeLegacy
 }

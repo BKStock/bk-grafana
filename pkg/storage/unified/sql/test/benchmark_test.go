@@ -11,9 +11,10 @@ import (
 
 func TestIntegrationBenchmarkSQLStorageBackend(t *testing.T) {
 	testutil.SkipIntegrationTestInShortMode(t)
-	opts := test.DefaultBenchmarkOptions()
+	opts := test.DefaultBenchmarkOptions(t)
 	if db.IsTestDbSQLite() {
 		opts.Concurrency = 1 // to avoid SQLite database is locked error
 	}
-	test.BenchmarkStorageBackend(t, newTestBackend(t, true, 2*time.Millisecond), opts)
+	backend := newTestBackend(t, true, 2*time.Millisecond, min(max(10, opts.Concurrency), 100))
+	test.RunStorageBackendBenchmark(t, backend, opts)
 }

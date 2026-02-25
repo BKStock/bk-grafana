@@ -8,7 +8,7 @@ import { selectors } from '@grafana/e2e-selectors';
 import { Trans, t } from '@grafana/i18n';
 import { getTemplateSrv, RefreshEvent } from '@grafana/runtime';
 import { Icon, TextLink, Themeable2, withTheme2 } from '@grafana/ui';
-import appEvents from 'app/core/app_events';
+import { appEvents } from 'app/core/app_events';
 import { DashboardInteractions } from 'app/features/dashboard-scene/utils/interactions';
 import { SHARED_DASHBOARD_QUERY } from 'app/plugins/datasource/dashboard/constants';
 import grabDarkSvg from 'img/grab_dark.svg';
@@ -143,7 +143,7 @@ export class UnthemedDashboardRow extends Component<DashboardRowProps> {
               type="button"
               className="pointer"
               onClick={() => {
-                DashboardInteractions.trackRemoveRowClick();
+                DashboardInteractions.trackDeleteDashboardElement('row');
                 this.onDelete();
               }}
               aria-label={t('dashboard.unthemed-dashboard-row.aria-label-delete-row', 'Delete row')}

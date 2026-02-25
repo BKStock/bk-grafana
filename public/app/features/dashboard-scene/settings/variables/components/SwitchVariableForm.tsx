@@ -11,6 +11,7 @@ interface SwitchVariableFormProps {
   disabledValue: string;
   onEnabledValueChange: (value: string) => void;
   onDisabledValueChange: (value: string) => void;
+  inline?: boolean;
 }
 
 const VALUE_PAIR_OPTIONS: Array<ComboboxOption<string>> = [
@@ -25,14 +26,24 @@ export function SwitchVariableForm({
   disabledValue,
   onEnabledValueChange,
   onDisabledValueChange,
+  inline,
 }: SwitchVariableFormProps) {
   const currentValuePairType = getCurrentValuePairType(enabledValue, disabledValue);
   const [isCustomValuePairType, setIsCustomValuePairType] = useState(currentValuePairType === 'custom');
+  const [enabledValueInvalid, setEnabledValueInvalid] = useState<boolean>(false);
+  const [disabledValueInvalid, setDisabledValueInvalid] = useState<boolean>(false);
+  const identicalValuesErrorMessage = t(
+    'dashboard-scene.switch-variable-form.same-values-error',
+    'Enabled and disabled values cannot be the same'
+  );
 
   const onValuePairTypeChange = (selection: ComboboxOption<string> | null) => {
     if (!selection?.value) {
       return;
     }
+
+    setEnabledValueInvalid(false);
+    setDisabledValueInvalid(false);
 
     switch (selection.value) {
       case 'boolean':
@@ -56,11 +67,37 @@ export function SwitchVariableForm({
     }
   };
 
+  const handleEnabledValueChange = (newEnabledValue: string) => {
+    const isInvalid = newEnabledValue === disabledValue;
+
+    setEnabledValueInvalid(isInvalid);
+    setDisabledValueInvalid(false);
+
+    if (!isInvalid) {
+      onEnabledValueChange(newEnabledValue);
+    }
+  };
+
+  const handleDisabledValueChange = (newDisabledValue: string) => {
+    const isInvalid = newDisabledValue === enabledValue;
+
+    setDisabledValueInvalid(isInvalid);
+    setEnabledValueInvalid(false);
+
+    if (!isInvalid) {
+      onDisabledValueChange(newDisabledValue);
+    }
+  };
+
+  const fieldWidth = inline ? undefined : 30;
+
   return (
     <>
-      <VariableLegend>
-        <Trans i18nKey="dashboard-scene.switch-variable-form.switch-options">Switch options</Trans>
-      </VariableLegend>
+      {!inline && (
+        <VariableLegend>
+          <Trans i18nKey="dashboard-scene.switch-variable-form.switch-options">Switch options</Trans>
+        </VariableLegend>
+      )}
 
       <Stack gap={2} direction="column">
         <Field
@@ -72,7 +109,7 @@ export function SwitchVariableForm({
           )}
         >
           <Combobox
-            width={40}
+            width={fieldWidth}
             value={isCustomValuePairType ? 'custom' : currentValuePairType}
             options={VALUE_PAIR_OPTIONS}
             onChange={onValuePairTypeChange}
@@ -90,12 +127,14 @@ export function SwitchVariableForm({
                 'dashboard-scene.switch-variable-form.enabled-value-description',
                 'Value when switch is enabled'
               )}
+              error={enabledValueInvalid && identicalValuesErrorMessage}
+              invalid={enabledValueInvalid}
             >
               <Input
-                width={40}
-                value={enabledValue}
+                width={fieldWidth}
+                defaultValue={enabledValue}
                 onChange={(event) => {
-                  onEnabledValueChange(event.currentTarget.value);
+                  handleEnabledValueChange(event.currentTarget.value);
                 }}
                 placeholder={t(
                   'dashboard-scene.switch-variable-form.enabled-value-placeholder',
@@ -112,11 +151,13 @@ export function SwitchVariableForm({
                 'dashboard-scene.switch-variable-form.disabled-value-description',
                 'Value when switch is disabled'
               )}
+              error={disabledValueInvalid && identicalValuesErrorMessage}
+              invalid={disabledValueInvalid}
             >
               <Input
-                width={40}
-                value={disabledValue}
-                onChange={(event) => onDisabledValueChange(event.currentTarget.value)}
+                width={fieldWidth}
+                defaultValue={disabledValue}
+                onChange={(event) => handleDisabledValueChange(event.currentTarget.value)}
                 placeholder={t(
                   'dashboard-scene.switch-variable-form.disabled-value-placeholder',
                   'e.g. Off, Disabled, Inactive'

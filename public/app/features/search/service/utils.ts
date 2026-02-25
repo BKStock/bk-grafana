@@ -1,10 +1,11 @@
+import { ManagedBy } from '@grafana/api-clients/rtkq/dashboard/v0alpha1';
 import { DataFrameView, IconName, fuzzySearch } from '@grafana/data';
-import { isSharedWithMe } from 'app/features/browse-dashboards/components/utils';
 import { DashboardViewItemWithUIItems } from 'app/features/browse-dashboards/types';
+import { isSharedWithMe } from 'app/features/browse-dashboards/utils/dashboards';
 import { getDashboardSrv } from 'app/features/dashboard/services/DashboardSrv';
 import { DashboardDataDTO } from 'app/types/dashboard';
 
-import { AnnoKeyFolder, ResourceList } from '../../apiserver/types';
+import { AnnoKeyFolder, ManagerKind, ResourceList } from '../../apiserver/types';
 import { DashboardSearchHit, DashboardSearchItemType, DashboardViewItem, DashboardViewItemKind } from '../types';
 
 import { DashboardQueryResult, SearchQuery, SearchResultMeta } from './types';
@@ -82,12 +83,18 @@ function isSearchResultMeta(obj: unknown): obj is SearchResultMeta {
   return obj !== null && typeof obj === 'object' && 'locationInfo' in obj;
 }
 
+export function extractManagerKind(managedBy?: ManagedBy | ManagerKind): ManagerKind | undefined {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  return typeof managedBy === 'string' ? managedBy : (managedBy?.kind as ManagerKind);
+}
+
 export function queryResultToViewItem(
   item: DashboardQueryResult,
   view?: DataFrameView<DashboardQueryResult>
 ): DashboardViewItem {
   const customMeta = view?.dataFrame.meta?.custom;
   const meta: SearchResultMeta | undefined = isSearchResultMeta(customMeta) ? customMeta : undefined;
+  const managedByStr = extractManagerKind(item.managedBy);
 
   const viewItem: DashboardViewItem = {
     kind: parseKindString(item.kind),
@@ -95,7 +102,7 @@ export function queryResultToViewItem(
     title: item.name,
     url: item.url,
     tags: item.tags ?? [],
-    managedBy: item.managedBy,
+    managedBy: managedByStr,
   };
 
   // Set enterprise sort value property
@@ -124,6 +131,11 @@ export function queryResultToViewItem(
 
 export function resourceToSearchResult(resource: ResourceList<DashboardDataDTO>): SearchHit[] {
   return resource.items.map((item) => {
+    const field: Record<string, string | number> = {};
+    if (item.metadata.deletionTimestamp) {
+      field.deletionTimestamp = item.metadata.deletionTimestamp;
+    }
+
     const hit = {
       resource: 'dashboards',
       name: item.metadata.name,
@@ -131,7 +143,7 @@ export function resourceToSearchResult(resource: ResourceList<DashboardDataDTO>)
       location: 'general',
       folder: item?.metadata?.annotations?.[AnnoKeyFolder] ?? 'general',
       tags: item.spec?.tags || [],
-      field: {},
+      field,
       url: '',
     };
     if (!hit.folder) {
@@ -165,7 +177,7 @@ export function searchHitsToDashboardSearchHits(searchHits: SearchHit[]): Dashbo
 /**
  * Filters search results based on query parameters
  * This is used when backend filtering is not available (e.g., for deleted dashboards)
- * Supports fuzzy search for tags and titles and alphabetical sorting
+ * Supports fuzzy search for tags and titles, alphabetical sorting, and deletion timestamp sorting
  */
 export function filterSearchResults(
   results: SearchHit[],
@@ -185,9 +197,33 @@ export function filterSearchResults(
   }
 
   if (query.sort) {
-    const collator = new Intl.Collator();
-    const mult = query.sort === 'alpha-desc' ? -1 : 1;
-    filtered.sort((a, b) => mult * collator.compare(a.title, b.title));
+    if (query.sort === 'deleted-asc' || query.sort === 'deleted-desc') {
+      const mult = query.sort === 'deleted-desc' ? -1 : 1;
+      filtered.sort((a, b) => {
+        const timestampA = a.field.deletionTimestamp;
+        const timestampB = b.field.deletionTimestamp;
+
+        // Handle missing or invalid timestamps - items without timestamps go to the end
+        if (typeof timestampA !== 'string' && typeof timestampB !== 'string') {
+          return 0;
+        }
+        if (typeof timestampA !== 'string') {
+          return 1;
+        }
+        if (typeof timestampB !== 'string') {
+          return -1;
+        }
+
+        const timeA = Date.parse(timestampA);
+        const timeB = Date.parse(timestampB);
+        return mult * (timeA - timeB);
+      });
+    } else {
+      // Alphabetical sorting
+      const collator = new Intl.Collator();
+      const mult = query.sort === 'alpha-desc' ? -1 : 1;
+      filtered.sort((a, b) => mult * collator.compare(a.title, b.title));
+    }
   }
 
   return filtered;

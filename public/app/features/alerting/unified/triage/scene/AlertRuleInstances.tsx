@@ -8,11 +8,11 @@ import { useQueryRunner, useTimeRange } from '@grafana/scenes-react';
 import { Box } from '@grafana/ui';
 
 import { useWorkbenchContext } from '../WorkbenchContext';
-import { METRIC_NAME } from '../constants';
 import { GenericRow } from '../rows/GenericRow';
 import { InstanceRow } from '../rows/InstanceRow';
 
-import { getDataQuery } from './utils';
+import { alertRuleInstancesQuery } from './queries';
+import { useQueryFilter } from './utils';
 
 function extractInstancesFromData(series: DataFrame[] | undefined) {
   if (!series) {
@@ -47,13 +47,9 @@ type AlertRuleInstancesProps = {
 export function AlertRuleInstances({ ruleUID, depth = 0 }: AlertRuleInstancesProps) {
   const { leftColumnWidth } = useWorkbenchContext();
   const [timeRange] = useTimeRange();
+  const queryFilter = useQueryFilter();
 
-  const query = getDataQuery(
-    `count without (alertname, grafana_alertstate, grafana_folder, grafana_rule_uid) (${METRIC_NAME}{grafana_rule_uid="${ruleUID}"})`,
-    { format: 'timeseries', legendFormat: '{{alertstate}}' }
-  );
-
-  const queryRunner = useQueryRunner({ queries: [query] });
+  const queryRunner = useQueryRunner({ queries: [alertRuleInstancesQuery(ruleUID, queryFilter)] });
 
   const isLoading = !queryRunner.isDataReadyToDisplay();
   const { data } = queryRunner.useState();
@@ -72,7 +68,7 @@ export function AlertRuleInstances({ ruleUID, depth = 0 }: AlertRuleInstancesPro
         depth={depth}
       >
         <div>
-          <Trans i18nKey="alerting.triage.no-instances-found">No alert instances found for rule: {ruleUID}</Trans>
+          <Trans i18nKey="alerting.triage.no-instances-found">No alert instances found for rule: {{ ruleUID }}</Trans>
         </div>
       </GenericRow>
     );

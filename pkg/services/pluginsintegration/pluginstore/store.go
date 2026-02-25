@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/grafana/dskit/services"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/plugins/manager/loader"
 	"github.com/grafana/grafana/pkg/plugins/manager/registry"
 	"github.com/grafana/grafana/pkg/plugins/manager/sources"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
-	"golang.org/x/sync/errgroup"
 )
 
 var _ Store = (*Service)(nil)
@@ -39,6 +40,7 @@ type Service struct {
 
 func ProvideService(pluginRegistry registry.Service, pluginSources sources.Registry,
 	pluginLoader loader.Service, features featuremgmt.FeatureToggles) (*Service, error) {
+	//nolint:staticcheck // not yet migrated to OpenFeature
 	if features.IsEnabledGlobally(featuremgmt.FlagPluginStoreServiceLoading) {
 		s := New(pluginRegistry, pluginLoader, pluginSources)
 		s.loadOnStartup = true
@@ -57,7 +59,6 @@ func ProvideService(pluginRegistry registry.Service, pluginSources sources.Regis
 			logger.Error("Loading plugin source failed", "source", ps.PluginClass(ctx), "error", err)
 			return nil, err
 		}
-
 		totalPlugins += len(loadedPlugins)
 	}
 

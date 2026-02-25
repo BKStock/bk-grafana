@@ -19,7 +19,6 @@ const repeatOptions = [1, 2, 3, 4];
 
 test.use({
   featureToggles: {
-    kubernetesDashboards: true,
     dashboardNewLayouts: true,
     groupByVariable: true,
   },
@@ -135,7 +134,7 @@ test.describe(
 
       await dashboardPage.getByGrafanaSelector(selectors.components.NavToolbar.editDashboard.editButton).click();
 
-      await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('New panel')).first().click();
+      await dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.headerContainer).first().click();
 
       const panelTitleInput = dashboardPage.getByGrafanaSelector(
         selectors.components.PanelEditor.OptionsPane.fieldInput('Title')
@@ -316,9 +315,7 @@ test.describe(
         dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('New panel'))
       ).toBeVisible();
 
-      await dashboardPage
-        .getByGrafanaSelector(selectors.components.NavToolbar.editDashboard.backToDashboardButton)
-        .click();
+      await page.keyboard.press('Escape');
 
       // repeated panel in original tab repeat
       await dashboardPage
@@ -341,9 +338,7 @@ test.describe(
         dashboardPage.getByGrafanaSelector(selectors.components.Panels.Panel.title('Tab 1 - Row 2 - Panel repeat 2'))
       ).toBeVisible();
 
-      await dashboardPage
-        .getByGrafanaSelector(selectors.components.NavToolbar.editDashboard.backToDashboardButton)
-        .click();
+      await page.keyboard.press('Escape');
 
       // repeated panel in repeated tab
       await dashboardPage

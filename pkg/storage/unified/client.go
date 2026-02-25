@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/fullstorydev/grpchan"
+	grpcUtils "github.com/grafana/grafana/pkg/storage/unified/resource/grpc"
+	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 	otgrpc "github.com/opentracing-contrib/go-grpc"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"gocloud.dev/blob/fileblob"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -57,7 +59,6 @@ func ProvideUnifiedStorageClient(opts *Options,
 	storageMetrics *resource.StorageMetrics,
 	indexMetrics *resource.BleveIndexMetrics,
 ) (resource.ResourceClient, error) {
-	// See: apiserver.applyAPIServerConfig(cfg, features, o)
 	apiserverCfg := opts.Cfg.SectionWithEnvOverrides("grafana-apiserver")
 	client, err := newClient(options.StorageOptions{
 		StorageType:             options.StorageType(apiserverCfg.Key("storage_type").MustString(string(options.StorageTypeUnified))),
@@ -108,22 +109,11 @@ func newClient(opts options.StorageOptions,
 
 	switch opts.StorageType {
 	case options.StorageTypeFile:
-		if opts.DataPath == "" {
-			opts.DataPath = filepath.Join(cfg.DataPath, "grafana-apiserver")
-		}
-		bucket, err := fileblob.OpenBucket(filepath.Join(opts.DataPath, "resource"), &fileblob.Options{
-			CreateDir: true,
-			Metadata:  fileblob.MetadataDontWrite, // skip
-		})
+		backend, err := sql.NewFileBackend(cfg)
 		if err != nil {
 			return nil, err
 		}
-		backend, err := resource.NewCDKBackend(ctx, resource.CDKBackendOptions{
-			Bucket: bucket,
-		})
-		if err != nil {
-			return nil, err
-		}
+
 		server, err := resource.NewResourceServer(resource.ResourceServerOptions{
 			Backend: backend,
 			Blob: resource.BlobConfig{
@@ -162,30 +152,36 @@ func newClient(opts options.StorageOptions,
 			indexConn = conn
 		}
 
-		// Create a client instance
-		client, err := resource.NewResourceClient(conn, indexConn, cfg, features, tracer)
+		// Create a resource client
+		return resource.NewResourceClient(conn, indexConn, cfg, features, tracer)
+
+	default:
+		searchOptions, err := search.NewSearchOptions(features, cfg, docs, indexMetrics, nil)
 		if err != nil {
 			return nil, err
 		}
-		return client, nil
 
-	default:
-		searchOptions, err := search.NewSearchOptions(features, cfg, tracer, docs, indexMetrics, nil)
+		backend, err := sql.NewStorageBackend(cfg, db, reg, storageMetrics, tracer, false)
 		if err != nil {
 			return nil, err
+		}
+
+		if backendService, ok := backend.(services.Service); ok {
+			if err := services.StartAndAwaitRunning(ctx, backendService); err != nil {
+				return nil, fmt.Errorf("failed to start storage backend: %w", err)
+			}
 		}
 
 		serverOptions := sql.ServerOptions{
-			DB:             db,
-			Cfg:            cfg,
-			Tracer:         tracer,
-			Reg:            reg,
-			AccessClient:   authzc,
-			SearchOptions:  searchOptions,
-			StorageMetrics: storageMetrics,
-			IndexMetrics:   indexMetrics,
-			Features:       features,
-			SecureValues:   secure,
+			Backend:       backend,
+			Cfg:           cfg,
+			Tracer:        tracer,
+			Reg:           reg,
+			AccessClient:  authzc,
+			SearchOptions: searchOptions,
+			IndexMetrics:  indexMetrics,
+			Features:      features,
+			SecureValues:  secure,
 		}
 
 		if cfg.QOSEnabled {
@@ -213,6 +209,19 @@ func newClient(opts options.StorageOptions,
 			serverOptions.QOSQueue = queue
 		}
 
+		// only enable if an overrides file path is provided
+		if cfg.OverridesFilePath != "" {
+			overridesSvc, err := resource.NewOverridesService(ctx, cfg.Logger, reg, tracer, resource.ReloadOptions{
+				FilePath:     cfg.OverridesFilePath,
+				ReloadPeriod: cfg.OverridesReloadInterval,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			serverOptions.OverridesService = overridesSvc
+		}
+
 		server, err := sql.NewResourceServer(serverOptions)
 		if err != nil {
 			return nil, err
@@ -221,10 +230,47 @@ func newClient(opts options.StorageOptions,
 	}
 }
 
+func NewStorageApiSearchClient(cfg *setting.Cfg, features featuremgmt.FeatureToggles) (resourcepb.ResourceIndexClient, error) {
+	var searchClient resourcepb.ResourceIndexClient
+	var err error
+	if cfg.EnableSearchClient {
+		searchClient, err = NewSearchClient(cfg, features)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create search client: %w", err)
+		}
+	}
+	return searchClient, nil
+}
+
+func NewSearchClient(cfg *setting.Cfg, features featuremgmt.FeatureToggles) (resourcepb.ResourceIndexClient, error) {
+	apiserverCfg := cfg.SectionWithEnvOverrides("grafana-apiserver")
+	searchServerAddress := apiserverCfg.Key("search_server_address").MustString("")
+	grpcClientKeepaliveTime := apiserverCfg.Key("grpc_client_keepalive_time").MustDuration(0)
+
+	if searchServerAddress == "" {
+		return nil, fmt.Errorf("expecting search_server_address to be set for search client under grafana-apiserver section")
+	}
+
+	var (
+		conn    grpc.ClientConnInterface
+		err     error
+		metrics = newClientMetrics(prometheus.NewRegistry())
+	)
+
+	conn, err = newGrpcConn(searchServerAddress, metrics, features, grpcClientKeepaliveTime)
+	if err != nil {
+		return nil, err
+	}
+
+	cc := grpchan.InterceptClientConn(conn, grpcUtils.UnaryClientInterceptor, grpcUtils.StreamClientInterceptor)
+	return resourcepb.NewResourceIndexClient(cc), nil
+}
+
 func newGrpcConn(address string, metrics *clientMetrics, features featuremgmt.FeatureToggles, clientKeepaliveTime time.Duration) (grpc.ClientConnInterface, error) {
 	// Create either a connection pool or a single connection.
 	// The connection pool __can__ be useful when connection to
 	// server side load balancers like kube-proxy.
+	//nolint:staticcheck // not yet migrated to OpenFeature
 	if features.IsEnabledGlobally(featuremgmt.FlagUnifiedStorageGrpcConnectionPool) {
 		conn, err := newPooledConn(&poolOpts{
 			initialCapacity: 3,
@@ -259,7 +305,7 @@ func grpcConn(address string, metrics *clientMetrics, clientKeepaliveTime time.D
 	retryCfg := retryConfig{
 		Max:           3,
 		Backoff:       time.Second,
-		BackoffJitter: 0.5,
+		BackoffJitter: 0.1,
 	}
 	unary = append(unary, unaryRetryInterceptor(retryCfg))
 	unary = append(unary, unaryRetryInstrument(metrics.requestRetries))
@@ -276,12 +322,14 @@ func grpcConn(address string, metrics *clientMetrics, clientKeepaliveTime time.D
 	opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	// Use round_robin to balances requests more evenly over the available Storage server.
+	// Use round_robin to balance requests more evenly over the available Storage server.
 	opts = append(opts, grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`))
 
 	// Disable looking up service config from TXT DNS records.
 	// This reduces the number of requests made to the DNS servers.
 	opts = append(opts, grpc.WithDisableServiceConfig())
+
+	opts = append(opts, connectionBackoffOptions())
 
 	if clientKeepaliveTime > 0 {
 		opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{

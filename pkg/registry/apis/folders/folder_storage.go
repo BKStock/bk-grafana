@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	claims "github.com/grafana/authlib/types"
 
@@ -86,6 +87,11 @@ func (s *folderStorage) Create(ctx context.Context,
 		return nil, &statusErr
 	}
 
+	// Skip permission side effects during dry-run
+	if dryrun.IsDryRun(options.DryRun) {
+		return obj, nil
+	}
+
 	// When cfg.RBAC.PermissionsOnCreation("folder") is not enabled
 	if !s.permissionsOnCreate {
 		return obj, err
@@ -155,6 +161,7 @@ func (s *folderStorage) setDefaultFolderPermissions(ctx context.Context, orgID i
 	var permissions []accesscontrol.SetResourcePermissionCommand
 
 	isNested := parentUID != ""
+	//nolint:staticcheck // not yet migrated to OpenFeature
 	if s.features.IsEnabledGlobally(featuremgmt.FlagKubernetesDashboards) && isNested {
 		// No permissions on nested folders when kubernetesDashboards is enabled
 		return nil

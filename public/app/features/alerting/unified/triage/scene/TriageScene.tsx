@@ -15,7 +15,10 @@ import { EmbeddedSceneWithContext } from '@grafana/scenes-react';
 
 import { DATASOURCE_UID } from '../constants';
 
+import { TriageSavedSearchesControl } from './TriageSavedSearchesControl';
 import { WorkbenchSceneObject } from './Workbench';
+import { prometheusExpressionBuilder } from './expressionBuilder';
+import { getAdHocTagKeysProvider, getAdHocTagValuesProvider, getGroupByTagKeysProvider } from './tagKeysProviders';
 import { defaultTimeRange } from './utils';
 
 const cursorSync = new behaviors.CursorSync({ key: 'triage-cursor-sync', sync: DashboardCursorSync.Crosshair });
@@ -25,6 +28,7 @@ export const triageScene = new EmbeddedSceneWithContext({
   $behaviors: [cursorSync],
   controls: [
     new VariableValueSelectors({}),
+    new TriageSavedSearchesControl({}),
     new SceneControlsSpacer(),
     new SceneTimePicker({}),
     new SceneRefreshPicker({}),
@@ -41,7 +45,7 @@ export const triageScene = new EmbeddedSceneWithContext({
         },
         allowCustomValue: true,
         applyMode: 'manual',
-        value: 'grafana_folder',
+        getTagKeysProvider: getGroupByTagKeysProvider,
       }),
       new AdHocFiltersVariable({
         name: 'filters',
@@ -57,6 +61,9 @@ export const triageScene = new EmbeddedSceneWithContext({
         filters: [],
         baseFilters: [],
         layout: 'combobox',
+        expressionBuilder: prometheusExpressionBuilder,
+        getTagKeysProvider: getAdHocTagKeysProvider,
+        getTagValuesProvider: getAdHocTagValuesProvider,
       }),
     ],
   }),

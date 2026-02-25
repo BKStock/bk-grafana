@@ -413,11 +413,11 @@
         }
       },
       "prom-query-builder-options": {
-        "aria-label-exemplars": "",
-        "aria-label-format": "",
-        "aria-label-lower-limit-parameter": "",
+        "aria-label-exemplars": "范例开关。",
+        "aria-label-format": "格式化组合框",
+        "aria-label-lower-limit-parameter": "最小步长文本框，设置步长参数的下限",
         "aria-label-select-resolution": "选择分辨率",
-        "aria-label-type": "",
+        "aria-label-type": "类型单选按钮组",
         "format-options": {
           "label-heatmap": "热图",
           "label-table": "表格",
@@ -441,7 +441,7 @@
         "title-parsing-error-switch-builder": "解析错误：切换到构建器模式？"
       },
       "prom-query-legend-editor": {
-        "aria-label-legend": "",
+        "aria-label-legend": "图例组合框",
         "label-legend": "图例",
         "placeholder-select-legend-mode": "选择图例模式",
         "tooltip-legend": "序列名称覆盖或模板。例如，{{templateExample}} 将替换为 {{labelName}} 的标签值。"

@@ -85,8 +85,20 @@ func TestIdentityQueries(t *testing.T) {
 		return &v
 	}
 
+	updateTeamMember := func(cmd *UpdateTeamMemberCommand) sqltemplate.SQLTemplate {
+		v := newUpdateTeamMember(nodb, cmd)
+		v.SQLTemplate = mocks.NewTestingSQLTemplate()
+		return &v
+	}
+
 	listTeamMembers := func(q *ListTeamMembersQuery) sqltemplate.SQLTemplate {
 		v := newListTeamMembers(nodb, q)
+		v.SQLTemplate = mocks.NewTestingSQLTemplate()
+		return &v
+	}
+
+	deleteTeamMember := func(q *DeleteTeamMemberCommand) sqltemplate.SQLTemplate {
+		v := newDeleteTeamMember(nodb, q)
 		v.SQLTemplate = mocks.NewTestingSQLTemplate()
 		return &v
 	}
@@ -184,6 +196,20 @@ func TestIdentityQueries(t *testing.T) {
 						},
 					}),
 				},
+				{
+					Name: "users_email",
+					Data: listUsers(&ListUserQuery{
+						Email:      "test@example.com",
+						Pagination: common.Pagination{Limit: 5},
+					}),
+				},
+				{
+					Name: "users_login",
+					Data: listUsers(&ListUserQuery{
+						Login:      "testuser",
+						Pagination: common.Pagination{Limit: 5},
+					}),
+				},
 			},
 			sqlQueryDisplayTemplate: {
 				{
@@ -259,6 +285,27 @@ func TestIdentityQueries(t *testing.T) {
 						},
 					}),
 				},
+				{
+					Name: "team_bindings_external_true",
+					Data: listTeamBindings(&ListTeamBindingsQuery{
+						OrgID: 1,
+						Pagination: common.Pagination{
+							Limit:    1,
+							Continue: 2,
+						},
+						External: boolPtr(true),
+					}),
+				},
+			},
+			sqlUpdateTeamMemberQuery: {
+				{
+					Name: "update_team_member_basic",
+					Data: updateTeamMember(&UpdateTeamMemberCommand{
+						UID:        "team-member-1",
+						Permission: team.PermissionTypeAdmin,
+						Updated:    legacysql.NewDBTime(time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)),
+					}),
+				},
 			},
 			sqlQueryTeamMembersTemplate: {
 				{
@@ -275,6 +322,14 @@ func TestIdentityQueries(t *testing.T) {
 						UID:        "team-1",
 						OrgID:      1,
 						Pagination: common.Pagination{Limit: 1, Continue: 2},
+					}),
+				},
+			},
+			sqlDeleteTeamMemberQuery: {
+				{
+					Name: "delete_team_member_basic",
+					Data: deleteTeamMember(&DeleteTeamMemberCommand{
+						UID: "team-member-1",
 					}),
 				},
 			},
@@ -586,4 +641,8 @@ func TestIdentityQueries(t *testing.T) {
 			},
 		},
 	})
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

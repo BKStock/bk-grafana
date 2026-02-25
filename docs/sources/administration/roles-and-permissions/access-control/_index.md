@@ -147,9 +147,6 @@ Each basic role is comprised of a number of _permissions_. For example, the view
 - `Action: datasources.id:read, Scope: datasources:*`: Enables the viewer to see the ID of a data source.
 - `Action: orgs:read`: Enables the viewer to see their organization details
 - `Action: annotations:read, Scope: annotations:*`: Enables the viewer to see annotations that other users have added to a dashboard.
-- `Action: annotations:create, Scope: annotations:type:dashboard`: Enables the viewer to add annotations to a dashboard.
-- `Action: annotations:write, Scope: annotations:type:dashboard`: Enables the viewer to modify annotations of a dashboard.
-- `Action: annotations:delete, Scope: annotations:type:dashboard`: Enables the viewer to remove annotations from a dashboard.
 
 {{< admonition type="note" >}}
 You can't have a Grafana user without a basic role assigned. The `None` role contains no permissions.
@@ -185,7 +182,7 @@ Assign fixed roles when the basic roles do not meet your permission requirements
 - [Explore](/docs/grafana/<GRAFANA_VERSION>/explore/)
 - [Feature Toggles](/docs/grafana/<GRAFANA_VERSION>/administration/feature-toggles/)
 - [Folders](ref:dashboards-create-a-dashboard-folder)
-- [LDAP](/docs/grafana/<GRAFANA_VERSION>/setup-grafana/configure-security/configure-authentication/ldap/)
+- [LDAP](/docs/grafana/<GRAFANA_VERSION>/setup-grafana/configure-access/configure-authentication/ldap/)
 - [Library panels](ref:dashboards-manage-library-panels)
 - [Licenses](/docs/grafana/<GRAFANA_VERSION>/administration/stats-and-license/)
 - [Organizations](/docs/grafana/<GRAFANA_VERSION>/administration/organization-management/)

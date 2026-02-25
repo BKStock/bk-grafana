@@ -1,4 +1,5 @@
 import { css } from '@emotion/css';
+import { isString } from 'lodash';
 import React from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
@@ -8,6 +9,7 @@ import { MetaText } from '../../components/MetaText';
 import { GenericGroupedRow } from '../types';
 
 import { GenericRow } from './GenericRow';
+import { RowActions } from './InstanceCountBadges';
 
 interface FolderGroupRowProps {
   row: GenericGroupedRow;
@@ -27,9 +29,10 @@ export const FolderGroupRow = ({ row, leftColumnWidth, rowKey, depth = 0, childr
       title={
         <Stack direction="row" gap={0.5} alignItems="center">
           <MetaText icon="folder" />
-          <Text color="primary">{row.metadata.value}</Text>
+          {isString(row.metadata.value) && <Text color="primary">{row.metadata.value}</Text>}
         </Stack>
       }
+      actions={<RowActions counts={row.instanceCounts} />}
       isOpenByDefault={true}
       leftColumnClassName={styles.folderGroupRow}
       rightColumnClassName={styles.folderGroupRow}

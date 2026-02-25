@@ -28,11 +28,13 @@ composableKinds: PanelCfg: {
 				Options: {
 					showLabels:               bool
 					showCommonLabels:         bool
+					showFieldSelector?:       bool
 					showTime:                 bool
 					showLogContextToggle:     bool
 					showControls?:            bool
 					controlsStorageKey?:      string
 					wrapLogMessage:           bool
+					unwrappedColumns?:        bool
 					prettifyLogMessage:       bool
 					enableLogDetails:         bool
 					syntaxHighlighting?:      bool

@@ -1,5 +1,6 @@
 ---
 aliases:
+  - ../../../panels-visualizations/query-transform-data/sql-expressions/ # /docs/grafana/next/panels-visualizations/query-transform-data/sql-expressions/
 labels:
   products:
     - cloud
@@ -72,6 +73,7 @@ The following are compatible data sources:
 - Graphite
 - Google Sheets
 - Amazon Athena
+- PostgreSQL
 
 **Partial support:** The following data sources have limited or conditional support. Some support multiple query types depending on the service. For example, Azure Monitor can query multiple services, each with its own query format. In some cases, you can also switch the query type within a panel.
 

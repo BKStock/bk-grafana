@@ -5,7 +5,7 @@ import { memo, useContext, useEffect, useMemo } from 'react';
 import { Trans, t } from '@grafana/i18n';
 import { locationService } from '@grafana/runtime';
 import { Dashboard } from '@grafana/schema';
-import { Spec as DashboardV2Spec } from '@grafana/schema/dist/esm/schema/dashboard/v2';
+import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { ModalsContext, Modal, Button, useStyles2 } from '@grafana/ui';
 import { Prompt } from 'app/core/components/FormPrompt/Prompt';
 import { contextSrv } from 'app/core/services/context_srv';
@@ -16,7 +16,7 @@ import { DashboardMeta } from 'app/types/dashboard';
 
 import { SaveLibraryVizPanelModal } from '../panel-edit/SaveLibraryVizPanelModal';
 import { DashboardScene } from '../scene/DashboardScene';
-import { getLibraryPanelBehavior, isLibraryPanel } from '../utils/utils';
+import { getLibraryPanelBehavior, hasActualSaveChanges, isLibraryPanel } from '../utils/utils';
 
 interface DashboardPromptProps {
   dashboard: DashboardScene;
@@ -200,7 +200,7 @@ export function ignoreChanges(scene: DashboardScene | null) {
     return true;
   }
 
-  return !canSave || fromScript || fromFile;
+  return !canSave || fromScript || fromFile || (scene.state.isEditing && !hasActualSaveChanges(scene));
 }
 
 export function isEmptyDashboard(

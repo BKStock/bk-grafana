@@ -1,17 +1,16 @@
 import { css } from '@emotion/css';
 import { isEmpty } from 'lodash';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { AlertLabels } from '@grafana/alerting/unstable';
 import { DataFrame, GrafanaTheme2, Labels, LoadingState, TimeRange } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
 import { SceneDataNode, VizConfigBuilders } from '@grafana/scenes';
-import { VizPanel } from '@grafana/scenes-react';
+import { SceneContextProvider, VizPanel } from '@grafana/scenes-react';
 import { GraphDrawStyle, VisibilityMode } from '@grafana/schema';
 import {
   AxisPlacement,
   BarAlignment,
-  IconButton,
   LegendDisplayMode,
   StackingMode,
   Text,
@@ -23,6 +22,7 @@ import { overrideToFixedColor } from '../../home/Insights';
 import { InstanceDetailsDrawer } from '../instance-details/InstanceDetailsDrawer';
 
 import { GenericRow } from './GenericRow';
+import { OpenDrawerButton } from './OpenDrawerButton';
 
 interface Instance {
   labels: Labels;
@@ -75,13 +75,13 @@ export function InstanceRow({
   const styles = useStyles2(getStyles);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const handleDrawerOpen = () => {
+  const handleDrawerOpen = useCallback(() => {
     setIsDrawerOpen(true);
-  };
+  }, []);
 
-  const handleDrawerClose = () => {
+  const handleDrawerClose = useCallback(() => {
     setIsDrawerOpen(false);
-  };
+  }, []);
 
   const dataProvider = useMemo(
     () =>
@@ -112,13 +112,12 @@ export function InstanceRow({
               displayCommonLabels={true}
               labelSets={[instance.labels, commonLabels]}
               size="xs"
+              commonLabelsMode="tooltip"
             />
           )
         }
         actions={
-          <IconButton
-            style={{ transform: 'rotate(180deg)' }}
-            name="web-section-alt"
+          <OpenDrawerButton
             aria-label={t('alerting.triage.open-in-sidebar', 'Open in sidebar')}
             onClick={handleDrawerOpen}
           />
@@ -136,7 +135,14 @@ export function InstanceRow({
       />
 
       {isDrawerOpen && (
-        <InstanceDetailsDrawer ruleUID={ruleUID} instanceLabels={instance.labels} onClose={handleDrawerClose} />
+        <SceneContextProvider
+          timeRange={{
+            from: typeof timeRange.raw.from === 'string' ? timeRange.raw.from : timeRange.raw.from.toISOString(),
+            to: typeof timeRange.raw.to === 'string' ? timeRange.raw.to : timeRange.raw.to.toISOString(),
+          }}
+        >
+          <InstanceDetailsDrawer ruleUID={ruleUID} instanceLabels={instance.labels} onClose={handleDrawerClose} />
+        </SceneContextProvider>
       )}
     </>
   );

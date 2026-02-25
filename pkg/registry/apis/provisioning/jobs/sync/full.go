@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/grafana/grafana-app-sdk/logging"
+	"github.com/grafana/grafana/apps/provisioning/pkg/quotas"
 	"github.com/grafana/grafana/apps/provisioning/pkg/repository"
 	"github.com/grafana/grafana/apps/provisioning/pkg/safepath"
+	"github.com/grafana/grafana/pkg/cmd/grafana-cli/logger"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/registry/apis/provisioning/jobs"
 	"github.com/grafana/grafana/pkg/registry/apis/provisioning/resources"
@@ -27,11 +31,17 @@ func FullSync(
 	progress jobs.JobProgressRecorder,
 	tracer tracing.Tracer,
 	maxSyncWorkers int,
+	metrics jobs.JobMetrics,
+	quotaTracker quotas.QuotaTracker,
 ) error {
+	syncStart := time.Now()
 	cfg := repo.Config()
 
 	ctx, span := tracer.Start(ctx, "provisioning.sync.full")
 	defer span.End()
+	defer func() {
+		metrics.RecordSyncDuration(jobs.SyncTypeFull, time.Since(syncStart))
+	}()
 
 	ensureFolderCtx, ensureFolderSpan := tracer.Start(ctx, "provisioning.sync.full.ensure_folder_exists")
 	// Ensure the configured folder exists and is managed by the repository
@@ -49,42 +59,87 @@ func FullSync(
 	ensureFolderSpan.End()
 
 	compareCtx, compareSpan := tracer.Start(ctx, "provisioning.sync.full.compare")
-	changes, err := compare(compareCtx, repo, repositoryResources, currentRef)
+	var changes []ResourceFileChange
+	err := instrumentedFullSyncPhase(jobs.FullSyncPhaseCompare, func() (err error) {
+		changes, err = compare(compareCtx, repo, repositoryResources, currentRef)
+		return
+	}, metrics)
+	compareSpan.End()
+
 	if err != nil {
-		compareSpan.End()
 		return tracing.Error(span, fmt.Errorf("compare changes: %w", err))
 	}
-	compareSpan.End()
 
 	if len(changes) == 0 {
 		progress.SetFinalMessage(ctx, "no changes to sync")
 		return nil
 	}
 
-	return applyChanges(ctx, changes, clients, repositoryResources, progress, tracer, maxSyncWorkers)
+	// Check quota before applying changes
+	if err := checkQuotaBeforeSync(ctx, repo, changes, tracer); err != nil {
+		span.SetAttributes(attribute.Bool("pre_check_quota", false))
+		progress.Record(ctx, jobs.NewResourceResult().WithError(err).Build())
+		progress.SetFinalMessage(ctx, "sync skipped: repository is already over quota and incoming changes do not free enough resources")
+
+		return nil
+	}
+	span.SetAttributes(attribute.Bool("pre_check_quota", true))
+
+	return applyChanges(ctx, changes, clients, repositoryResources, progress, tracer, maxSyncWorkers, metrics, quotaTracker)
 }
 
-func applyChange(ctx context.Context, change ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer) {
+// shouldSkipChange checks if a change should be skipped based on previous failures on parent/child folders.
+// If there is a previous failure on the path, we don't need to process the change as it will fail anyway.
+func shouldSkipChange(ctx context.Context, change ResourceFileChange, progress jobs.JobProgressRecorder, tracer tracing.Tracer) bool {
+	if change.Action != repository.FileActionDeleted && progress.HasDirPathFailedCreation(change.Path) {
+		skipCtx, skipSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.skip_nested_resource")
+		skipSpan.SetAttributes(attribute.String("path", change.Path))
+
+		progress.Record(skipCtx, jobs.NewPathOnlyResult(change.Path).
+			WithError(fmt.Errorf("resource was not processed because the parent folder could not be created")).
+			AsSkipped().
+			Build())
+		skipSpan.End()
+		return true
+	}
+
+	if change.Action == repository.FileActionDeleted && safepath.IsDir(change.Path) && progress.HasDirPathFailedDeletion(change.Path) {
+		skipCtx, skipSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.skip_folder_with_failed_deletions")
+		skipSpan.SetAttributes(attribute.String("path", change.Path))
+		progress.Record(skipCtx, jobs.NewResourceResult().
+			WithGroup(resources.FolderKind.Group).
+			WithKind(resources.FolderKind.Kind).
+			WithPath(change.Path).
+			WithError(fmt.Errorf("folder was not processed because children resources in its path could not be deleted")).
+			AsSkipped().
+			Build())
+		skipSpan.End()
+		return true
+	}
+
+	return false
+}
+
+func applyChange(ctx context.Context, change ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, quotaTracker quotas.QuotaTracker) {
 	if ctx.Err() != nil {
+		return
+	}
+
+	if shouldSkipChange(ctx, change, progress, tracer) {
 		return
 	}
 
 	if change.Action == repository.FileActionDeleted {
 		deleteCtx, deleteSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.delete")
-		result := jobs.JobResourceResult{
-			Path:   change.Path,
-			Action: change.Action,
-		}
+		resultBuilder := jobs.NewPathOnlyResult(change.Path).WithAction(change.Action)
 
 		if change.Existing == nil || change.Existing.Name == "" {
-			result.Error = fmt.Errorf("processing deletion for file %s: missing existing reference", change.Path)
+			result := resultBuilder.WithError(fmt.Errorf("processing deletion for file %s: missing existing reference", change.Path)).Build()
 			progress.Record(deleteCtx, result)
-			deleteSpan.RecordError(result.Error)
+			deleteSpan.RecordError(result.Error())
 			deleteSpan.End()
 			return
 		}
-		result.Name = change.Existing.Name
-		result.Group = change.Existing.Group
 
 		versionlessGVR := schema.GroupVersionResource{
 			Group:    change.Existing.Group,
@@ -94,67 +149,89 @@ func applyChange(ctx context.Context, change ResourceFileChange, clients resourc
 		// TODO: should we use the clients or the resource manager instead?
 		client, gvk, err := clients.ForResource(deleteCtx, versionlessGVR)
 		if err != nil {
-			result.Kind = versionlessGVR.Resource // could not find a kind
-			result.Error = fmt.Errorf("get client for deleted object: %w", err)
-			progress.Record(deleteCtx, result)
+			resultBuilder.WithError(fmt.Errorf("get client for deleted object: %w", err)).
+				WithName(change.Existing.Name).
+				WithGroup(change.Existing.Group).
+				WithKind(versionlessGVR.Resource) // could not find a kind
+			progress.Record(deleteCtx, resultBuilder.Build())
 			deleteSpan.End()
 			return
 		}
-		result.Kind = gvk.Kind
+
+		resultBuilder.WithName(change.Existing.Name).
+			WithGVK(gvk)
 
 		if err := client.Delete(deleteCtx, change.Existing.Name, metav1.DeleteOptions{}); err != nil {
-			result.Error = fmt.Errorf("deleting resource %s/%s %s: %w", change.Existing.Group, gvk.Kind, change.Existing.Name, err)
+			resultBuilder.WithError(fmt.Errorf("deleting resource %s/%s %s: %w", change.Existing.Group, gvk.Kind, change.Existing.Name, err))
+		} else {
+			quotaTracker.Release()
 		}
-		progress.Record(deleteCtx, result)
+		progress.Record(deleteCtx, resultBuilder.Build())
 		deleteSpan.End()
 		return
 	}
 
 	// Handle folders based on action type
 	if safepath.IsDir(change.Path) {
-		// For non-deletions, ensure folder exists
-		ensureFolderCtx, ensureFolderSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.ensure_folder_exists")
-		result := jobs.JobResourceResult{
-			Path:   change.Path,
-			Action: change.Action,
-			Group:  resources.FolderKind.Group,
-			Kind:   resources.FolderKind.Kind,
-		}
-
-		folder, err := repositoryResources.EnsureFolderPathExist(ensureFolderCtx, change.Path)
-		if err != nil {
-			result.Error = fmt.Errorf("ensuring folder exists at path %s: %w", change.Path, err)
-			ensureFolderSpan.RecordError(err)
-			ensureFolderSpan.End()
-			progress.Record(ctx, result)
+		if change.Action == repository.FileActionCreated && !quotaTracker.TryAcquire() {
+			progress.Record(ctx, jobs.NewFolderResult(change.Path).
+				WithAction(change.Action).
+				WithError(quotas.NewQuotaExceededError(fmt.Errorf("resource quota exceeded, skipping creation of %s", change.Path))).
+				AsSkipped().
+				Build())
 			return
 		}
 
-		result.Name = folder
-		progress.Record(ensureFolderCtx, result)
+		// For non-deletions, ensure folder exists
+		ensureFolderCtx, ensureFolderSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.ensure_folder_exists")
+		resultBuilder := jobs.NewFolderResult(change.Path).WithAction(change.Action)
+
+		folder, err := repositoryResources.EnsureFolderPathExist(ensureFolderCtx, change.Path)
+		if err != nil {
+			resultBuilder.WithError(fmt.Errorf("ensuring folder exists at path %s: %w", change.Path, err))
+			ensureFolderSpan.RecordError(err)
+			ensureFolderSpan.End()
+			progress.Record(ctx, resultBuilder.Build())
+
+			return
+		}
+
+		resultBuilder.WithName(folder)
+		progress.Record(ensureFolderCtx, resultBuilder.Build())
 		ensureFolderSpan.End()
+		return
+	}
+
+	if change.Action == repository.FileActionCreated && !quotaTracker.TryAcquire() {
+		progress.Record(ctx, jobs.NewPathOnlyResult(change.Path).
+			WithAction(change.Action).
+			WithError(quotas.NewQuotaExceededError(fmt.Errorf("resource quota exceeded, skipping creation of %s", change.Path))).
+			AsSkipped().
+			Build())
 		return
 	}
 
 	writeCtx, writeSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.write_resource_from_file")
 	name, gvk, err := repositoryResources.WriteResourceFromFile(writeCtx, change.Path, "")
-	result := jobs.JobResourceResult{
-		Path:   change.Path,
-		Action: change.Action,
-		Name:   name,
-		Group:  gvk.Group,
-		Kind:   gvk.Kind,
-	}
-
+	resultBuilder := jobs.NewGVKResult(name, gvk).WithAction(change.Action).WithPath(change.Path)
 	if err != nil {
 		writeSpan.RecordError(err)
-		result.Error = fmt.Errorf("writing resource from file %s: %w", change.Path, err)
+		resultBuilder.WithError(fmt.Errorf("writing resource from file %s: %w", change.Path, err))
 	}
-	progress.Record(writeCtx, result)
+
+	progress.Record(writeCtx, resultBuilder.Build())
 	writeSpan.End()
 }
 
-func applyChanges(ctx context.Context, changes []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, maxSyncWorkers int) error {
+// instrument a function with a phase and metrics
+func instrumentedFullSyncPhase(phase jobs.FullSyncPhase, fn func() error, metrics jobs.JobMetrics) error {
+	phaseStart := time.Now()
+	err := fn()
+	metrics.RecordFullSyncPhase(phase, time.Since(phaseStart))
+	return err
+}
+
+func applyChanges(ctx context.Context, changes []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, maxSyncWorkers int, metrics jobs.JobMetrics, quotaTracker quotas.QuotaTracker) error {
 	progress.SetTotal(ctx, len(changes))
 
 	_, applyChangesSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes",
@@ -199,97 +276,96 @@ func applyChanges(ctx context.Context, changes []ResourceFileChange, clients res
 	)
 
 	if len(fileDeletions) > 0 {
-		if err := applyResourcesInParallel(ctx, fileDeletions, clients, repositoryResources, progress, tracer, maxSyncWorkers); err != nil {
+		if err := instrumentedFullSyncPhase(jobs.FullSyncPhaseFileDeletions, func() error {
+			return applyResourcesInParallel(ctx, fileDeletions, clients, repositoryResources, progress, tracer, maxSyncWorkers, quotaTracker)
+		}, metrics); err != nil {
 			return err
 		}
 	}
 
 	if len(folderDeletions) > 0 {
-		if err := applyFoldersSerially(ctx, folderDeletions, clients, repositoryResources, progress, tracer); err != nil {
+		if err := instrumentedFullSyncPhase(jobs.FullSyncPhaseFolderDeletions, func() error {
+			return applyFoldersSerially(ctx, folderDeletions, clients, repositoryResources, progress, tracer, quotaTracker)
+		}, metrics); err != nil {
 			return err
 		}
 	}
 
 	if len(folderCreations) > 0 {
-		if err := applyFoldersSerially(ctx, folderCreations, clients, repositoryResources, progress, tracer); err != nil {
+		if err := instrumentedFullSyncPhase(jobs.FullSyncPhaseFolderCreations, func() error {
+			return applyFoldersSerially(ctx, folderCreations, clients, repositoryResources, progress, tracer, quotaTracker)
+		}, metrics); err != nil {
 			return err
 		}
 	}
 
 	if len(fileCreations) > 0 {
-		return applyResourcesInParallel(ctx, fileCreations, clients, repositoryResources, progress, tracer, maxSyncWorkers)
+		if err := instrumentedFullSyncPhase(jobs.FullSyncPhaseFileCreations, func() error {
+			return applyResourcesInParallel(ctx, fileCreations, clients, repositoryResources, progress, tracer, maxSyncWorkers, quotaTracker)
+		}, metrics); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func applyFoldersSerially(ctx context.Context, folders []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer) error {
-	folderCtx, folderCancel := context.WithCancel(ctx)
-	defer folderCancel()
-
+func applyFoldersSerially(ctx context.Context, folders []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, quotaTracker quotas.QuotaTracker) error {
 	for _, folder := range folders {
-		if folderCtx.Err() != nil {
-			return folderCtx.Err()
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 
 		if err := progress.TooManyErrors(); err != nil {
 			return err
 		}
 
-		applyChange(folderCtx, folder, clients, repositoryResources, progress, tracer)
+		wrapWithTimeout(ctx, 15*time.Second, func(timeoutCtx context.Context) {
+			applyChange(timeoutCtx, folder, clients, repositoryResources, progress, tracer, quotaTracker)
+		})
 	}
 
 	return nil
 }
 
-func applyResourcesInParallel(ctx context.Context, resources []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, maxSyncWorkers int) error {
+func applyResourcesInParallel(ctx context.Context, resources []ResourceFileChange, clients resources.ResourceClients, repositoryResources resources.RepositoryResources, progress jobs.JobProgressRecorder, tracer tracing.Tracer, maxSyncWorkers int, quotaTracker quotas.QuotaTracker) error {
+	logger := logging.FromContext(ctx)
+	logger.Info("applying resources in parallel test changes 1")
+
 	if len(resources) == 0 {
 		return nil
 	}
 
-	workerCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	changeChan := make(chan ResourceFileChange, len(resources))
+	sem := make(chan struct{}, maxSyncWorkers)
 	var wg sync.WaitGroup
 
-	for i := 0; i < maxSyncWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case change, ok := <-changeChan:
-					if !ok {
-						return
-					}
-
-					if err := progress.TooManyErrors(); err != nil {
-						cancel()
-						return
-					}
-					if workerCtx.Err() != nil {
-						return
-					}
-
-					applyChange(workerCtx, change, clients, repositoryResources, progress, tracer)
-
-				case <-workerCtx.Done():
-					return
-				}
-			}
-		}()
-	}
-
+loop:
 	for _, change := range resources {
-		select {
-		case changeChan <- change:
-		case <-workerCtx.Done():
-			goto done
+		if err := progress.TooManyErrors(); err != nil {
+			break
 		}
+		if ctx.Err() != nil {
+			break
+		}
+
+		// Acquire semaphore slot (blocks if max workers reached)
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break loop
+		}
+
+		wg.Add(1)
+		go func(change ResourceFileChange) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			wrapWithTimeout(ctx, 15*time.Second, func(timeoutCtx context.Context) {
+				applyChange(timeoutCtx, change, clients, repositoryResources, progress, tracer, quotaTracker)
+			})
+		}(change)
 	}
-done:
-	close(changeChan)
+
 	wg.Wait()
 
 	if err := progress.TooManyErrors(); err != nil {
@@ -297,4 +373,57 @@ done:
 	}
 
 	return ctx.Err()
+}
+
+// wrapWithTimeout wraps a function call with a timeout context
+func wrapWithTimeout(ctx context.Context, timeout time.Duration, fn func(context.Context)) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	fn(timeoutCtx)
+}
+
+// checkQuotaBeforeSync checks if the repository is over quota and if the sync would exceed the quota limit.
+// Returns a QuotaExceededError if the sync should be blocked, nil otherwise.
+func checkQuotaBeforeSync(ctx context.Context, repo repository.Repository, changes []ResourceFileChange, tracer tracing.Tracer) error {
+	if !quotas.IsQuotaExceeded(repo.Config().Status.Conditions) {
+		return nil
+	}
+
+	cfg := repo.Config()
+	quotaUsage := quotas.NewQuotaUsageFromStats(cfg.Status.Stats)
+
+	// Calculate the net change in resource count (positive for additions, negative for deletions)
+	var netChange int64
+	allDeletions := true
+	for _, change := range changes {
+		if change.Action != repository.FileActionDeleted {
+			allDeletions = false
+		}
+
+		switch change.Action {
+		case repository.FileActionCreated:
+			netChange++
+		case repository.FileActionDeleted:
+			netChange--
+		case repository.FileActionUpdated, repository.FileActionRenamed, repository.FileActionIgnored:
+			// change does not affect quota
+		default:
+			logger.Error("unknown change action", "action", change.Action)
+		}
+	}
+
+	// If only deletions, allow the sync since it can only reduce resource usage.
+	if allDeletions {
+		return nil
+	}
+
+	if !quotas.WouldStayWithinQuota(cfg.Status.Quota, quotaUsage, netChange) {
+		return quotas.NewQuotaExceededError(fmt.Errorf(
+			"usage %d/%d, incoming changes do not free enough resources",
+			quotaUsage.TotalResources, cfg.Status.Quota.MaxResourcesPerRepository,
+		))
+	}
+
+	return nil
 }

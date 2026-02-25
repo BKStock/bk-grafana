@@ -2,17 +2,19 @@ import { t } from '@grafana/i18n';
 import {
   sceneGraph,
   SceneGridItemLike,
+  SceneGridLayout,
   SceneGridRow,
   SceneObject,
   SceneObjectBase,
   SceneObjectState,
   VizPanel,
 } from '@grafana/scenes';
-import { Spec as DashboardV2Spec } from '@grafana/schema/dist/esm/schema/dashboard/v2';
+import { Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 
 import { dashboardEditActions, ObjectsReorderedOnCanvasEvent } from '../../edit-pane/shared';
 import { serializeRowsLayout } from '../../serialization/layoutSerializers/RowsLayoutSerializer';
 import { getDashboardSceneFor } from '../../utils/utils';
+import { AutoGridItem } from '../layout-auto-grid/AutoGridItem';
 import { AutoGridLayoutManager } from '../layout-auto-grid/AutoGridLayoutManager';
 import { DashboardGridItem } from '../layout-default/DashboardGridItem';
 import { DefaultGridLayoutManager } from '../layout-default/DefaultGridLayoutManager';
@@ -21,7 +23,10 @@ import { TabsLayoutManager } from '../layout-tabs/TabsLayoutManager';
 import { findAllGridTypes } from '../layouts-shared/findAllGridTypes';
 import { getRowFromClipboard } from '../layouts-shared/paste';
 import { showConvertMixedGridsModal, showUngroupConfirmation } from '../layouts-shared/ungroupConfirmation';
-import { generateUniqueTitle, ungroupLayout, GridLayoutType, mapIdToGridLayoutType } from '../layouts-shared/utils';
+import { generateUniqueTitle, GridLayoutType, mapIdToGridLayoutType, ungroupLayout } from '../layouts-shared/utils';
+import { DashboardDropTarget } from '../types/DashboardDropTarget';
+import { isDashboardLayoutGrid } from '../types/DashboardLayoutGrid';
+import { DashboardLayoutGroup, isDashboardLayoutGroup } from '../types/DashboardLayoutGroup';
 import { DashboardLayoutManager } from '../types/DashboardLayoutManager';
 import { isLayoutParent } from '../types/LayoutParent';
 import { LayoutRegistryItem } from '../types/LayoutRegistryItem';
@@ -31,11 +36,16 @@ import { RowLayoutManagerRenderer } from './RowsLayoutManagerRenderer';
 
 interface RowsLayoutManagerState extends SceneObjectState {
   rows: RowItem[];
+  isDropTarget?: boolean;
 }
 
-export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> implements DashboardLayoutManager {
+export class RowsLayoutManager
+  extends SceneObjectBase<RowsLayoutManagerState>
+  implements DashboardLayoutGroup, DashboardDropTarget
+{
   public static Component = RowLayoutManagerRenderer;
   public readonly isDashboardLayoutManager = true;
+  public readonly isDashboardDropTarget = true as const;
 
   public static readonly descriptor: LayoutRegistryItem = {
     get name() {
@@ -50,13 +60,47 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
     icon: 'list-ul',
   };
 
-  public serialize(): DashboardV2Spec['layout'] {
-    return serializeRowsLayout(this);
+  public serialize(isSnapshot?: boolean): DashboardV2Spec['layout'] {
+    return serializeRowsLayout(this, isSnapshot);
   }
 
   public readonly descriptor = RowsLayoutManager.descriptor;
 
-  public addPanel(vizPanel: VizPanel) {}
+  public addPanel(vizPanel: VizPanel) {
+    this.state.rows[0]?.getLayout().addPanel(vizPanel);
+  }
+
+  public setIsDropTarget(isDropTarget: boolean): void {
+    this.setState({ isDropTarget });
+  }
+
+  public draggedGridItemInside(gridItem: SceneGridItemLike): void {
+    // Create a new row with a DefaultGridLayoutManager and add the grid item to it
+    const newLayout = new DefaultGridLayoutManager({
+      grid: new SceneGridLayout({ children: [], isDraggable: true, isResizable: true }),
+    });
+    const newRow = new RowItem({
+      title: t('dashboard.rows-layout.new-row-title', 'New row'),
+      layout: newLayout,
+      collapse: false,
+    });
+
+    // Convert AutoGridItem to DashboardGridItem if needed
+    if (gridItem instanceof AutoGridItem) {
+      const vizPanel = gridItem.state.body;
+      const newGridItem = new DashboardGridItem({
+        body: vizPanel.clone(),
+        width: 12,
+        height: 8,
+      });
+      newLayout.addGridItem(newGridItem);
+    } else if (gridItem instanceof DashboardGridItem) {
+      newLayout.addGridItem(gridItem);
+    }
+
+    // Add the row to this layout
+    this.setState({ rows: [...this.state.rows, newRow], isDropTarget: false });
+  }
 
   public getVizPanels(): VizPanel[] {
     const panels: VizPanel[] = [];
@@ -132,7 +176,7 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
     return outlineChildren;
   }
 
-  public convertAllRowsLayouts(gridLayoutType: GridLayoutType) {
+  public convertAllGridLayouts(gridLayoutType: GridLayoutType) {
     for (const row of this.state.rows) {
       switch (gridLayoutType) {
         case GridLayoutType.AutoGridLayout:
@@ -187,7 +231,7 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
       description: t('dashboard.rows-layout.edit.ungroup-rows', 'Ungroup rows'),
       source: scene,
       perform: () => {
-        this._ungroupRows(gridLayoutType);
+        this.ungroup(gridLayoutType);
       },
       undo: () => {
         parent.switchLayout(previousLayout);
@@ -195,15 +239,15 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
     });
   }
 
-  private _ungroupRows(gridLayoutType: GridLayoutType) {
+  public ungroup(gridLayoutType: GridLayoutType) {
     const hasNonGridLayout = this.state.rows.some((row) => !row.getLayout().descriptor.isGridLayout);
 
     if (hasNonGridLayout) {
       for (const row of this.state.rows) {
         const layout = row.getLayout();
         if (!layout.descriptor.isGridLayout) {
-          if (layout instanceof RowsLayoutManager) {
-            layout._ungroupRows(gridLayoutType);
+          if (isDashboardLayoutGroup(layout)) {
+            layout.ungroup(gridLayoutType);
           } else {
             throw new Error(`Ungrouping not supported for layout type: ${layout.descriptor.name}`);
           }
@@ -211,7 +255,7 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
       }
     }
 
-    this.convertAllRowsLayouts(gridLayoutType);
+    this.convertAllGridLayouts(gridLayoutType);
 
     const firstRow = this.state.rows[0];
     const firstRowLayout = firstRow.getLayout();
@@ -219,8 +263,8 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
 
     for (const row of otherRows) {
       const layout = row.getLayout();
-      if (firstRowLayout.merge) {
-        firstRowLayout.merge(layout);
+      if (isDashboardLayoutGrid(firstRowLayout) && isDashboardLayoutGrid(layout)) {
+        firstRowLayout.mergeGrid(layout);
       } else {
         throw new Error(`Layout type ${firstRowLayout.descriptor.name} does not support merging`);
       }
@@ -228,22 +272,32 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
 
     this.setState({ rows: [firstRow] });
     this.removeRow(firstRow, true);
+    ungroupLayout(this, firstRow.state.layout, true);
   }
 
   public removeRow(row: RowItem, skipUndo?: boolean) {
-    // When removing last row replace ourselves with the inner row layout
-    if (this.shouldUngroup()) {
-      ungroupLayout(this, row.state.layout, skipUndo ?? false);
-      return;
+    const rowsBeforeRemoval = [...this.state.rows];
+    const rowsAfterRemoval = rowsBeforeRemoval.filter((r) => r !== row);
+    const parent = this.parent!;
+    if (!isLayoutParent(parent)) {
+      throw new Error('Parent object is not a LayoutParent');
     }
 
-    const indexOfRowToRemove = this.state.rows.findIndex((r) => r === row);
+    const perform = () => {
+      if (!rowsAfterRemoval.length) {
+        parent.switchLayout(AutoGridLayoutManager.createEmpty());
+      } else {
+        this.setState({ rows: rowsAfterRemoval });
+      }
+    };
 
-    const perform = () => this.setState({ rows: this.state.rows.filter((r) => r !== row) });
+    const thisLayout = this;
     const undo = () => {
-      const rows = [...this.state.rows];
-      rows.splice(indexOfRowToRemove, 0, row);
-      this.setState({ rows });
+      if (!rowsAfterRemoval.length) {
+        parent.switchLayout(thisLayout);
+      } else {
+        this.setState({ rows: rowsBeforeRemoval });
+      }
     };
 
     if (skipUndo) {
@@ -293,6 +347,8 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
 
         const conditionalRendering = tab.state.conditionalRendering;
         conditionalRendering?.clearParent();
+        // We need to clear the target since we don't want to point the original tab anymore (if it was set)
+        conditionalRendering?.setTarget(undefined);
 
         rows.push(
           new RowItem({
@@ -357,8 +413,7 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
             layout: DefaultGridLayoutManager.fromGridItems(
               rowConfig.children,
               rowConfig.isDraggable ?? layout.state.grid.state.isDraggable,
-              rowConfig.isResizable ?? layout.state.grid.state.isResizable,
-              layout.state.grid.state.isLazy
+              rowConfig.isResizable ?? layout.state.grid.state.isResizable
             ),
           })
       );
@@ -388,5 +443,31 @@ export class RowsLayoutManager extends SceneObjectBase<RowsLayoutManagerState> i
     });
 
     return duplicateTitles;
+  }
+
+  public collapseAllRows() {
+    this.state.rows.forEach((row) => {
+      if (!row.getCollapsedState()) {
+        row.setCollapsedState(true);
+      }
+      row.state.repeatedRows?.forEach((repeatedRow) => {
+        if (!repeatedRow.getCollapsedState()) {
+          repeatedRow.setCollapsedState(true);
+        }
+      });
+    });
+  }
+
+  public expandAllRows() {
+    this.state.rows.forEach((row) => {
+      if (row.getCollapsedState()) {
+        row.setCollapsedState(false);
+      }
+      row.state.repeatedRows?.forEach((repeatedRow) => {
+        if (repeatedRow.getCollapsedState()) {
+          repeatedRow.setCollapsedState(false);
+        }
+      });
+    });
   }
 }

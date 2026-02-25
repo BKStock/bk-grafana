@@ -22,11 +22,11 @@ import { RepoInvalidStateBanner } from '../Shared/RepoInvalidStateBanner';
 import { ResourceEditFormSharedFields } from '../Shared/ResourceEditFormSharedFields';
 
 export interface Props {
+  canPushToConfiguredBranch: boolean;
   dashboard: DashboardScene;
   defaultValues: ProvisionedDashboardFormData;
   readOnly: boolean;
   isNew?: boolean;
-  workflowOptions: Array<{ label: string; value: string }>;
   loadedFromRef?: string;
   repository?: RepositoryView;
   onDismiss: () => void;
@@ -37,12 +37,12 @@ export interface Props {
  * Drawer component for deleting a git provisioned dashboard.
  */
 export function DeleteProvisionedDashboardForm({
+  canPushToConfiguredBranch,
   dashboard,
   defaultValues,
   loadedFromRef,
   readOnly,
   isNew,
-  workflowOptions,
   repository,
   onDismiss,
 }: Props) {
@@ -166,6 +166,8 @@ export function DeleteProvisionedDashboardForm({
     request,
     workflow,
     resourceType: 'dashboard',
+    repository,
+    selectedBranch: ref || loadedFromRef,
     successMessage: t(
       'dashboard-scene.delete-provisioned-dashboard-form.success-message',
       'Dashboard deleted successfully'
@@ -204,8 +206,7 @@ export function DeleteProvisionedDashboardForm({
                 resourceType="dashboard"
                 isNew={isNew}
                 readOnly={readOnly}
-                workflow={workflow}
-                workflowOptions={workflowOptions}
+                canPushToConfiguredBranch={canPushToConfiguredBranch}
                 repository={repository}
               />
 

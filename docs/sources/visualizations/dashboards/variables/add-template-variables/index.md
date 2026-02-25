@@ -104,6 +104,7 @@ The following table lists the types of variables shipped with Grafana.
 | Data source       | Quickly change the data source for an entire dashboard. [Add a data source variable](#add-a-data-source-variable).                                                                      |
 | Interval          | Interval variables represent time spans. [Add an interval variable](#add-an-interval-variable).                                                                                         |
 | Ad hoc filters    | Key/value filters that are automatically added to all metric queries for a data source (Prometheus, Loki, InfluxDB, and Elasticsearch only). [Add ad hoc filters](#add-ad-hoc-filters). |
+| Switch            | Display a switch that allows you to toggle between two configurable values for enabled and disabled states. [Add a switch variable](#add-a-switch-variable).                            |
 | Global variables  | Built-in variables that can be used in expressions in the query editor. Refer to [Global variables](#global-variables).                                                                 |
 | Chained variables | Variable queries can contain other variables. Refer to [Chained variables](#chained-variables).                                                                                         |
 
@@ -122,10 +123,11 @@ To create a variable, follow these steps:
 
    If you don't enter a display name, then the drop-down list label is the variable name.
 
-1. Choose a **Show on dashboard** option:
-   - **Label and value** - The variable drop-down list displays the variable **Name** or **Label** value. This is the default.
-   - **Value:** The variable drop-down list only displays the selected variable value and a down arrow.
-   - **Nothing:** No variable drop-down list is displayed on the dashboard.
+1. Choose a **Display** option:
+   - **Above dashboard** - The variable drop-down list displays above the dashboard with the variable **Name** or **Label** value. This is the default.
+   - **Above dashboard, label hidden** - The variable drop-down list displays above the dashboard, but without showing the name of the variable.
+   - **Controls menu** - The variable is displayed in the dashboard controls menu instead of above the dashboard. The dashboard controls menu appears as a button in the dashboard toolbar.
+   - **Hidden** - No variable drop-down list is displayed on the dashboard.
 
 1. Click one of the following links to complete the steps for adding your selected variable type:
    - [Query](#add-a-query-variable)
@@ -135,6 +137,7 @@ To create a variable, follow these steps:
    - [Data source](#add-a-data-source-variable)
    - [Interval](#add-an-interval-variable)
    - [Ad hoc filters](#add-ad-hoc-filters)
+   - [Switch](#add-a-switch-variable)
 
 <!-- vale Grafana.Spelling = YES -->
 
@@ -143,7 +146,7 @@ To create a variable, follow these steps:
 - Variable drop-down lists are displayed in the order in which they're listed in the **Variables** in dashboard settings, so put the variables that you will change often at the top, so they will be shown first (far left on the dashboard).
 - By default, variables don't have a default value. This means that the topmost value in the drop-down list is always preselected. If you want to pre-populate a variable with an empty value, you can use the following workaround in the variable settings:
   1. Select the **Include All Option** checkbox.
-  2. In the **Custom all value** field, enter a value like `+`.
+  2. In the **Custom all value** field, enter a value like `.+`.
 
 ## Add a query variable
 
@@ -159,33 +162,31 @@ Query expressions are different for each data source. For more information, refe
 
 1. [Enter general options](#enter-general-options).
 1. Under the **Query options** section of the page, select a target data source in the **Data source** drop-down list.
-
    You can also click **Open advanced data source picker** to see more options, including adding a data source (Admins only).
    For more information about data sources, refer to [Add a data source](ref:add-a-data-source).
 
-1. In the **Query type** drop-down list, select one of the following options:
-   - **Label names**
-   - **Label values**
-   - **Metrics**
-   - **Query result**
-   - **Series query**
-   - **Classic query**
-
-1. In the **Query** field, enter a query.
+1. In the **Query type** drop-down list, select an option and fill in the query fields accordingly.
    - The query field varies according to your data source. Some data sources have custom query editors.
    - Each data source defines how the variable values are extracted. The typical implementation uses every string value returned from the data source response as a variable value. Make sure to double-check the documentation for the data source.
    - Some data sources let you provide custom "display names" for the values. For instance, the PostgreSQL, MySQL, and Microsoft SQL Server plugins handle this by looking for fields named `__text` and `__value` in the result. Other data sources may look for `text` and `value` or use a different approach. Always remember to double-check the documentation for the data source.
    - If you need more room in a single input field query editor, then hover your cursor over the lines in the lower right corner of the field and drag downward to expand.
 
 1. (Optional) In the **Regex** field, type a regular expression to filter or capture specific parts of the names returned by your data source query. To see examples, refer to [Filter variables with a regular expression](#filter-variables-with-regex).
+1. Under **Apply regex to**, select **Variable value** or **Display text** to choose where the regex pattern is applied. The default is **Variable value**.
 1. In the **Sort** drop-down list, select the sort order for values to be displayed in the dropdown list. The default option, **Disabled**, means that the order of options returned by your data source query is used.
 1. Under **Refresh**, select when the variable should update options:
    - **On dashboard load** - Queries the data source every time the dashboard loads. This slows down dashboard loading, because the variable query needs to be completed before dashboard can be initialized.
    - **On time range change** - Queries the data source every time the dashboard loads and when the dashboard time range changes. Use this option if your variable options query contains a time range filter or is dependent on the dashboard time range.
 
+1. (Optional) In the **Static options** section of the page, toggle on the **Use static options** switch to add custom options in addition to the query results:
+   - Make entries in the **Value** and **Display text** fields.
+   - Click **+ Add new option** to add another static option.
+   - Repeat these steps as many times as needed.
+
 1. (Optional) Configure the settings in the [Selection Options](#configure-variable-selection-options) section:
    - **Multi-value** - Enables multiple values to be selected at the same time.
-   - **Include All option** - Enables an option to include all variables.
+   - **Allow custom values** - Enables users to add custom values to the list.
+   - **Include All option** - Enables an option to include all variables. Enter a value in the **Custom all value** field to set your own "all" option.
 
 1. In the **Preview of values** section, Grafana displays a list of the current variable values. Review them to ensure they match what you expect.
 1. Click **Save dashboard**.
@@ -198,15 +199,16 @@ Use a _custom_ variable for a value that does not change, such as a number or a 
 For example, if you have server names or region names that never change, then you might want to create them as custom variables rather than query variables. Because they do not change, you might use them in [chained variables](#chained-variables) rather than other query variables. That would reduce the number of queries Grafana must send when chained variables are updated.
 
 1. [Enter general options](#enter-general-options).
-1. Under the **Custom options** section of the page, in the **Values separated by comma** field, enter the values for this variable in a comma-separated list.
-
-   You can include numbers, strings, or key/value pairs separated by a space and a colon. For example, `key1 : value1,key2 : value2`.
+1. Under the **Custom options** section of the page, select one of the following:
+   - **CSV** - Enter a flat list of values for the variable in a comma-separated list. You can include numbers, strings, or key/value pairs separated by a space and a colon. For example, `key1 : value1,key2 : value2`.
+   - **JSON** - Provide a JSON array of objects where each object can have any number of properties that can be referenced. For more information refer, to [Configure multi-property variables](#configure-multi-property-variables).
 
 1. (Optional) Configure the settings in the [Selection Options](#configure-variable-selection-options) section:
    - **Multi-value** - Enables multiple values to be selected at the same time.
+   - **Allow custom values** - Enables users to add custom values to the list. Only applies to CSV custom values.
    - **Include All option** - Enables an option to include all variables.
 
-1. In the **Preview of values** section, Grafana displays a list of the current variable values. Review them to ensure they match what you expect.
+1. In the **Preview of values** section, Grafana displays a list of the current variable values. If you've entered a JSON array, the preview is a table that includes all the value properties. Review them to ensure they match what you expect.
 1. Click **Save dashboard**.
 1. Click **Back to dashboard** and **Exit edit**.
 
@@ -330,6 +332,23 @@ To create an ad hoc filter, follow these steps:
 
 Now you can [filter data on the dashboard](ref:filter-dashboard).
 
+{{< admonition type="tip" >}}
+You can use data links to link back to the dashboard you are currently on. This enables "panel-to-panel filtering," where clicking a data point in one panel updates the dashboard variables and filters the rest of the dashboard.
+
+To preserve the context of the current dashboard:
+
+- **Time range:** You must explicitly include the current time range in the link.
+- **Variables:** You must enable **Include all variables** to preserve existing selections.
+- **Ordering:** Ensure that **Include all variables** is placed before the specific variable you are defining in the link.
+
+Ad hoc filters on the current dashboard are automatically preserved.
+
+Learn more in:
+
+- [Configure data links and actions](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/visualizations/panels-visualizations/configure-data-links/)
+- [Create dashboard URL variables – Ad hoc filters](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/visualizations/dashboards/build-dashboards/create-dashboard-url-variables/#ad-hoc-filters)
+  {{< /admonition >}}
+
 ### Filter any data using the Dashboard data source
 
 In cases where a data source doesn't support the use of ad hoc filters, you can use the Dashboard data source to reference that data, and then filter it in a new panel.
@@ -383,6 +402,51 @@ If one of the panels in the dashboard using that data source doesn't include tha
 
 In cases where the data source you're using doesn't support ad hoc filtering, consider using the special Dashboard data source.
 For more information, refer to [Filter any data using the Dashboard data source](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/dashboards/variables/add-template-variables/#filter-any-data-using-the-dashboard-data-source).
+
+## Add a switch variable
+
+_Switch_ variables display a switch with two configurable values representing enabled and disabled states. This variable type is useful when you need to:
+
+- Toggle between different query conditions
+- Enable or disable specific filters
+- Switch between different visualization modes
+- Control boolean parameters in your data sources
+
+1. [Enter general options](#enter-general-options).
+1. Under the **Switch options** section of the page, configure the switch values:
+
+   In the **Value pair type** drop-down list, select one of the following predefined options or choose **Custom** to define your own values:
+   - **True / False** - Uses boolean values `true` and `false`
+   - **1 / 0** - Uses numeric values `1` and `0`
+   - **Yes / No** - Uses string values `yes` and `no`
+   - **Custom** - Allows you to define custom values for both enabled and disabled states
+
+1. If you selected **Custom** in the previous step, configure the custom values:
+   - **Enabled value** - Enter the value that represents the enabled state (for example, "on").
+   - **Disabled value** - Enter the value that represents the disabled state (for example, "off").
+
+1. Click **Save dashboard**.
+1. Click **Back to dashboard** and **Exit edit**.
+
+### Switch variable examples
+
+The following example shows a switch variable `$debug_mode` used in a Prometheus query to conditionally include debug labels:
+
+```
+up{job="my-service"} and ($debug_mode == "true" or on() vector(0))
+```
+
+The following example shows a switch variable `$show_errors` used to filter log entries:
+
+```
+{job="application"} |= ($show_errors == "1" ? "ERROR" : "")
+```
+
+You can also use switch variables in panel titles and other dashboard elements:
+
+```
+{{#if debug_mode}}Debug Mode: {{/if}}Application Metrics
+```
 
 <!-- vale Grafana.Spelling = YES -->
 <!-- vale Grafana.WordList = YES -->
@@ -450,6 +514,53 @@ Enter regular expressions, globs, or Lucene syntax in the **Custom all value** f
 By default the `All` value includes all options in combined expression. This can become very long and can have performance problems. Sometimes it can be better to specify a custom all value, like a wildcard regular expression.
 
 In order to have custom regular expression, globs, or Lucene syntax in the **Custom all value** option, it is never escaped so you have to think about what is a valid value for your data source.
+
+## Configure multi-property variables
+
+If you have a multi-source dashboard that uses multiple variables for the same logical concept&mdash;for example, an environment identified as `dev` vs `development`&mdash;, you can set up a multi-property variable to let you reference all those values. Instead of creating and keeping multiple variables for the same logical concept in sync, you can map all of those identifiers to one variable and then reference any property you need in panels and queries.
+
+To do so, configure a JSON array in which each object can have any number of properties.
+Then, you can reference any of the properties in as you use those variables.
+
+This applies to the following variable types:
+
+- Custom
+- Query
+  - Infinity
+  - PostgreSQL
+
+<!-- add links to data source docs -->
+
+### Multi-property custom variables
+
+To create a custom variable with multiple properties, define a JSON array, like this:
+
+```json
+[
+  { "value": "1", "text": "Development", "aws": "dev", "azure": "development", "google": "googledev" },
+  { "value": "2", "text": "Staging", "aws": "stag", "azure": "staging", "google": "googlestag" },
+  { "value": "3", "text": "Production", "aws": "prod", "azure": "production", "google": "googleprod" }
+]
+```
+
+This is how those values are displayed in a preview:
+
+{{< figure src="/media/docs/grafana/dashboards/screenshot-multipropvar-preview-vals-v12.4.png" max-width="600px" alt="Custom variable configuration and preview of values" >}}
+
+Then you can use `${varName.someProperty}` syntax to reference any property in your dashboard panels or metrics:
+
+{{< figure src="/media/docs/grafana/dashboards/screenshot-multipropvar-used-12.4.png" max-width=750px" alt="Multi-property variable used in a text panel" >}}
+
+You can even deeply nest properties and still access them using familiar variable syntax. In the following example, each user has an address property with all the elements of an address nested within it:
+
+{{< figure src="/media/docs/grafana/dashboards/screenshot-multipropvar-nested-v12.4.png" max-width="650px" alt="Nested variable configuration" >}}
+
+### Multi-property query variables
+
+Because query configuration is different for each data source, there's no one way to set up a JSON array to create a multi-property query variable.
+For PostgreSQL, refer to [PostgreSQL template variables](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/datasources/postgres/template-variables/).
+For other data sources, refer to the relevant [Data sources documentation](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/datasources/) for preinstalled data source plugins.
+For configuration information on all other data source plugins, refer to the [Plugins documentation](https://grafana.com/docs/plugins/).
 
 ## Global variables
 

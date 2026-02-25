@@ -3,6 +3,7 @@ package rbac
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/grafana/grafana/pkg/apimachinery/utils"
 	"github.com/grafana/grafana/pkg/services/accesscontrol/ossaccesscontrol"
@@ -24,17 +25,20 @@ type Mapping interface {
 	AllActions() []string
 	// HasFolderSupport returns true if the translation supports folders.
 	HasFolderSupport() bool
-	// SkipScopeOnCreate returns true if the translation does not require a scope on create.
-	SkipScopeOnCreate() bool
+	// SkipScope returns true if the translation does not require a scope for the given verb.
+	SkipScope(verb string) bool
+	// Resource returns the K8s resource name for this mapping.
+	Resource() string
 }
 
 type translation struct {
-	resource          string
-	attribute         string
-	verbMapping       map[string]string
-	actionSetMapping  map[string][]string
-	folderSupport     bool
-	skipScopeOnCreate bool
+	resource         string
+	attribute        string
+	verbMapping      map[string]string
+	actionSetMapping map[string][]string
+	folderSupport    bool
+	// actions to skip scope on, e.g., create actions
+	skipScopeOnVerb map[string]bool
 	// use this option if you need to limit access to users that can access all resources
 	useWildcardScope bool
 }
@@ -77,8 +81,15 @@ func (t translation) HasFolderSupport() bool {
 	return t.folderSupport
 }
 
-func (t translation) SkipScopeOnCreate() bool {
-	return t.skipScopeOnCreate
+func (t translation) SkipScope(verb string) bool {
+	if t.skipScopeOnVerb != nil {
+		return t.skipScopeOnVerb[verb]
+	}
+	return false
+}
+
+func (t translation) Resource() string {
+	return t.resource
 }
 
 // MapperRegistry is a registry of mappers that maps a group and resource to a translation.
@@ -88,11 +99,13 @@ type MapperRegistry interface {
 	Get(group, resource string) (Mapping, bool)
 	// GetAll returns all the translations for the given group
 	GetAll(group string) []Mapping
+	// GetGroups returns all registered group names
+	GetGroups() []string
 }
 
 type mapper map[string]map[string]translation
 
-func newResourceTranslation(resource string, attribute string, folderSupport, skipScopeOnCreate bool) translation {
+func newResourceTranslation(resource string, attribute string, folderSupport bool, skipScopeOnVerb map[string]bool) translation {
 	defaultMapping := func(r string) map[string]string {
 		return map[string]string{
 			utils.VerbGet:              fmt.Sprintf("%s:read", r),
@@ -109,17 +122,17 @@ func newResourceTranslation(resource string, attribute string, folderSupport, sk
 	}
 
 	return translation{
-		resource:          resource,
-		attribute:         attribute,
-		verbMapping:       defaultMapping(resource),
-		folderSupport:     folderSupport,
-		skipScopeOnCreate: skipScopeOnCreate,
+		resource:        resource,
+		attribute:       attribute,
+		verbMapping:     defaultMapping(resource),
+		folderSupport:   folderSupport,
+		skipScopeOnVerb: skipScopeOnVerb,
 	}
 }
 
 // newDashboardTranslation creates a translation for dashboards and also maps the actions to action sets
 func newDashboardTranslation() translation {
-	dashTranslation := newResourceTranslation("dashboards", "uid", true, false)
+	dashTranslation := newResourceTranslation("dashboards", "uid", true, nil)
 
 	actionSetMapping := make(map[string][]string)
 	for verb, rbacAction := range dashTranslation.verbMapping {
@@ -152,7 +165,7 @@ func newDashboardTranslation() translation {
 
 // newFolderTranslation creates a translation for folders and also maps the actions to action sets
 func newFolderTranslation() translation {
-	folderTranslation := newResourceTranslation("folders", "uid", true, false)
+	folderTranslation := newResourceTranslation("folders", "uid", true, nil)
 
 	actionSetMapping := make(map[string][]string)
 	for verb, rbacAction := range folderTranslation.verbMapping {
@@ -179,21 +192,33 @@ func newFolderTranslation() translation {
 }
 
 func NewMapperRegistry() MapperRegistry {
+	skipScopeOnAllVerbs := map[string]bool{
+		utils.VerbCreate:           true,
+		utils.VerbGet:              true,
+		utils.VerbUpdate:           true,
+		utils.VerbPatch:            true,
+		utils.VerbDelete:           true,
+		utils.VerbDeleteCollection: true,
+		utils.VerbList:             true,
+		utils.VerbWatch:            true,
+		utils.VerbGetPermissions:   true,
+		utils.VerbSetPermissions:   true,
+	}
+
 	mapper := mapper(map[string]map[string]translation{
 		"dashboard.grafana.app": {
 			"dashboards":    newDashboardTranslation(),
-			"librarypanels": newResourceTranslation("library.panels", "uid", true, false),
+			"librarypanels": newResourceTranslation("library.panels", "uid", true, nil),
 		},
 		"folder.grafana.app": {
 			"folders": newFolderTranslation(),
 		},
 		"iam.grafana.app": {
 			// Users is a special case. We translate user permissions from id to uid based.
-			"users":           newResourceTranslation("users", "uid", false, true),
-			"serviceaccounts": newResourceTranslation("serviceaccounts", "uid", false, true),
+			"users":           newResourceTranslation("users", "uid", false, map[string]bool{utils.VerbCreate: true}),
+			"serviceaccounts": newResourceTranslation("serviceaccounts", "uid", false, map[string]bool{utils.VerbCreate: true}),
 			// Teams is a special case. We translate user permissions from id to uid based.
-			"teams": newResourceTranslation("teams", "uid", false, true),
-			// No need to skip scope on create for roles because we translate `permissions:type:delegate` to `roles:*``
+			"teams": newResourceTranslation("teams", "uid", false, map[string]bool{utils.VerbCreate: true}),
 			"coreroles": translation{
 				resource:  "roles",
 				attribute: "uid",
@@ -202,8 +227,20 @@ func NewMapperRegistry() MapperRegistry {
 					utils.VerbList:  "roles:read",
 					utils.VerbWatch: "roles:read",
 				},
-				folderSupport:     false,
-				skipScopeOnCreate: false,
+				folderSupport: false,
+				// No need to skip scope on create for roles because we translate `permissions:type:delegate` to `roles:*``
+				skipScopeOnVerb: nil,
+			},
+			"globalroles": translation{
+				resource:  "roles",
+				attribute: "uid",
+				verbMapping: map[string]string{
+					utils.VerbGet:   "roles:read",
+					utils.VerbList:  "roles:read",
+					utils.VerbWatch: "roles:read",
+				},
+				folderSupport:    false,
+				useWildcardScope: true,
 			},
 			"roles": translation{
 				resource:  "roles",
@@ -218,8 +255,9 @@ func NewMapperRegistry() MapperRegistry {
 					utils.VerbList:             "roles:read",
 					utils.VerbWatch:            "roles:read",
 				},
-				folderSupport:     false,
-				skipScopeOnCreate: false,
+				folderSupport: false,
+				// No need to skip scope on create for roles because we translate `permissions:type:delegate` to `roles:*``
+				skipScopeOnVerb: nil,
 			},
 			"rolebindings": translation{
 				resource: "rolebindings",
@@ -238,9 +276,17 @@ func NewMapperRegistry() MapperRegistry {
 				folderSupport: false,
 			},
 		},
+		"provisioning.grafana.app": {
+			"repositories": newResourceTranslation("provisioning.repositories", "uid", false, skipScopeOnAllVerbs),
+			"connections":  newResourceTranslation("provisioning.connections", "uid", false, skipScopeOnAllVerbs),
+			"jobs":         newResourceTranslation("provisioning.jobs", "uid", false, skipScopeOnAllVerbs),
+			"historicjobs": newResourceTranslation("provisioning.historicjobs", "uid", false, skipScopeOnAllVerbs),
+			"settings":     newResourceTranslation("provisioning.settings", "", false, skipScopeOnAllVerbs),
+			"stats":        newResourceTranslation("provisioning.stats", "", false, skipScopeOnAllVerbs),
+		},
 		"secret.grafana.app": {
-			"securevalues": newResourceTranslation("secret.securevalues", "uid", false, false),
-			"keepers":      newResourceTranslation("secret.keepers", "uid", false, false),
+			"securevalues": newResourceTranslation("secret.securevalues", "uid", false, nil),
+			"keepers":      newResourceTranslation("secret.keepers", "uid", false, nil),
 		},
 		"query.grafana.app": {
 			"query": translation{
@@ -249,21 +295,76 @@ func NewMapperRegistry() MapperRegistry {
 				verbMapping: map[string]string{
 					utils.VerbCreate: "datasources:query",
 				},
-				folderSupport:     false,
-				skipScopeOnCreate: false,
+				folderSupport:   false,
+				skipScopeOnVerb: nil,
 			},
+		},
+		"datasource.grafana.app": { // duplicate the query group here
+			"query": translation{
+				resource:  "datasources",
+				attribute: "uid",
+				verbMapping: map[string]string{
+					utils.VerbCreate: "datasources:query",
+				},
+				folderSupport:   false,
+				skipScopeOnVerb: nil,
+			},
+		},
+		"*.datasource.grafana.app": {
+			"datasources": newResourceTranslation("datasources", "uid", false, nil),
+		},
+		"plugins.grafana.app": {
+			"plugins": newResourceTranslation("plugins.plugins", "uid", false, nil),
+			"metas":   newResourceTranslation("plugins.metas", "uid", false, nil),
+		},
+		"advisor.grafana.app": {
+			"checks":     newResourceTranslation("advisor.checks", "uid", false, nil),
+			"checktypes": newResourceTranslation("advisor.checktypes", "uid", false, nil),
+			"register":   newResourceTranslation("advisor.register", "uid", false, nil),
 		},
 	})
 
 	return mapper
 }
 
+// findGroupKey returns the registry key for group, using exact match first,
+// then wildcard match. A wildcard key has the form "*.<suffix>" (e.g. "*.datasource.grafana.app");
+// group matches if it has that suffix, is longer than the suffix (non-empty prefix), and the prefix
+// contains no dot (so "loki.datasource.grafana.app" matches but "foo.loki.datasource.grafana.app" does not).
+// Group starting with "*" never matches (so we never exact-match a wildcard registry key as input).
+func (m mapper) findGroupKey(group string) (string, bool) {
+	if strings.HasPrefix(group, "*") {
+		return "", false
+	}
+	if _, ok := m[group]; ok {
+		return group, true
+	}
+	for key := range m {
+		// is this a wildcard key?
+		if len(key) < 2 || key[0] != '*' || key[1] != '.' {
+			continue
+		}
+		suffix := key[1:]                              // remove the leading "*"
+		prefix, ok := strings.CutSuffix(group, suffix) // loki.datasource.grafana.app -> loki
+		if !ok || prefix == "" {
+			continue
+		}
+		// prefix must be a single segment (no nested dots)
+		if strings.Contains(prefix, ".") {
+			continue
+		}
+		return key, true
+	}
+	return "", false
+}
+
 func (m mapper) Get(group, resource string) (Mapping, bool) {
-	resources, ok := m[group]
+	groupKey, ok := m.findGroupKey(group)
 	if !ok {
 		return nil, false
 	}
 
+	resources := m[groupKey]
 	t, ok := resources[resource]
 	if !ok {
 		return nil, false
@@ -273,10 +374,12 @@ func (m mapper) Get(group, resource string) (Mapping, bool) {
 }
 
 func (m mapper) GetAll(group string) []Mapping {
-	resources, ok := m[group]
+	groupKey, ok := m.findGroupKey(group)
 	if !ok {
 		return nil
 	}
+
+	resources := m[groupKey]
 
 	translations := make([]Mapping, 0, len(resources))
 	for _, t := range resources {
@@ -284,4 +387,12 @@ func (m mapper) GetAll(group string) []Mapping {
 	}
 
 	return translations
+}
+
+func (m mapper) GetGroups() []string {
+	groups := make([]string, 0, len(m))
+	for group := range m {
+		groups = append(groups, group)
+	}
+	return groups
 }

@@ -7,6 +7,7 @@ import { config, locationService } from '@grafana/runtime';
 import {
   NewSceneObjectAddedEvent,
   PanelBuilders,
+  SceneComponentProps,
   SceneDataTransformer,
   SceneObjectBase,
   SceneObjectRef,
@@ -15,7 +16,6 @@ import {
   SceneQueryRunner,
   sceneUtils,
   VizPanel,
-  isSceneObject,
 } from '@grafana/scenes';
 import { Panel } from '@grafana/schema';
 import { OptionFilter } from 'app/features/dashboard/components/PanelEditor/OptionsPaneOptions';
@@ -38,6 +38,8 @@ import {
 
 import { DataProviderSharer } from './PanelDataPane/DataProviderSharer';
 import { PanelDataPane } from './PanelDataPane/PanelDataPane';
+import { PanelDataPaneNext } from './PanelEditNext/PanelDataPaneNext';
+import { PanelEditorRendererNext } from './PanelEditNext/PanelEditorRendererNext';
 import { PanelEditorRenderer } from './PanelEditorRenderer';
 import { PanelOptionsPane } from './PanelOptionsPane';
 
@@ -45,7 +47,7 @@ export interface PanelEditorState extends SceneObjectState {
   isNewPanel: boolean;
   isDirty?: boolean;
   optionsPane?: PanelOptionsPane;
-  dataPane?: PanelDataPane;
+  dataPane?: PanelDataPane | PanelDataPaneNext;
   panelRef: SceneObjectRef<VizPanel>;
   showLibraryPanelSaveModal?: boolean;
   showLibraryPanelUnlinkModal?: boolean;
@@ -55,10 +57,17 @@ export interface PanelEditorState extends SceneObjectState {
    * Waiting for library panel or panel plugin to load
    */
   isInitializing?: boolean;
+  /**
+   * Enable the v2 query editor experience
+   */
+  useQueryExperienceNext?: boolean;
 }
 
 export class PanelEditor extends SceneObjectBase<PanelEditorState> {
-  static Component = PanelEditorRenderer;
+  static Component = ({ model }: SceneComponentProps<PanelEditor>) => {
+    const { useQueryExperienceNext } = model.useState();
+    return useQueryExperienceNext ? <PanelEditorRendererNext model={model} /> : <PanelEditorRenderer model={model} />;
+  };
 
   private _layoutItemState?: SceneObjectState;
   private _layoutItem: DashboardLayoutItem;
@@ -82,8 +91,14 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
 
   private _activationHandler() {
     const panel = this.state.panelRef.resolve();
+    const dashboard = getDashboardSceneFor(this);
 
-    if (panel.state.pluginId === UNCONFIGURED_PANEL_PLUGIN_ID) {
+    // Clear any panel selection when entering panel edit mode.
+    // Need to clear selection here since selection is activated when panel edit mode is entered through the panel actions menu. This causes sidebar panel editor to be open when exiting panel edit mode
+    dashboard.state.editPane.clearSelection();
+
+    // this will be deleted when suggestions is fully rolled out.
+    if (panel.state.pluginId === UNCONFIGURED_PANEL_PLUGIN_ID && !config.featureToggles.newVizSuggestions) {
       panel.changePluginType('timeseries');
     }
 
@@ -95,16 +110,6 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
     );
 
     const deactivateParents = activateSceneObjectAndParentTree(panel);
-
-    // Ensure headerActions are activated
-    const headerActions = panel.state.headerActions;
-    if (headerActions) {
-      (Array.isArray(headerActions) ? headerActions : [headerActions]).forEach((action) => {
-        if (isSceneObject(action)) {
-          action.activate();
-        }
-      });
-    }
 
     this.waitForPlugin();
 
@@ -215,7 +220,6 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
     // First time initialization
     if (this.state.isInitializing) {
       this.setOriginalState(this.state.panelRef);
-
       this._setupChangeDetection();
       this._updateDataPane(plugin);
 
@@ -229,12 +233,16 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
       );
 
       // Setup options pane
+      const optionsPane = new PanelOptionsPane({
+        panelRef: this.state.panelRef,
+        searchQuery: '',
+        listMode: OptionFilter.All,
+        isVizPickerOpen: this.state.isNewPanel,
+        isNewPanel: this.state.isNewPanel,
+      });
+
       this.setState({
-        optionsPane: new PanelOptionsPane({
-          panelRef: this.state.panelRef,
-          searchQuery: '',
-          listMode: OptionFilter.All,
-        }),
+        optionsPane,
         isInitializing: false,
       });
     } else {
@@ -263,7 +271,7 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
 
     if (!skipDataQuery) {
       if (!this.state.dataPane) {
-        const dataPane = PanelDataPane.createFor(this.getPanel());
+        const dataPane = PanelDataPane.createFor(this.getPanel(), this.state.useQueryExperienceNext);
         this.setState({ dataPane });
         // This is to notify UrlSyncManager that a new object has been added to scene that requires url sync
         this.publishEvent(new NewSceneObjectAddedEvent(dataPane), true);
@@ -385,10 +393,27 @@ export class PanelEditor extends SceneObjectBase<PanelEditorState> {
         .build(),
     });
   };
+
+  /**
+   * Toggle between v1 and v2 query editor.
+   */
+  public onToggleQueryEditorVersion = () => {
+    const newUseQueryExperienceNext = !this.state.useQueryExperienceNext;
+    const dataPane = PanelDataPane.createFor(this.getPanel(), newUseQueryExperienceNext);
+
+    this.setState({
+      useQueryExperienceNext: newUseQueryExperienceNext,
+      dataPane,
+    });
+
+    // This is to notify UrlSyncManager that a new object has been added to scene that requires url sync
+    this.publishEvent(new NewSceneObjectAddedEvent(dataPane), true);
+  };
 }
 
 export function buildPanelEditScene(panel: VizPanel, isNewPanel = false): PanelEditor {
   return new PanelEditor({
+    useQueryExperienceNext: config.featureToggles.queryEditorNext,
     isInitializing: true,
     panelRef: panel.getRef(),
     isNewPanel,

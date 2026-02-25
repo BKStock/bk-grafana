@@ -71,7 +71,7 @@ var (
 )
 
 // ignore fields that are not part of the rule definition
-var ignoreFieldsForValidate = [...]string{"RuleGroupIndex"}
+var ignoreFieldsForValidate = [...]string{"RuleGroupIndex", "FolderFullpath"}
 
 // RouteDeleteAlertRules deletes all alert rules the user is authorized to access in the given namespace
 // or, if non-empty, a specific group of rules in the namespace.
@@ -264,6 +264,7 @@ func (srv RulerSrv) RouteGetRulesGroupConfig(c *contextmodel.ReqContext, namespa
 // RouteGetRulesConfig returns all alert rules that are available to the current user
 func (srv RulerSrv) RouteGetRulesConfig(c *contextmodel.ReqContext) response.Response {
 	if strings.ToLower(c.Query("deleted")) == "true" {
+		//nolint:staticcheck // not yet migrated to OpenFeature
 		if !srv.featureManager.IsEnabledGlobally(featuremgmt.FlagAlertRuleRestore) {
 			return ErrResp(http.StatusBadRequest, errors.New("restore of deleted rules is not enabled"), "")
 		}
@@ -384,12 +385,22 @@ func (srv RulerSrv) RouteGetRuleVersionsByUID(c *contextmodel.ReqContext, ruleUI
 	}
 	sort.Slice(rules, func(i, j int) bool { return rules[i].ID > rules[j].ID })
 	result := make(apimodels.GettableRuleVersions, 0, len(rules))
-	userUIDmapping := srv.getUserUIDmapping(ctx, rules)
+	userUIDmapping := srv.getUserUIDmapping(ctx, alertRuleVersionsToAlertRules(rules))
 	for _, rule := range rules {
 		// do not provide provenance status because we do not have historical changes for it
-		result = append(result, toGettableExtendedRuleNode(*rule, map[string]ngmodels.Provenance{}, userUIDmapping))
+		ruleNode := toGettableExtendedRuleNode(rule.AlertRule, map[string]ngmodels.Provenance{}, userUIDmapping)
+		ruleNode.GrafanaManagedAlert.Message = rule.Message
+		result = append(result, ruleNode)
 	}
 	return response.JSON(http.StatusOK, result)
+}
+
+func alertRuleVersionsToAlertRules(vs []*ngmodels.AlertRuleVersion) []*ngmodels.AlertRule {
+	result := make([]*ngmodels.AlertRule, len(vs))
+	for i := range vs {
+		result[i] = &vs[i].AlertRule
+	}
+	return result
 }
 
 func (srv RulerSrv) RoutePostNameRulesConfig(c *contextmodel.ReqContext, ruleGroupConfig apimodels.PostableRuleGroupConfig, namespaceUID string) response.Response {
@@ -401,9 +412,14 @@ func (srv RulerSrv) RoutePostNameRulesConfig(c *contextmodel.ReqContext, ruleGro
 		deletePermanently = true
 	}
 
-	namespace, err := srv.store.GetNamespaceByUID(c.Req.Context(), namespaceUID, c.GetOrgID(), c.SignedInUser)
+	f, err := srv.store.GetNamespaceByUID(c.Req.Context(), namespaceUID, c.GetOrgID(), c.SignedInUser)
 	if err != nil {
 		return toNamespaceErrorResponse(err)
+	}
+
+	namespace := ngmodels.NewNamespace(f)
+	if err := namespace.ValidateForRuleStorage(); err != nil {
+		return ErrResp(http.StatusBadRequest, fmt.Errorf("%w: %s", ngmodels.ErrAlertRuleFailedValidation, err), "")
 	}
 
 	if err := srv.checkGroupLimits(ruleGroupConfig); err != nil {
@@ -519,7 +535,7 @@ func (srv RulerSrv) performUpdateAlertRules(ctx context.Context, c *contextmodel
 			if err != nil {
 				return fmt.Errorf("failed to parse configuration: %w", err)
 			}
-			validator := notifier.NewNotificationSettingsValidator(&cfg.AlertmanagerConfig)
+			validator := notifier.NewNotificationSettingsValidator(cfg)
 			for _, s := range newOrUpdatedNotificationSettings {
 				if err := validator.Validate(s); err != nil {
 					return errors.Join(ngmodels.ErrAlertRuleFailedValidation, err)
@@ -565,9 +581,9 @@ func (srv RulerSrv) performUpdateAlertRules(ctx context.Context, c *contextmodel
 		}
 
 		if len(finalChanges.New) > 0 {
-			inserts := make([]ngmodels.AlertRule, 0, len(finalChanges.New))
+			inserts := make([]ngmodels.InsertRule, 0, len(finalChanges.New))
 			for _, rule := range finalChanges.New {
-				inserts = append(inserts, *rule)
+				inserts = append(inserts, ngmodels.InsertRule{AlertRule: *rule})
 			}
 			added, err := srv.store.InsertAlertRules(tranCtx, ngmodels.NewUserUID(c.SignedInUser), inserts)
 			if err != nil {
@@ -830,9 +846,13 @@ func (srv RulerSrv) RouteUpdateNamespaceRules(c *contextmodel.ReqContext, body a
 		return ErrResp(http.StatusBadRequest, errors.New("missing request body"), "")
 	}
 
-	namespace, err := srv.store.GetNamespaceByUID(c.Req.Context(), namespaceUID, c.GetOrgID(), c.SignedInUser)
+	f, err := srv.store.GetNamespaceByUID(c.Req.Context(), namespaceUID, c.GetOrgID(), c.SignedInUser)
 	if err != nil {
 		return toNamespaceErrorResponse(err)
+	}
+	namespace := ngmodels.NewNamespace(f)
+	if err := namespace.ValidateForRuleStorage(); err != nil {
+		return ErrResp(http.StatusBadRequest, fmt.Errorf("%w: %s", ngmodels.ErrAlertRuleFailedValidation, err), "")
 	}
 
 	ruleGroups, _, err := srv.searchAuthorizedAlertRules(c.Req.Context(), authorizedRuleGroupQuery{
