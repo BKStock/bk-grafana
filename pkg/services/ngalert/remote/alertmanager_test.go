@@ -125,7 +125,7 @@ func TestNewAlertmanager(t *testing.T) {
 				BasicAuthPassword: test.password,
 				DefaultConfig:     defaultGrafanaConfig,
 			}
-			am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+			am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 			if test.expErr != "" {
 				require.EqualError(tt, err, test.expErr)
 				return
@@ -233,7 +233,7 @@ func TestGetRemoteState(t *testing.T) {
 				URL:           server.URL,
 				DefaultConfig: defaultGrafanaConfig,
 			}
-			am, err := newAlertmanagerSut(cfg, fstore, tc, NoopAutogenFn)
+			am, err := newAlertmanagerSut(cfg, fstore, tc)
 			require.NoError(t, err)
 
 			s, err := am.GetRemoteState(ctx)
@@ -336,7 +336,7 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", notifier.NotificationLogFilename, testNflog1))
 
 	// An error response from the remote Alertmanager should result in the readiness check failing.
-	am, err := newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	orig := client.ReadinessTimeout
@@ -387,7 +387,7 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	require.Equal(t, 1, stateSyncs)
 
 	// After a restart, the Alertmanager shouldn't send the configuration if it has not changed.
-	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 	applied, err = am.ApplyConfig(ctx, config([]byte(testGrafanaConfig)))
 	require.False(t, applied) // Not applied.
@@ -396,7 +396,7 @@ func TestIntegrationApplyConfig(t *testing.T) {
 
 	// Changing the "from" address should result in the configuration being updated.
 	cfg.SmtpConfig.FromAddress = "new-address@test.com"
-	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 	applied, err = am.ApplyConfig(ctx, config([]byte(testGrafanaConfig)))
 	require.True(t, applied)
@@ -416,7 +416,7 @@ func TestIntegrationApplyConfig(t *testing.T) {
 		StaticHeaders:  map[string]string{"test": "true"},
 		User:           "Test User",
 	}
-	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 	applied, err = am.ApplyConfig(ctx, config([]byte(testGrafanaConfig)))
 	require.True(t, applied)
@@ -425,7 +425,7 @@ func TestIntegrationApplyConfig(t *testing.T) {
 	require.Equal(t, am.smtp, configSent.SmtpConfig)
 
 	// Failing to add the auto-generated routes should not result in an error.
-	_, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), errAutogenFn)
+	_, err = newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err, errTest)
 }
 
@@ -674,7 +674,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(tt *testing.T) {
 			ctx := context.Background()
-			am, err := newAlertmanagerSut(cfg, fstore, testCrypto, NoopAutogenFn)
+			am, err := newAlertmanagerSut(cfg, fstore, testCrypto)
 			require.NoError(tt, err)
 
 			if test.enabledMultipleRoutes {
@@ -766,7 +766,7 @@ func Test_TestReceiversDecryptsSecureSettings(t *testing.T) {
 		DefaultConfig: defaultGrafanaConfig,
 	}
 
-	am, err := newAlertmanagerSut(cfg, fstore, testCrypto, NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, fstore, testCrypto)
 	require.NoError(t, err)
 
 	var inputCfg apimodels.PostableUserConfig
@@ -962,7 +962,7 @@ func Test_isDefaultConfiguration(t *testing.T) {
 				PromoteConfig: true,
 			}
 
-			am, err := newAlertmanagerSut(c, fstore, tc, NoopAutogenFn)
+			am, err := newAlertmanagerSut(c, fstore, tc)
 			require.NoError(t, err)
 
 			features := featuremgmt.WithFeatures()
@@ -1041,7 +1041,7 @@ receivers:
 	require.NoError(t, store.Set(ctx, c.OrgID, "alertmanager", notifier.SilencesFilename, ""))
 	require.NoError(t, store.Set(ctx, c.OrgID, "alertmanager", notifier.NotificationLogFilename, ""))
 
-	am, err := newAlertmanagerSut(c, fstore, tc, NoopAutogenFn)
+	am, err := newAlertmanagerSut(c, fstore, tc)
 	require.NoError(t, err)
 
 	applied, err := notifier.WithMOA(t, &cfg, func(prepared notify.NotificationsConfiguration) (bool, error) {
@@ -1155,7 +1155,7 @@ receivers:
 	require.NoError(t, store.Set(ctx, c.OrgID, "alertmanager", notifier.SilencesFilename, ""))
 	require.NoError(t, store.Set(ctx, c.OrgID, "alertmanager", notifier.NotificationLogFilename, ""))
 
-	am, err := newAlertmanagerSut(c, fstore, tc, NoopAutogenFn)
+	am, err := newAlertmanagerSut(c, fstore, tc)
 	require.NoError(t, err)
 
 	sent, err := notifier.WithMOA(t, &cfg, func(prepared notify.NotificationsConfiguration) (bool, error) {
@@ -1205,7 +1205,7 @@ func TestIntegrationRemoteAlertmanagerConfiguration(t *testing.T) {
 	require.NoError(t, store.Set(ctx, cfg.OrgID, "alertmanager", notifier.NotificationLogFilename, testNflog1))
 
 	secretsService := secretsManager.SetupTestService(t, database.ProvideSecretsStore(db.InitTestDB(t)))
-	am, err := newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, fstore, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	encodedFullState, err := am.getFullState(ctx)
@@ -1324,7 +1324,7 @@ func TestIntegrationRemoteAlertmanagerGetStatus(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	// We should get the default Cloud Alertmanager configuration.
@@ -1355,7 +1355,7 @@ func TestIntegrationRemoteAlertmanagerSilences(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	// We should have no silences at first.
@@ -1438,7 +1438,7 @@ func TestIntegrationRemoteAlertmanagerAlerts(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	// Wait until the Alertmanager is ready to send alerts.
@@ -1513,7 +1513,7 @@ func TestIntegrationRemoteAlertmanagerReceivers(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	// We should start with the default config.
@@ -1549,7 +1549,7 @@ func TestIntegrationRemoteAlertmanagerTestTemplates(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	// Valid template
@@ -1607,7 +1607,7 @@ func TestIntegrationRemoteAlertmanagerTestIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	secretsService := secretsManager.SetupTestService(t, fakes.NewFakeSecretsStore())
-	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()), NoopAutogenFn)
+	am, err := newAlertmanagerSut(cfg, nil, notifier.NewCrypto(secretsService, nil, log.NewNopLogger()))
 	require.NoError(t, err)
 
 	integration := ngmodels.IntegrationGen(ngmodels.IntegrationMuts.WithValidConfig("webhook"))()
@@ -1643,11 +1643,6 @@ func genAlert(active bool, labels map[string]string) amv2.PostableAlert {
 	}
 }
 
-// errAutogenFn is an AutogenFn that always returns an error.
-func errAutogenFn(_ context.Context, _ log.Logger, _ int64, _ *definition.PostableApiAlertingConfig, _ notifier.InvalidReceiversAction) error {
-	return errTest
-}
-
 const defaultCloudAMConfig = `
 global:
     resolve_timeout: 5m
@@ -1669,13 +1664,12 @@ receivers:
     - name: empty-receiver
 `
 
-func newAlertmanagerSut(cfg AlertmanagerConfig, fstore *notifier.FileStore, crypto notifier.Crypto, fn AutogenFn) (*Alertmanager, error) {
+func newAlertmanagerSut(cfg AlertmanagerConfig, fstore *notifier.FileStore, crypto notifier.Crypto) (*Alertmanager, error) {
 	return NewAlertmanager(
 		context.Background(),
 		cfg,
 		fstore,
 		crypto,
-		fn,
 		metrics.NewRemoteAlertmanagerMetrics(prometheus.NewRegistry()),
 		tracing.InitializeTracerForTest(),
 		featuremgmt.WithFeatures(),

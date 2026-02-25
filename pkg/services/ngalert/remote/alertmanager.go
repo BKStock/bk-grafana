@@ -52,14 +52,6 @@ type stateStore interface {
 	GetFlushLog(ctx context.Context) (string, error)
 }
 
-// AutogenFn is a function that adds auto-generated routes to a configuration.
-type AutogenFn func(ctx context.Context, logger log.Logger, orgId int64, config *apimodels.PostableApiAlertingConfig, invalidReceiverAction notifier.InvalidReceiversAction) error
-
-// NoopAutogenFn is used to skip auto-generating routes.
-func NoopAutogenFn(_ context.Context, _ log.Logger, _ int64, _ *apimodels.PostableApiAlertingConfig, _ notifier.InvalidReceiversAction) error {
-	return nil
-}
-
 type Crypto interface {
 	Encrypt(ctx context.Context, payload []byte, opt secrets.EncryptionOptions) ([]byte, error)
 	Decrypt(ctx context.Context, payload []byte) ([]byte, error)
@@ -67,7 +59,6 @@ type Crypto interface {
 }
 
 type Alertmanager struct {
-	autogenFn         AutogenFn
 	crypto            Crypto
 	defaultConfig     string
 	defaultConfigHash [16]byte
@@ -143,7 +134,6 @@ func NewAlertmanager(
 	cfg AlertmanagerConfig,
 	store stateStore,
 	crypto Crypto,
-	autogenFn AutogenFn,
 	metrics *metrics.RemoteAlertmanager,
 	tracer tracing.Tracer,
 	features featuremgmt.FeatureToggles,
@@ -205,7 +195,6 @@ func NewAlertmanager(
 
 	am := &Alertmanager{
 		amClient:      amc,
-		autogenFn:     autogenFn,
 		crypto:        crypto,
 		defaultConfig: cfg.DefaultConfig,
 
