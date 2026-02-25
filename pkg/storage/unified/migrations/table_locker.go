@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/grafana/grafana/pkg/infra/db"
 	"github.com/grafana/grafana/pkg/infra/log"
@@ -131,6 +132,7 @@ func (l *mysqlTableLocker) LockMigrationTables(ctx context.Context, _ *xorm.Sess
 		lockSQL.WriteString(" READ")
 	}
 
+	// Use a dedicated connection to not implicitly commit migration transaction.
 	conn, err := sqlHelper.DB.GetEngine().DB().Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dedicated connection for table lock: %w", err)
@@ -143,13 +145,19 @@ func (l *mysqlTableLocker) LockMigrationTables(ctx context.Context, _ *xorm.Sess
 		return nil, err
 	}
 
+	var (
+		once      sync.Once
+		unlockErr error
+	)
 	return func(ctx context.Context) error {
-		defer func() {
-			if closeErr := conn.Close(); closeErr != nil {
-				tableLockerLog.Warn("failed to close lock connection", "error", closeErr)
-			}
-		}()
-		_, err := conn.ExecContext(ctx, "UNLOCK TABLES")
-		return err
+		once.Do(func() {
+			defer func() {
+				if closeErr := conn.Close(); closeErr != nil {
+					tableLockerLog.Warn("failed to close lock connection", "error", closeErr)
+				}
+			}()
+			_, unlockErr = conn.ExecContext(ctx, "UNLOCK TABLES")
+		})
+		return unlockErr
 	}, nil
 }

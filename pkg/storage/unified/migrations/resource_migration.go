@@ -105,22 +105,15 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 		return fmt.Errorf("failed to recover partial rename: %w", err)
 	}
 	lockTables := r.definition.GetLockTables()
-	unlocked := false
-
 	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, lockTables)
 	if err != nil {
 		return fmt.Errorf("failed to lock tables for migration: %w", err)
 	}
-	doUnlock := func() {
-		if unlocked {
-			return
-		}
-		unlocked = true
+	defer func() {
 		if err := unlockTables(ctx); err != nil {
 			r.log.Error("error unlocking legacy tables", "error", err)
 		}
-	}
-	defer doUnlock()
+	}()
 
 	for _, org := range orgs {
 		info, err := types.ParseNamespace(types.OrgNamespaceFormatter(org.ID))
@@ -134,7 +127,7 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 	}
 
 	if !r.cfg.DisableLegacyTableRename {
-		if err := r.tableRenamer.RenameTables(ctx, r.definition.RenameTables, doUnlock); err != nil {
+		if err := r.tableRenamer.RenameTables(ctx, r.definition.RenameTables, unlockTables); err != nil {
 			return err
 		}
 	}

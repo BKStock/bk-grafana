@@ -19,8 +19,8 @@ type MigrationTableRenamer interface {
 	Init(sess *xorm.Session, mg *migrator.Migrator)
 
 	// RenameTables renames the given tables with a _legacy suffix.
-	// doUnlock releases the migration lock at the right moment for the database.
-	RenameTables(ctx context.Context, tables []string, doUnlock func()) error
+	// doUnlock should release the migration table lock.
+	RenameTables(ctx context.Context, tables []string, doUnlock func(ctx context.Context) error) error
 
 	// RecoverRenamedTables restores _legacy tables back to their original names
 	// so the migration can re-run. This handles crash recovery (partial rename from
@@ -70,7 +70,7 @@ func (r *transactionalTableRenamer) RecoverRenamedTables(tables []string) error 
 	return nil
 }
 
-func (r *transactionalTableRenamer) RenameTables(_ context.Context, tables []string, _ func()) error {
+func (r *transactionalTableRenamer) RenameTables(_ context.Context, tables []string, _ func(ctx context.Context) error) error {
 	toRename, err := buildRenamePairs(r.log, r.mg, tables)
 	if err != nil {
 		return err
@@ -94,9 +94,11 @@ func (r *transactionalTableRenamer) RenameTables(_ context.Context, tables []str
 // all to reach metadata-lock-wait state, then releases the READ lock so DDL priority
 // ensures renames execute before any pending DML.
 type mysqlTableRenamer struct {
-	log  log.Logger
-	sess *xorm.Session
-	mg   *migrator.Migrator
+	log          log.Logger
+	sess         *xorm.Session
+	mg           *migrator.Migrator
+	unlockTables func(context.Context) error
+	waitDeadline time.Duration // 0 means 1 minute
 }
 
 func (r *mysqlTableRenamer) Init(sess *xorm.Session, mg *migrator.Migrator) {
@@ -129,7 +131,7 @@ type renameResult struct {
 	err  error
 }
 
-func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, doUnlock func()) error {
+func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, doUnlock func(ctx context.Context) error) error {
 	tablesToRename, err := buildRenamePairs(r.log, r.mg, tables)
 	if err != nil {
 		return fmt.Errorf("failed to build rename pairs: %w", err)
@@ -160,7 +162,10 @@ func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, d
 	if err := r.waitForRenamesQueued(ctx, tablesToRename); err != nil {
 		return fmt.Errorf("aborting rename: not all RENAME statements confirmed queued (set disable_legacy_table_rename=true to skip renaming): %w", err)
 	}
-	doUnlock() // release READ lock — DDL priority ensures RENAMEs run first
+	err = doUnlock(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to release lock for MySQL RENAME TABLE: %w", err)
+	}
 
 	// Collect all results; rollback successful renames if any failed.
 	renameResults := make([]renameResult, 0, len(tablesToRename))
@@ -182,7 +187,11 @@ func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, d
 // waitForRenamesQueued polls information_schema.processlist via sess to confirm all
 // RENAME statements are waiting for metadata locks. Returns error on timeout.
 func (r *mysqlTableRenamer) waitForRenamesQueued(ctx context.Context, pairs []renamePair) error {
-	deadline := time.After(time.Minute)
+	d := r.waitDeadline
+	if d == 0 {
+		d = time.Minute
+	}
+	deadline := time.After(d)
 	for {
 		found := 0
 		for _, p := range pairs {

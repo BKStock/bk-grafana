@@ -24,7 +24,7 @@ var MigratedUnifiedResources = map[string]bool{
 	PlaylistResource:  true, // enabled by default
 	FolderResource:    false,
 	DashboardResource: false,
-	ShortURLResource:  false, // Requires kubernetesShortURLs to be enabled
+	ShortURLResource:  false, // Requires kubernetesShortURLs to be enabled by default
 }
 
 // AutoMigratedUnifiedResources maps resources that support auto-migration
