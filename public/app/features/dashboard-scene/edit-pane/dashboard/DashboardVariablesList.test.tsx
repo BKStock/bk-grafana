@@ -23,6 +23,8 @@ jest.mock('../../utils/interactions', () => ({
 }));
 
 function renderVariablesList(variables: SceneVariable[] = []) {
+  const user = userEvent.setup();
+
   const variableSet = new SceneVariableSet({ variables });
   const dashboardScene = new DashboardScene({
     $variables: variableSet,
@@ -35,6 +37,7 @@ function renderVariablesList(variables: SceneVariable[] = []) {
 
   return {
     ...renderResult,
+    user,
     elements: {
       dashboardScene,
       addVariableButton: () => renderResult.getByRole('button', { name: /add variable/i }),
@@ -47,7 +50,7 @@ function buildTestVariables() {
     visibleVar1: new ConstantVariable({ name: 'visibleVar1', hide: VariableHide.dontHide }),
     visibleVar2: new ConstantVariable({ name: 'visibleVar2', hide: VariableHide.hideLabel }),
     controlsMenuVar1: new ConstantVariable({ name: 'controlsMenuVar1', hide: VariableHide.inControlsMenu }),
-    hiddenVar1: new ConstantVariable({ name: 'hiddenVar1', hide: VariableHide.hideVariable }),
+    hiddenVar1: new ConstantVariable({ name: 'ninjaVar1', hide: VariableHide.hideVariable }),
     snapshotVar1: new SnapshotVariable({ name: 'snapshotVar1' }),
   };
 }
@@ -62,31 +65,31 @@ describe('<DashboardVariablesList />', () => {
       visibleVar1,
     ]);
 
-    expect(getByText('Above dashboard')).toBeInTheDocument();
+    expect(getByText(/above dashboard/i)).toBeInTheDocument();
     const aboveList = getByTestId('variables-visible');
     const aboveItems = Array.from(aboveList.querySelectorAll('li')).map((item) => item.textContent);
     expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']); // order is preserved
 
-    expect(getByText('Controls menu')).toBeInTheDocument();
+    expect(getByText(/controls menu/i)).toBeInTheDocument();
     const controlsMenuList = getByTestId('variables-controls-menu');
     const controlsMenuItems = Array.from(controlsMenuList.querySelectorAll('li')).map((item) => item.textContent);
     expect(controlsMenuItems).toEqual(['controlsMenuVar1']);
 
-    expect(getByText('Hidden')).toBeInTheDocument();
+    expect(getByText(/hidden/i)).toBeInTheDocument();
     const hiddenMenuList = getByTestId('variables-hidden');
     const hiddenMenuItems = Array.from(hiddenMenuList.querySelectorAll('li')).map((item) => item.textContent);
-    expect(hiddenMenuItems).toEqual(['hiddenVar1']);
+    expect(hiddenMenuItems).toEqual(['ninjaVar1']);
 
     expect(elements.addVariableButton()).toBeInTheDocument();
   });
 
-  test('renders sections that have variables', () => {
+  test('always renders all 3 section titles even when some are empty', () => {
     const { hiddenVar1 } = buildTestVariables();
-    const { queryByText, getByText } = renderVariablesList([hiddenVar1]);
+    const { getByText } = renderVariablesList([hiddenVar1]);
 
-    expect(queryByText('Above dashboard')).not.toBeInTheDocument();
-    expect(queryByText('Controls menu')).not.toBeInTheDocument();
-    expect(getByText('Hidden')).toBeInTheDocument();
+    expect(getByText(/above dashboard/i)).toBeInTheDocument();
+    expect(getByText(/controls menu/i)).toBeInTheDocument();
+    expect(getByText(/hidden/i)).toBeInTheDocument();
   });
 
   test('always renders an "Add variable" button', () => {
@@ -98,9 +101,8 @@ describe('<DashboardVariablesList />', () => {
   describe('User interactions', () => {
     describe('when a variable name is clicked', () => {
       test('selects the variable in the pane', async () => {
-        const user = userEvent.setup();
         const { visibleVar1 } = buildTestVariables();
-        const { getByText, elements } = renderVariablesList([visibleVar1]);
+        const { user, getByText, elements } = renderVariablesList([visibleVar1]);
 
         await user.click(getByText(visibleVar1.state.name));
 
@@ -113,17 +115,15 @@ describe('<DashboardVariablesList />', () => {
 
     describe('when the "Add variable" button is clicked', () => {
       test('opens the add variable pane', async () => {
-        const user = userEvent.setup();
-        const { elements } = renderVariablesList([]);
+        const { user, elements } = renderVariablesList([]);
 
         await user.click(elements.addVariableButton());
 
-        expect(openAddVariablePane).toHaveBeenCalled();
+        expect(openAddVariablePane).toHaveBeenCalledWith(elements.dashboardScene);
       });
 
       test('calls DashboardInteractions.addVariableButtonClicked ', async () => {
-        const user = userEvent.setup();
-        const { elements } = renderVariablesList([]);
+        const { user, elements } = renderVariablesList([]);
 
         await user.click(elements.addVariableButton());
 
@@ -181,9 +181,13 @@ describe('<DashboardVariablesList />', () => {
 describe('partitionVariablesByDisplay()', () => {
   test('separates variables into 3 lists: visible, controlsMenu and hidden, while preserving order', () => {
     const { visibleVar1, visibleVar2, controlsMenuVar1, hiddenVar1 } = buildTestVariables();
-    const variables = [hiddenVar1, controlsMenuVar1, visibleVar2, visibleVar1];
 
-    const { visible, controlsMenu, hidden } = partitionVariablesByDisplay(variables);
+    const { visible, controlsMenu, hidden } = partitionVariablesByDisplay([
+      hiddenVar1,
+      controlsMenuVar1,
+      visibleVar2,
+      visibleVar1,
+    ]);
 
     expect(visible.length).toBe(2);
     expect(visible[0]).toBe(visibleVar2);
@@ -219,9 +223,8 @@ describe('partitionVariablesByDisplay()', () => {
 describe('partitionVariablesByEditability()', () => {
   test('separates editable from non-editable variables, while preserving order', () => {
     const { visibleVar1, visibleVar2, snapshotVar1 } = buildTestVariables();
-    const variables = [snapshotVar1, visibleVar2, visibleVar1];
 
-    const { editable, nonEditable } = partitionVariablesByEditability(variables);
+    const { editable, nonEditable } = partitionVariablesByEditability([snapshotVar1, visibleVar2, visibleVar1]);
 
     expect(editable.length).toBe(2);
     expect(editable[0]).toBe(visibleVar2);

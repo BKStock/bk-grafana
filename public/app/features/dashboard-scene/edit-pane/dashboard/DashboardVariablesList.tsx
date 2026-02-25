@@ -90,32 +90,26 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
   return (
     <Stack direction="column" gap={1}>
       <DragDropContext onDragEnd={onDragEnd}>
-        {visible.length > 0 && (
-          <VariablesSection
-            title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard')}
-            variables={visible}
-            droppableId="variables-visible"
-            onClickVariable={onClickVariable}
-          />
-        )}
-        {controlsMenu.length > 0 && (
-          <VariablesSection
-            title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu')}
-            variables={controlsMenu}
-            droppableId="variables-controls-menu"
-            onClickVariable={onClickVariable}
-          />
-        )}
-        {hidden.length > 0 && (
-          <VariablesSection
-            title={t('dashboard-scene.variables-list.title-hidden', 'Hidden')}
-            variables={hidden}
-            droppableId="variables-hidden"
-            onClickVariable={onClickVariable}
-          />
-        )}
+        <VariablesSection
+          title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard')}
+          variables={visible}
+          droppableId="variables-visible"
+          onClickVariable={onClickVariable}
+        />
+        <VariablesSection
+          title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu')}
+          variables={controlsMenu}
+          droppableId="variables-controls-menu"
+          onClickVariable={onClickVariable}
+        />
+        <VariablesSection
+          title={t('dashboard-scene.variables-list.title-hidden', 'Hidden')}
+          variables={hidden}
+          droppableId="variables-hidden"
+          onClickVariable={onClickVariable}
+        />
       </DragDropContext>
-      <Box display="flex" paddingTop={0} paddingBottom={2}>
+      <Box display="flex" paddingTop={1} paddingBottom={2}>
         <Button
           fullWidth
           icon="plus"
@@ -154,7 +148,9 @@ function VariablesSection({
     <div className={styles.section}>
       <div className={styles.title}>
         {icon && <Icon name={icon} size="sm" className={styles.titleIcon} />}
-        <Text color="primary">{title}</Text>
+        <Text color="primary">
+          {title} ({variables.length})
+        </Text>
       </div>
       <Droppable droppableId={droppableId} direction="vertical">
         {(provided) => (
