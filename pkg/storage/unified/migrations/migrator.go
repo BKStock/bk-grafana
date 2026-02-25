@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/grafana/dskit/backoff"
+	"github.com/grafana/grafana/pkg/infra/log"
 	"google.golang.org/grpc/metadata"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	authlib "github.com/grafana/authlib/types"
 
-	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
 	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 )

@@ -29,10 +29,13 @@ type MigrationTableRenamer interface {
 }
 
 // newTableRenamer returns the appropriate renamer for the database type.
-func newTableRenamer(dbType string, log log.Logger) MigrationTableRenamer {
+func newTableRenamer(dbType string, log log.Logger, waitDeadline time.Duration) MigrationTableRenamer {
 	switch dbType {
 	case "mysql":
-		return &mysqlTableRenamer{log: log}
+		if waitDeadline == 0 {
+			waitDeadline = time.Minute
+		}
+		return &mysqlTableRenamer{log: log, waitDeadline: waitDeadline}
 	default:
 		return &transactionalTableRenamer{log: log}
 	}
@@ -60,6 +63,13 @@ func (r *transactionalTableRenamer) RecoverRenamedTables(tables []string) error 
 		}
 		if !legacyExists {
 			continue
+		}
+		originalExists, err := r.mg.DBEngine.IsTableExist(table)
+		if err != nil {
+			return fmt.Errorf("failed to check if table %q exists: %w", table, err)
+		}
+		if originalExists {
+			return fmt.Errorf("both %q and %q exist, unexpected state — manual intervention required", table, legacyName)
 		}
 		restoreSQL := r.mg.Dialect.RenameTable(legacyName, table)
 		r.log.Info("Restoring renamed table", "from", legacyName, "to", table)
@@ -109,12 +119,19 @@ func (r *mysqlTableRenamer) Init(sess *xorm.Session, mg *migrator.Migrator) {
 func (r *mysqlTableRenamer) RecoverRenamedTables(tables []string) error {
 	for _, table := range tables {
 		legacyName := table + legacySuffix
-		legacyExists, err := r.sess.IsTableExist(legacyName)
+		legacyExists, err := r.mg.DBEngine.IsTableExist(legacyName)
 		if err != nil {
 			return fmt.Errorf("failed to check if table %q exists: %w", legacyName, err)
 		}
 		if !legacyExists {
 			continue
+		}
+		originalExists, err := r.mg.DBEngine.IsTableExist(table)
+		if err != nil {
+			return fmt.Errorf("failed to check if table %q exists: %w", table, err)
+		}
+		if originalExists {
+			return fmt.Errorf("both %q and %q exist, unexpected state — manual intervention required", table, legacyName)
 		}
 		restoreSQL := r.mg.Dialect.RenameTable(legacyName, table)
 		r.log.Info("Restoring renamed table", "from", legacyName, "to", table)
@@ -171,10 +188,18 @@ func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, d
 	renameResults := make([]renameResult, 0, len(tablesToRename))
 	var firstErr error
 	for range tablesToRename {
-		res := <-results
-		renameResults = append(renameResults, res)
-		if res.err != nil && firstErr == nil {
-			firstErr = res.err
+		select {
+		case res := <-results:
+			renameResults = append(renameResults, res)
+			if res.err != nil && firstErr == nil {
+				firstErr = res.err
+			}
+		case <-ctx.Done():
+			r.rollbackRenames(renameResults)
+			return fmt.Errorf("context cancelled while waiting for RENAME TABLE to complete: %w", ctx.Err())
+		case <-time.After(r.waitDeadline):
+			r.rollbackRenames(renameResults)
+			return fmt.Errorf("timeout: only %d of %d RENAME TABLE statements completed", len(renameResults), len(tablesToRename))
 		}
 	}
 	if firstErr != nil {
@@ -186,12 +211,11 @@ func (r *mysqlTableRenamer) RenameTables(ctx context.Context, tables []string, d
 
 // waitForRenamesQueued polls information_schema.processlist via sess to confirm all
 // RENAME statements are waiting for metadata locks. Returns error on timeout.
+// NOTE: This relies on exact text matching of the info column in processlist against
+// the SQL we generate. If MySQL ever normalizes the SQL (quoting, casing, whitespace),
+// the match will fail and this will timeout. This is acceptable because we control
+// the SQL generation in RenameTables above.
 func (r *mysqlTableRenamer) waitForRenamesQueued(ctx context.Context, pairs []renamePair) error {
-	d := r.waitDeadline
-	if d == 0 {
-		d = time.Minute
-	}
-	deadline := time.After(d)
 	for {
 		found := 0
 		for _, p := range pairs {
@@ -215,7 +239,7 @@ func (r *mysqlTableRenamer) waitForRenamesQueued(ctx context.Context, pairs []re
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context cancelled while waiting for RENAME statements to queue: %w", ctx.Err())
-		case <-deadline:
+		case <-time.After(r.waitDeadline):
 			return fmt.Errorf("timeout: only %d of %d RENAME statements confirmed in processlist", found, len(pairs))
 		case <-time.After(100 * time.Millisecond):
 		}
@@ -232,7 +256,7 @@ func (r *mysqlTableRenamer) rollbackRenames(results []renameResult) {
 		r.log.Warn("Rolling back successful rename due to other rename failure",
 			"table", res.pair.oldName, "sql", rollbackSQL)
 		if _, err := r.mg.DBEngine.Exec(rollbackSQL); err != nil {
-			r.log.Error("Failed to rollback rename — manual intervention required",
+			r.log.Error("Failed to rollback rename",
 				"table", res.pair.oldName, "newName", res.pair.newName, "error", err)
 		}
 	}

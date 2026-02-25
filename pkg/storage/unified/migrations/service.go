@@ -46,7 +46,7 @@ func ProvideUnifiedStorageMigrationService(
 	return &UnifiedStorageMigrationServiceImpl{
 		migrator:     migrator,
 		tableLocker:  newTableLocker(sqlStore, sql),
-		tableRenamer: newTableRenamer(string(sqlStore.GetDBType()), logger),
+		tableRenamer: newTableRenamer(string(sqlStore.GetDBType()), logger, cfg.RenameWaitDeadline),
 		cfg:          cfg,
 		sqlStore:     sqlStore,
 		kv:           kv,

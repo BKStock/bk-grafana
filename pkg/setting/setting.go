@@ -609,7 +609,10 @@ type Cfg struct {
 	// MigrationCacheSizeKB sets SQLite PRAGMA cache_size during data migrations (in KB).
 	// Larger values reduce lock contention. Default: 50000 (50MB).
 	MigrationCacheSizeKB int
-	MaxPageSizeBytes     int
+	// RenameWaitDeadline is the maximum time to wait for MySQL RENAME TABLE
+	// statements to appear in the processlist. Default: 1 minute.
+	RenameWaitDeadline time.Duration
+	MaxPageSizeBytes   int
 	// IndexPath the directory where index files are stored.
 	// Note: Bleve locks index files, so mounts cannot be shared between multiple instances.
 	IndexPath                                  string

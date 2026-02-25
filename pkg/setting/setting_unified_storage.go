@@ -80,6 +80,7 @@ func (cfg *Cfg) setUnifiedStorageConfig() {
 	cfg.DisableDataMigrations = section.Key("disable_data_migrations").MustBool(false)
 	cfg.MigrationCacheSizeKB = section.Key("migration_cache_size_kb").MustInt(50000)
 	cfg.DisableLegacyTableRename = section.Key("disable_legacy_table_rename").MustBool(false)
+	cfg.RenameWaitDeadline = section.Key("rename_wait_deadline").MustDuration(time.Minute)
 	if !cfg.DisableDataMigrations && cfg.UnifiedStorageType() == "unified" {
 		// Helper log to find instances running migrations in the future
 		cfg.Logger.Info("Unified migration configs enforced")
