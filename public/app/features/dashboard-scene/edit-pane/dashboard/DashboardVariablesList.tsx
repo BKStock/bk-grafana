@@ -16,61 +16,65 @@ import { dashboardEditActions } from '../shared';
 
 export function VariablesList({ set }: { set: SceneVariableSet }) {
   const { variables } = set.useState();
-
-  const { editable, nonEditable } = useMemo(() => {
-    const editable: SceneVariable[] = [];
-    const nonEditable: SceneVariable[] = [];
-    for (const v of variables) {
-      (isEditableVariableType(v.state.type) ? editable : nonEditable).push(v);
-    }
-    return { editable, nonEditable };
-  }, [variables]);
-
+  const { editable, nonEditable } = useMemo(() => partitionVariablesByEditability(variables), [variables]);
   const { visible, controlsMenu, hidden } = useMemo(() => partitionVariablesByDisplay(editable), [editable]);
 
-  const createDragEndHandler = useCallback(
-    (sourceList: SceneVariable[], mergeLists: (updated: SceneVariable[]) => SceneVariable[]) => {
-      return (result: DropResult) => {
-        if (!result.destination || result.destination.index === result.source.index) {
-          return;
-        }
+  const onDragEnd = useCallback(
+    (result: DropResult) => {
+      const { source, destination } = result;
+      if (!destination) {
+        return;
+      }
 
-        const currentList = set.state.variables;
+      const isSameList = source.droppableId === destination.droppableId;
+      if (isSameList && source.index === destination.index) {
+        return;
+      }
 
-        dashboardEditActions.edit({
-          source: set,
-          description: t(
-            'dashboard-scene.variables-list.create-drag-end-handler.description.reorder-variables-list',
-            'Reorder variables list'
-          ),
-          perform: () => {
-            const updated = [...sourceList];
-            const [moved] = updated.splice(result.source.index, 1);
-            updated.splice(result.destination!.index, 0, moved);
-            set.setState({ variables: [...nonEditable, ...mergeLists(updated)] });
-          },
-          undo: () => {
-            set.setState({ variables: currentList });
-          },
-        });
+      const currentVariables = set.state.variables;
+      const lists: Record<string, SceneVariable[]> = {
+        'variables-visible': [...visible],
+        'variables-controls-menu': [...controlsMenu],
+        'variables-hidden': [...hidden],
       };
+
+      const sourceList = lists[source.droppableId];
+      const destList = isSameList ? sourceList : lists[destination.droppableId];
+
+      const [moved] = sourceList.splice(source.index, 1);
+      destList.splice(destination.index, 0, moved);
+
+      const oldHide = moved.state.hide ?? VariableHide.dontHide;
+      const newHide = getTargetHide(destination.droppableId, oldHide);
+
+      dashboardEditActions.edit({
+        source: set,
+        description: t(
+          'dashboard-scene.variables-list.create-drag-end-handler.description.reorder-variables-list',
+          'Reorder variables list'
+        ),
+        perform: () => {
+          if (newHide !== oldHide) {
+            moved.setState({ hide: newHide });
+          }
+          set.setState({
+            variables: [
+              ...nonEditable,
+              ...lists['variables-visible'],
+              ...lists['variables-controls-menu'],
+              ...lists['variables-hidden'],
+            ],
+          });
+        },
+        undo: () => {
+          if (newHide !== oldHide) {
+            moved.setState({ hide: oldHide });
+          }
+          set.setState({ variables: currentVariables });
+        },
+      });
     },
-    [nonEditable, set]
-  );
-
-  const onVisibleDragEnd = useMemo(
-    () => createDragEndHandler(visible, (updated) => [...updated, ...controlsMenu, ...hidden]),
-    [createDragEndHandler, visible, controlsMenu, hidden]
-  );
-
-  const onControlsDragEnd = useMemo(
-    () => createDragEndHandler(controlsMenu, (updated) => [...visible, ...updated, ...hidden]),
-    [createDragEndHandler, visible, controlsMenu, hidden]
-  );
-
-  const onHiddenDragEnd = useMemo(
-    () => createDragEndHandler(hidden, (updated) => [...visible, ...controlsMenu, ...updated]),
-    [createDragEndHandler, visible, controlsMenu, hidden]
+    [set, nonEditable, visible, controlsMenu, hidden]
   );
 
   const onClickVariable = useCallback((variable: SceneVariable) => {
@@ -85,36 +89,32 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
 
   return (
     <Stack direction="column" gap={1}>
-      {visible.length > 0 && (
-        <DragDropContext onDragEnd={onVisibleDragEnd}>
+      <DragDropContext onDragEnd={onDragEnd}>
+        {visible.length > 0 && (
           <VariablesSection
             title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard')}
             variables={visible}
             droppableId="variables-visible"
             onClickVariable={onClickVariable}
           />
-        </DragDropContext>
-      )}
-      {controlsMenu.length > 0 && (
-        <DragDropContext onDragEnd={onControlsDragEnd}>
+        )}
+        {controlsMenu.length > 0 && (
           <VariablesSection
             title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu')}
             variables={controlsMenu}
             droppableId="variables-controls-menu"
             onClickVariable={onClickVariable}
           />
-        </DragDropContext>
-      )}
-      {hidden.length > 0 && (
-        <DragDropContext onDragEnd={onHiddenDragEnd}>
+        )}
+        {hidden.length > 0 && (
           <VariablesSection
             title={t('dashboard-scene.variables-list.title-hidden', 'Hidden')}
             variables={hidden}
             droppableId="variables-hidden"
             onClickVariable={onClickVariable}
           />
-        </DragDropContext>
-      )}
+        )}
+      </DragDropContext>
       <Box display="flex" paddingTop={0} paddingBottom={2}>
         <Button
           fullWidth
@@ -195,31 +195,64 @@ function VariablesSection({
   );
 }
 
-export function partitionVariablesByDisplay(variables: SceneVariable[]): {
-  visible: SceneVariable[];
-  controlsMenu: SceneVariable[];
-  hidden: SceneVariable[];
-} {
-  const visible: SceneVariable[] = [];
-  const controlsMenu: SceneVariable[] = [];
-  const hidden: SceneVariable[] = [];
+const DROPPABLE_TO_HIDE: Record<string, VariableHide> = {
+  'variables-visible': VariableHide.dontHide,
+  'variables-controls-menu': VariableHide.inControlsMenu,
+  'variables-hidden': VariableHide.hideVariable,
+};
 
+function getTargetHide(droppableId: string, currentHide: VariableHide): VariableHide {
+  if (droppableId === 'variables-visible') {
+    return currentHide === VariableHide.dontHide || currentHide === VariableHide.hideLabel
+      ? currentHide
+      : VariableHide.dontHide;
+  }
+  return DROPPABLE_TO_HIDE[droppableId];
+}
+
+function partitionVariables<K extends string>(
+  variables: SceneVariable[],
+  getPartitionKey: (v: SceneVariable) => K | null
+): Partial<Record<K, SceneVariable[]>> {
+  const result: Partial<Record<K, SceneVariable[]>> = {};
   for (const v of variables) {
-    if (!isEditableVariableType(v.state.type)) {
-      continue;
-    }
-    switch (v.state.hide) {
-      case VariableHide.hideVariable:
-        hidden.push(v);
-        break;
-      case VariableHide.inControlsMenu:
-        controlsMenu.push(v);
-        break;
-      default:
-        visible.push(v);
+    const key = getPartitionKey(v);
+    if (key !== null) {
+      if (!result[key]) {
+        result[key] = [];
+      }
+      result[key].push(v);
     }
   }
+  return result;
+}
 
+export function partitionVariablesByEditability(variables: SceneVariable[]) {
+  const { editable = [], nonEditable = [] } = partitionVariables(variables, (v) =>
+    isEditableVariableType(v.state.type) ? 'editable' : 'nonEditable'
+  );
+  return { editable, nonEditable };
+}
+
+export function partitionVariablesByDisplay(variables: SceneVariable[]) {
+  const {
+    visible = [],
+    controlsMenu = [],
+    hidden = [],
+  } = partitionVariables(variables, (v) => {
+    if (!isEditableVariableType(v.state.type)) {
+      return null;
+    }
+
+    switch (v.state.hide) {
+      case VariableHide.hideVariable:
+        return 'hidden';
+      case VariableHide.inControlsMenu:
+        return 'controlsMenu';
+      default:
+        return 'visible';
+    }
+  });
   return { visible, controlsMenu, hidden };
 }
 

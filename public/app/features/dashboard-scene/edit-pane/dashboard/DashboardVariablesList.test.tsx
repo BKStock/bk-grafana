@@ -10,7 +10,7 @@ import { openAddVariablePane } from '../../settings/variables/VariableAddEditabl
 import { DashboardInteractions } from '../../utils/interactions';
 import { activateFullSceneTree } from '../../utils/test-utils';
 
-import { partitionVariablesByDisplay, VariablesList } from './DashboardVariablesList';
+import { partitionVariablesByDisplay, partitionVariablesByEditability, VariablesList } from './DashboardVariablesList';
 
 jest.mock('../../settings/variables/VariableAddEditableElement', () => ({
   openAddVariablePane: jest.fn(),
@@ -171,15 +171,15 @@ describe('<DashboardVariablesList />', () => {
         await dragItem(container, findByText, 0, 'down');
 
         const aboveList = getByTestId('variables-visible');
-        const items = Array.from(aboveList.querySelectorAll('li')).map((li) => li.textContent);
-        expect(items).toEqual(['visibleVar2', 'visibleVar1']);
+        const aboveItems = Array.from(aboveList.querySelectorAll('li')).map((li) => li.textContent);
+        expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']);
       });
     });
   });
 });
 
-describe('partitionVariablesByDisplay(', () => {
-  test('partitions variables into 3 separate lists: visible, controlsMenu and hidden, while preserving order', () => {
+describe('partitionVariablesByDisplay()', () => {
+  test('separates variables into 3 lists: visible, controlsMenu and hidden, while preserving order', () => {
     const { visibleVar1, visibleVar2, controlsMenuVar1, hiddenVar1 } = buildTestVariables();
     const variables = [hiddenVar1, controlsMenuVar1, visibleVar2, visibleVar1];
 
@@ -213,5 +213,47 @@ describe('partitionVariablesByDisplay(', () => {
     expect(visible[0]).toBe(editableVar);
     expect(controlsMenu).toEqual([]);
     expect(hidden).toEqual([]);
+  });
+});
+
+describe('partitionVariablesByEditability()', () => {
+  test('separates editable from non-editable variables, while preserving order', () => {
+    const { visibleVar1, visibleVar2, snapshotVar1 } = buildTestVariables();
+    const variables = [snapshotVar1, visibleVar2, visibleVar1];
+
+    const { editable, nonEditable } = partitionVariablesByEditability(variables);
+
+    expect(editable.length).toBe(2);
+    expect(editable[0]).toBe(visibleVar2);
+    expect(editable[1]).toBe(visibleVar1);
+
+    expect(nonEditable.length).toBe(1);
+    expect(nonEditable[0]).toBe(snapshotVar1);
+  });
+
+  test('returns empty lists when given no variables', () => {
+    const { editable, nonEditable } = partitionVariablesByEditability([]);
+
+    expect(editable).toEqual([]);
+    expect(nonEditable).toEqual([]);
+  });
+
+  test('returns all variables as editable when none are non-editable', () => {
+    const { visibleVar1, controlsMenuVar1 } = buildTestVariables();
+
+    const { editable, nonEditable } = partitionVariablesByEditability([visibleVar1, controlsMenuVar1]);
+
+    expect(editable[0]).toBe(visibleVar1);
+    expect(editable[1]).toBe(controlsMenuVar1);
+    expect(nonEditable).toEqual([]);
+  });
+
+  test('returns all variables as non-editable when none are editable', () => {
+    const { snapshotVar1 } = buildTestVariables();
+
+    const { editable, nonEditable } = partitionVariablesByEditability([snapshotVar1]);
+
+    expect(editable).toEqual([]);
+    expect(nonEditable[0]).toBe(snapshotVar1);
   });
 });
