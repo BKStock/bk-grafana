@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { VariableHide } from '@grafana/data';
@@ -65,7 +65,7 @@ describe('<DashboardVariablesList />', () => {
     expect(getByText('Above dashboard')).toBeInTheDocument();
     const aboveList = getByTestId('variables-visible');
     const aboveItems = Array.from(aboveList.querySelectorAll('li')).map((item) => item.textContent);
-    expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']);
+    expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']); // order is preserved
 
     expect(getByText('Controls menu')).toBeInTheDocument();
     const controlsMenuList = getByTestId('variables-controls-menu');
@@ -128,6 +128,51 @@ describe('<DashboardVariablesList />', () => {
         await user.click(elements.addVariableButton());
 
         expect(DashboardInteractions.addVariableButtonClicked).toHaveBeenCalledWith({ source: 'edit_pane' });
+      });
+    });
+
+    describe('drag and drop', () => {
+      async function dragItem(
+        container: HTMLElement,
+        findByText: (text: RegExp) => Promise<HTMLElement>,
+        itemIndex: number,
+        direction: 'up' | 'down',
+        positions = 1
+      ) {
+        const dragHandles = container.querySelectorAll('[data-rfd-drag-handle-draggable-id]');
+        const handle = dragHandles[itemIndex] as HTMLElement;
+        handle.focus();
+        expect(handle).toHaveFocus();
+
+        // press space to start dragging
+        fireEvent.keyDown(handle, { keyCode: 32 });
+        await findByText(/you have lifted an item/i); // @hello-pangea/dnd announces each phase via aria-live; awaiting it ensures the library has processed the event
+
+        // press arrow down/up to drag
+        const arrowKey = direction === 'down' ? 40 : 38;
+        for (let i = 0; i < positions; i++) {
+          fireEvent.keyDown(handle, { keyCode: arrowKey });
+          await findByText(/you have moved the item/i);
+        }
+
+        // press space to drop
+        fireEvent.keyDown(handle, { keyCode: 32 });
+        await findByText(/you have dropped the item/i);
+      }
+
+      test('reorders visible variables when dragged down by one position', async () => {
+        const { visibleVar1, visibleVar2, controlsMenuVar1 } = buildTestVariables();
+        const { container, findByText, getByTestId } = renderVariablesList([
+          visibleVar1,
+          visibleVar2,
+          controlsMenuVar1,
+        ]);
+
+        await dragItem(container, findByText, 0, 'down');
+
+        const aboveList = getByTestId('variables-visible');
+        const items = Array.from(aboveList.querySelectorAll('li')).map((li) => li.textContent);
+        expect(items).toEqual(['visibleVar2', 'visibleVar1']);
       });
     });
   });
