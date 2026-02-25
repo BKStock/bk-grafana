@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { LoadingState, PanelData, toDataFrame, FieldType, getDefaultTimeRange } from '@grafana/data';
+import { FieldType, LoadingState, PanelData, PanelModel, getDefaultTimeRange, toDataFrame } from '@grafana/data';
 import { VizPanel } from '@grafana/scenes';
 import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene/UnconfiguredPanel';
 
