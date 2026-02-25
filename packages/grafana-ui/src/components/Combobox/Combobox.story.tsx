@@ -57,7 +57,7 @@ const meta: Meta<PropsAndCustomArgs> = {
         label: 'Iceberg Lettuce',
         value: 'iceberg-lettuce',
         description:
-          'this is a very long description that should be longer than the longest option label which should make the options list as long as the longest description',
+          'this is a very long description that should be longer than the longest option label which should make the options list as long as the longest description. Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
       },
       { label: 'Jackfruit', value: 'jackfruit' },
     ],
