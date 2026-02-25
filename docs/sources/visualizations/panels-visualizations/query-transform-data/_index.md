@@ -137,7 +137,7 @@ Saved queries are available in:
 
 You can see a list of these queries in the **Saved queries** drawer:
 
-{{< figure src="/media/docs/grafana/panels-visualizations/screenshot-saved-queries-v12.4.png" max-width="550px" alt="List of saved queries and the edit query form" caption="The **Saved queries** drawer accessed from Dashboards" >}}
+{{< figure src="/media/docs/grafana/panels-visualizations/screenshot-saved-queries-v12.4.png" max-width="600px" alt="List of saved queries and the edit query form" caption="The **Saved queries** drawer accessed from Dashboards" >}}
 
 When you first open the drawer, the list of queries in the **All** tab is filtered by the data source of the panel.
 However, you can clear that filter to display all saved queries.
@@ -204,7 +204,7 @@ You can map the original variables to either:
 - A variable in your dashboard
 - A custom value that you enter
 
-<!-- screenshot here -->
+{{< figure src="/media/docs/grafana/dashboards/screenshot-saved-queries-variables-v13.0.png" max-width="600px" alt="A saved query with substituted variables" >}}
 
 Grafana applies your selections to the query before inserting it into the dashboard.
 However, the substitutions only apply to the query when it's reused, and the original saved query remains unchanged.
