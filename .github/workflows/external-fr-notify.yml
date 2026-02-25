@@ -42,6 +42,7 @@ jobs:
         with:
           repo_secrets: |
             SLACK_BOT_TOKEN=community-slack-bot:token
+            SLACK_CHANNELS=community-slack-channels:map
 
       - name: Get issue metadata
         id: metadata

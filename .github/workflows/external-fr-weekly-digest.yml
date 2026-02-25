@@ -68,6 +68,7 @@ jobs:
           repo_secrets: |
             OPENAI_API_KEY=community-openai:key
             SLACK_BOT_TOKEN=community-slack-bot:token
+            SLACK_CHANNELS=community-slack-channels:map
 
       - name: Validate configuration
         run: |
