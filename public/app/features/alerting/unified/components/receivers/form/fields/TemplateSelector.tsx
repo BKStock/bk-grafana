@@ -344,6 +344,7 @@ interface WrapWithTemplateSelectionProps extends PropsWithChildren {
   onSelectTemplate: (template: string) => void;
   option: NotificationChannelOption;
   name: string;
+  readOnly?: boolean;
 }
 export function WrapWithTemplateSelection({
   useTemplates,
@@ -351,6 +352,7 @@ export function WrapWithTemplateSelection({
   option,
   name,
   children,
+  readOnly = false,
 }: WrapWithTemplateSelectionProps) {
   const styles = useStyles2(getStyles);
   const { getValues } = useFormContext();
@@ -359,13 +361,15 @@ export function WrapWithTemplateSelection({
   if (!option.placeholder.includes('{{ template ') || typeof value !== 'string') {
     return <>{children}</>;
   }
+  const showTemplatePicker = useTemplates && !readOnly;
+
   // Otherwise, we can use templates on this field
   // if the value is empty, we only show the template picker
   if (!value) {
     return (
       <div className={styles.inputContainer}>
         <Stack direction="row" gap={1} alignItems="center">
-          {useTemplates && (
+          {showTemplatePicker && (
             <TemplatesPicker onSelect={onSelectTemplate} option={option} valueInForm={getValues(name) ?? ''} />
           )}
         </Stack>
@@ -378,19 +382,19 @@ export function WrapWithTemplateSelection({
       <div className={styles.inputContainer}>
         <Stack direction="row" gap={1} alignItems="center">
           <Text variant="bodySmall">{`Template: ${getTemplateName(value)}`}</Text>
-          {useTemplates && (
+          {showTemplatePicker && (
             <TemplatesPicker onSelect={onSelectTemplate} option={option} valueInForm={getValues(name) ?? ''} />
           )}
         </Stack>
       </div>
     );
   }
-  // custom template  field
+  // custom template field
   return (
     <div className={styles.inputContainer}>
       <Stack direction="row" gap={1} alignItems="center">
         {children}
-        {useTemplates && (
+        {showTemplatePicker && (
           <TemplatesPicker onSelect={onSelectTemplate} option={option} valueInForm={getValues(name) ?? ''} />
         )}
       </Stack>
