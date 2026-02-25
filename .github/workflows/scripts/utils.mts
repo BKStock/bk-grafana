@@ -148,31 +148,10 @@ export function stripMarkdown(text: string): string {
 }
 
 export function teamChannelEnv(teamName: string, type: 'pr' | 'fr'): string {
-  const raw = process.env.SLACK_CHANNELS ?? '';
-  if (!raw) {
-    log.warning('SLACK_CHANNELS env var is not set');
-    return '';
-  }
-
-  let map: unknown;
-  try {
-    map = JSON.parse(raw);
-  } catch {
-    log.warning('SLACK_CHANNELS env var contains invalid JSON');
-    return '';
-  }
-
-  if (typeof map !== 'object' || map === null || Array.isArray(map)) {
-    log.warning('SLACK_CHANNELS env var is not a valid object');
-    return '';
-  }
-
-  const team = (map as Record<string, unknown>)[teamName];
-  if (typeof team !== 'object' || team === null || Array.isArray(team)) return '';
-
-  const value = (team as Record<string, unknown>)[type];
-  if (typeof value !== 'string' || !/^C[A-Z0-9]+$/.test(value)) return '';
-
+  const key = `SLACK_${teamName.toUpperCase()}_${type.toUpperCase()}`;
+  const value = process.env[key] ?? '';
+  if (!value) return '';
+  if (!/^C[A-Z0-9]+$/.test(value)) return '';
   return value;
 }
 

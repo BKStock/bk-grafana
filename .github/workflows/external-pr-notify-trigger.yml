@@ -16,7 +16,7 @@ jobs:
     name: Capture PR metadata for handler
     runs-on: ubuntu-latest
     if: |
-      contains(github.event.pull_request.labels.*.name, 'pr/external') &&
+      github.event.label.name == 'pr/external' &&
       !contains(github.event.pull_request.labels.*.name, 'pr/auto-triaged')
 
     steps:
