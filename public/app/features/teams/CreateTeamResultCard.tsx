@@ -1,18 +1,13 @@
+import { locationUtil } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { Alert, Link, Stack, Text } from '@grafana/ui';
+import { Alert, AlertVariant, Link, Stack, Text } from '@grafana/ui';
 
-export type CreateStepStatus = 'idle' | 'loading' | 'success' | 'error';
+import { extractErrorMessage } from '../../api/utils';
 
-export interface TeamCreationState {
-  status: CreateStepStatus;
-  uid?: string;
-  error?: string;
-}
-
-export interface FolderCreationState {
-  status: CreateStepStatus;
-  url?: string;
-  error?: string;
+export interface CardProps {
+  severity: AlertVariant;
+  description: string;
+  link?: ResultCardLink;
 }
 
 interface ResultCardLink {
@@ -20,114 +15,79 @@ interface ResultCardLink {
   text: string;
 }
 
-export type ResultAlertState =
-  | { status: 'idle' }
-  | { status: 'loading'; description: string }
-  | { status: 'error'; description: string }
-  | { status: 'success'; description: string; link?: ResultCardLink };
-
-interface StepResultAlertProps {
-  state: ResultAlertState;
-}
-
-export function StepResultAlert({ state }: StepResultAlertProps) {
-  if (state.status === 'idle') {
-    return null;
-  }
-
-  const severity = state.status === 'loading' ? 'info' : state.status;
-
+export function StepResultAlert({ severity, description, link }: CardProps) {
   return (
     <Alert severity={severity} title="">
-      <Stack direction="column" gap={0}>
-        <Text>{state.description}</Text>
-        {state.status === 'success' && state.link && <Link href={state.link.href}>{state.link.text}</Link>}
+      <Stack direction="row" justifyContent={'space-between'}>
+        <Text>{description}</Text>
+        {link && <Link href={link.href}>{link.text}</Link>}
       </Stack>
     </Alert>
   );
 }
 
-export function getFolderResultCardState(
-  teamState: TeamCreationState,
-  folderState: FolderCreationState
-): ResultAlertState {
-  if (teamState.status === 'loading') {
+export type FolderCardVariant =
+  | { type: 'loading' }
+  | { type: 'success'; url: string }
+  | { type: 'error'; error?: unknown };
+
+export function getFolderCardProps(variant: FolderCardVariant): CardProps {
+  if (variant.type === 'error') {
     return {
-      status: 'loading',
-      description: t(
-        'teams.create-team.folder-creation-waiting',
-        'Waiting for team creation before creating folder...'
-      ),
+      severity: 'error',
+      description: variant.error
+        ? extractErrorMessage(variant.error)
+        : t('teams.create-team.folder-create-failed', 'Failed to create folder'),
     };
   }
 
-  if (teamState.status === 'error') {
+  if (variant.type === 'success') {
     return {
-      status: 'error',
-      description: t(
-        'teams.create-team.folder-creation-skipped-team-failure',
-        'Folder was not created because team creation failed.'
-      ),
-    };
-  }
-
-  if (teamState.status !== 'success') {
-    return { status: 'idle' };
-  }
-
-  if (folderState.status === 'loading') {
-    return {
-      status: 'loading',
-      description: t('teams.create-team.folder-creation-loading', 'Creating folder...'),
-    };
-  }
-
-  if (folderState.status === 'error') {
-    return {
-      status: 'error',
-      description: folderState.error ?? t('teams.create-team.folder-create-failed', 'Failed to create folder'),
-    };
-  }
-
-  if (folderState.status === 'success' && folderState.url) {
-    return {
-      status: 'success',
+      severity: 'success',
       description: t('teams.create-team.folder-creation-success', 'Folder created successfully.'),
       link: {
-        href: folderState.url,
+        href: locationUtil.stripBaseFromUrl(variant.url),
         text: t('teams.create-team.folder-creation-link', 'Open folder'),
       },
     };
   }
 
-  return { status: 'idle' };
+  // variant.type === 'info'
+  return {
+    severity: 'info',
+    description: t('teams.create-team.folder-creation-loading', 'Creating folder...'),
+  };
 }
 
-export function getTeamResultCardState(teamState: TeamCreationState): ResultAlertState {
-  if (teamState.status === 'loading') {
+export type TeamCardVariant =
+  | { type: 'loading' }
+  | { type: 'success'; uid: string }
+  | { type: 'error'; error?: unknown };
+
+export function getTeamCardProps(variant: TeamCardVariant): CardProps {
+  if (variant.type === 'error') {
     return {
-      status: 'loading',
-      description: t('teams.create-team.team-creation-loading', 'Creating team...'),
+      severity: 'error',
+      description: variant.error
+        ? extractErrorMessage(variant.error)
+        : t('teams.create-team.failed-to-create', 'Failed to create team'),
     };
   }
 
-  if (teamState.status === 'error') {
+  if (variant.type === 'success') {
     return {
-      status: 'error',
-      description: teamState.error ?? t('teams.create-team.failed-to-create', 'Failed to create team'),
-    };
-  }
-
-  if (teamState.status === 'success' && teamState.uid) {
-    return {
-      status: 'success',
+      severity: 'success',
       description: t('teams.create-team.team-creation-success', 'Team created successfully.'),
       link: {
-        href: `/org/teams/edit/${teamState.uid}`,
+        href: `/org/teams/edit/${variant.uid}`,
         text: t('teams.create-team.team-creation-link', 'Open team details'),
       },
     };
   }
 
-  return { status: 'idle' };
+  // variant.type === 'loading'
+  return {
+    severity: 'info',
+    description: t('teams.create-team.team-creation-loading', 'Creating team...'),
+  };
 }

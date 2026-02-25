@@ -1,11 +1,10 @@
 import { JSX, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { locationUtil, NavModelItem } from '@grafana/data';
+import { NavModelItem } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
 import { Button, Checkbox, Field, FieldSet, Input, Stack } from '@grafana/ui';
 import { useCreateFolder } from 'app/api/clients/folder/v1beta1/hooks';
-import { extractErrorMessage } from 'app/api/utils';
 import { Page } from 'app/core/components/Page/Page';
 import { TeamRolePicker } from 'app/core/components/RolePicker/TeamRolePicker';
 import { useRoleOptions } from 'app/core/components/RolePicker/hooks';
@@ -13,13 +12,7 @@ import { contextSrv } from 'app/core/services/context_srv';
 import { Role } from 'app/types/accessControl';
 import { TeamDTO } from 'app/types/teams';
 
-import {
-  FolderCreationState,
-  getFolderResultCardState,
-  getTeamResultCardState,
-  StepResultAlert,
-  TeamCreationState,
-} from './CreateTeamResultCard';
+import { StepResultAlert, CardProps, getFolderCardProps, getTeamCardProps } from './CreateTeamResultCard';
 import { useCreateTeam } from './hooks';
 
 const pageNav: NavModelItem = {
@@ -36,88 +29,77 @@ const CreateTeam = (): JSX.Element => {
   const [createFolderTrigger] = useCreateFolder();
   const [pendingRoles, setPendingRoles] = useState<Role[]>([]);
   const [autocreateTeamFolder, setAutocreateTeamFolder] = useState(false);
-  const [teamCreationState, setTeamCreationState] = useState<TeamCreationState>({ status: 'idle' });
-  const [folderCreationState, setFolderCreationState] = useState<FolderCreationState>({ status: 'idle' });
+  const [teamCreationCardProps, setTeamCreationCardProps] = useState<CardProps | undefined>(undefined);
+  const [folderCreationCardProps, setFolderCreationCardProps] = useState<CardProps | undefined>(undefined);
   const [{ roleOptions }] = useRoleOptions(currentOrgId);
   const {
     handleSubmit,
     register,
     formState: { errors },
   } = useForm<TeamDTO>();
-  const shouldShowStatusCards = teamCreationState.status !== 'idle';
-  const showCreateButton = teamCreationState.status === 'idle' || teamCreationState.status === 'error';
+
+  // TODO: should we allow to click create again after error?
+  const showCreateButton = !teamCreationCardProps || teamCreationCardProps.severity === 'error';
   const formLocked =
-    teamCreationState.status === 'loading' ||
-    teamCreationState.status === 'success' ||
-    folderCreationState.status === 'loading';
-  const teamResultCardState = getTeamResultCardState(teamCreationState);
-  const folderResultCardState = getFolderResultCardState(teamCreationState, folderCreationState);
+    teamCreationCardProps?.severity === 'info' ||
+    teamCreationCardProps?.severity === 'success' ||
+    folderCreationCardProps?.severity === 'info';
 
+  // Trigger to create team and optionally also a folder. Each one has its own state to inform user about the progress
+  // or an error.
   const createTeam = async (formModel: TeamDTO) => {
-    setTeamCreationState({ status: 'loading' });
-    setFolderCreationState({ status: 'idle' });
+    setTeamCreationCardProps(getTeamCardProps({ type: 'loading' }));
 
+    let teamData, teamError;
     try {
-      const { data, error } = await createTeamTrigger(
+      const result = await createTeamTrigger(
         {
           email: formModel.email || '',
           name: formModel.name,
         },
         pendingRoles
       );
-
-      const teamErrorMessage = error ? extractErrorMessage(error) : undefined;
-
-      if (teamErrorMessage || !data?.uid) {
-        setTeamCreationState({
-          status: 'error',
-          error: teamErrorMessage ?? t('teams.create-team.failed-to-create', 'Failed to create team'),
-        });
-        return;
-      }
-
-      setTeamCreationState({ status: 'success', uid: data.uid });
-
-      if (!autocreateTeamFolder) {
-        return;
-      }
-
-      setFolderCreationState({ status: 'loading' });
-
-      try {
-        const { data: folderData, error: folderError } = await createFolderTrigger({
-          title: formModel.name,
-          teamOwnerReferences: [{ uid: data.uid, name: formModel.name }],
-        });
-
-        const folderErrorMessage = folderError ? extractErrorMessage(folderError) : undefined;
-
-        if (folderErrorMessage || !folderData?.url) {
-          setFolderCreationState({
-            status: 'error',
-            error: folderErrorMessage ?? t('teams.create-team.folder-create-failed', 'Failed to create folder'),
-          });
-          return;
-        }
-
-        setFolderCreationState({
-          status: 'success',
-          url: locationUtil.stripBaseFromUrl(folderData.url),
-        });
-      } catch (e) {
-        setFolderCreationState({
-          status: 'error',
-          error: t('teams.create-team.folder-create-failed', 'Failed to create folder'),
-        });
-        console.error(e);
-      }
+      teamData = result.data;
+      teamError = result.error;
     } catch (e) {
-      setTeamCreationState({
-        status: 'error',
-        error: t('teams.create-team.failed-to-create', 'Failed to create team'),
-      });
+      setTeamCreationCardProps(getTeamCardProps({ type: 'error', error: e }));
       console.error(e);
+      return;
     }
+
+    if (teamError || !teamData?.uid) {
+      setTeamCreationCardProps(getTeamCardProps({ type: 'error', error: teamError }));
+      return;
+    }
+
+    setTeamCreationCardProps(getTeamCardProps({ type: 'success', uid: teamData.uid }));
+
+    if (!autocreateTeamFolder) {
+      return;
+    }
+
+    setFolderCreationCardProps(getFolderCardProps({ type: 'loading' }));
+
+    let folderData, folderError;
+    try {
+      const result = await createFolderTrigger({
+        title: formModel.name,
+        teamOwnerReferences: [{ uid: teamData.uid, name: formModel.name }],
+      });
+      folderData = result.data;
+      folderError = result.error;
+    } catch (e) {
+      setFolderCreationCardProps(getFolderCardProps({ type: 'error', error: e }));
+      console.error(e);
+      return;
+    }
+
+    if (folderError || !folderData?.url) {
+      setFolderCreationCardProps(getFolderCardProps({ type: 'error', error: folderError }));
+      return;
+    }
+
+    setFolderCreationCardProps(getFolderCardProps({ type: 'success', url: folderData.url }));
   };
 
   return (
@@ -182,13 +164,10 @@ const CreateTeam = (): JSX.Element => {
               </Button>
             )}
 
-            {shouldShowStatusCards && (
-              <Stack direction="column" gap={1}>
-                <StepResultAlert state={teamResultCardState} />
-
-                {autocreateTeamFolder && <StepResultAlert state={folderResultCardState} />}
-              </Stack>
-            )}
+            <Stack direction="column" gap={1}>
+              {teamCreationCardProps && <StepResultAlert {...teamCreationCardProps} />}
+              {folderCreationCardProps && <StepResultAlert {...folderCreationCardProps} />}
+            </Stack>
           </Stack>
         </form>
       </Page.Contents>
