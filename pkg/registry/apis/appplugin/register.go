@@ -13,17 +13,14 @@ import (
 	"github.com/open-feature/go-sdk/openfeature"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana/pkg/apimachinery/utils"
 	apppluginv0alpha1 "github.com/grafana/grafana/pkg/apis/appplugin/v0alpha1"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/plugins/manager/sources"
 	ac "github.com/grafana/grafana/pkg/services/accesscontrol"
 	"github.com/grafana/grafana/pkg/services/apiserver/builder"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
-	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginassets"
 	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
-	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
-	"github.com/grafana/grafana/pkg/services/updatemanager"
-	"github.com/grafana/grafana/pkg/setting"
 )
 
 var (
@@ -33,24 +30,16 @@ var (
 
 // AppPluginAPIBuilder builds an apiserver for a single app plugin.
 type AppPluginAPIBuilder struct {
-	pluginID             string
-	groupVersion         schema.GroupVersion
-	pluginStore          pluginstore.Store
-	pluginSettings       pluginsettings.Service
-	pluginsUpdateChecker *updatemanager.PluginsService
-	pluginAssets         *pluginassets.Service
-	cfg                  *setting.Cfg
-	accessControl        ac.AccessControl
+	pluginID       string
+	groupVersion   schema.GroupVersion
+	pluginSettings pluginsettings.Service
+	accessControl  ac.AccessControl
 }
 
 func RegisterAPIService(
 	apiRegistrar builder.APIRegistrar,
 	pluginSources sources.Registry,
-	pluginStore pluginstore.Store,
 	pluginSettings pluginsettings.Service,
-	pluginsUpdateChecker *updatemanager.PluginsService,
-	pluginAssets *pluginassets.Service,
-	cfg *setting.Cfg,
 	accessControl ac.AccessControl,
 ) (*AppPluginAPIBuilder, error) {
 	ctx := context.Background()
@@ -65,19 +54,15 @@ func RegisterAPIService(
 
 	var last *AppPluginAPIBuilder
 	for _, pluginJSON := range pluginJSONs {
-		groupName := pluginJSON.ID + ".app.grafana.app"
+		groupName := pluginJSON.ID + ".grafana.app"
 		b := &AppPluginAPIBuilder{
 			pluginID: pluginJSON.ID,
 			groupVersion: schema.GroupVersion{
 				Group:   groupName,
 				Version: apppluginv0alpha1.VERSION,
 			},
-			pluginStore:          pluginStore,
-			pluginSettings:       pluginSettings,
-			pluginsUpdateChecker: pluginsUpdateChecker,
-			pluginAssets:         pluginAssets,
-			cfg:                  cfg,
-			accessControl:        accessControl,
+			pluginSettings: pluginSettings,
+			accessControl:  accessControl,
 		}
 		apiRegistrar.RegisterAPI(b)
 		last = b
@@ -124,15 +109,13 @@ func (b *AppPluginAPIBuilder) InstallSchema(scheme *runtime.Scheme) error {
 }
 
 func (b *AppPluginAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *genericapiserver.APIGroupInfo, opts builder.APIGroupOptions) error {
+	gr := b.groupVersion.WithResource("settings").GroupResource()
 	storage := map[string]rest.Storage{}
 	storage["settings"] = &settingsStorage{
-		pluginID:             b.pluginID,
-		pluginStore:          b.pluginStore,
-		pluginSettings:       b.pluginSettings,
-		pluginsUpdateChecker: b.pluginsUpdateChecker,
-		pluginAssets:         b.pluginAssets,
-		cfg:                  b.cfg,
-		resource:             b.groupVersion.WithResource("settings").GroupResource(),
+		pluginID:       b.pluginID,
+		pluginSettings: b.pluginSettings,
+		resource:       gr,
+		tableConverter: utils.NewTableConverter(gr, utils.TableColumns{}),
 	}
 	apiGroupInfo.VersionedResourcesStorageMap[b.groupVersion.Version] = storage
 	return nil

@@ -2,34 +2,33 @@ package appplugin
 
 import (
 	"context"
-	"encoding/json"
-	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 
-	"github.com/grafana/grafana/pkg/api/dtos"
-	"github.com/grafana/grafana/pkg/plugins"
-	"github.com/grafana/grafana/pkg/plugins/config"
-	"github.com/grafana/grafana/pkg/plugins/manager/registry"
-	"github.com/grafana/grafana/pkg/plugins/pluginassets/modulehash"
-	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginassets"
-	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
-	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
-	"github.com/grafana/grafana/pkg/setting"
-
+	"github.com/grafana/grafana/pkg/apimachinery/utils"
 	apppluginv0alpha1 "github.com/grafana/grafana/pkg/apis/appplugin/v0alpha1"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
 )
 
-func TestSettingsGet_InvalidName(t *testing.T) {
-	gr := schema.GroupResource{Group: "appplugin.grafana.app", Resource: "settings"}
-	storage := &settingsStorage{
-		pluginID: "test-app",
-		resource: gr,
+func newTestStorage(plugins map[string]*pluginsettings.DTO) *settingsStorage {
+	gr := schema.GroupResource{Group: "test-app.app.grafana.app", Resource: "settings"}
+	return &settingsStorage{
+		pluginID:       "test-app",
+		pluginSettings: &pluginsettings.FakePluginSettings{Plugins: plugins},
+		resource:       gr,
+		tableConverter: utils.NewTableConverter(gr, utils.TableColumns{}),
 	}
+}
+
+func TestSettingsGet_InvalidName(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
 
 	ctx := request.WithNamespace(context.Background(), "default")
 	obj, err := storage.Get(ctx, "not-current", nil)
@@ -38,242 +37,167 @@ func TestSettingsGet_InvalidName(t *testing.T) {
 	require.True(t, apierrors.IsNotFound(err))
 }
 
-// TestSettingsGet_JSONMatchesLegacyEndpoint tests that the JSON matches the legacy endpoint.
-func TestSettingsGet_JSONMatchesLegacyEndpoint(t *testing.T) {
-	cfg := &setting.Cfg{AppSubURL: "/grafana"}
-	pAssets := pluginassets.ProvideService(
-		modulehash.NewCalculator(&config.PluginManagementCfg{}, registry.NewInMemory(), nil, nil),
+func TestSettingsGet_NoPersistedSettings(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, err := storage.Get(ctx, "current", nil)
+	require.NoError(t, err)
+
+	settings := obj.(*apppluginv0alpha1.Settings)
+	require.Equal(t, "current", settings.Name)
+	require.Equal(t, "default", settings.Namespace)
+	require.False(t, settings.Spec.Enabled)
+	require.False(t, settings.Spec.Pinned)
+	require.Nil(t, settings.Spec.JsonData.Object)
+}
+
+func TestSettingsGet_WithPersistedSettings(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{
+		"test-app": {
+			PluginID: "test-app",
+			OrgID:    1,
+			Enabled:  true,
+			Pinned:   true,
+			JSONData: map[string]any{"apiUrl": "https://api.example.com", "timeout": float64(30)},
+		},
+	})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, err := storage.Get(ctx, "current", nil)
+	require.NoError(t, err)
+
+	settings := obj.(*apppluginv0alpha1.Settings)
+	require.True(t, settings.Spec.Enabled)
+	require.True(t, settings.Spec.Pinned)
+	require.Equal(t, map[string]any{"apiUrl": "https://api.example.com", "timeout": float64(30)}, settings.Spec.JsonData.Object)
+}
+
+func TestSettingsList(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{
+		"test-app": {
+			PluginID: "test-app",
+			OrgID:    1,
+			Enabled:  true,
+			Pinned:   false,
+			JSONData: map[string]any{"key": "value"},
+		},
+	})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, err := storage.List(ctx, nil)
+	require.NoError(t, err)
+
+	list := obj.(*apppluginv0alpha1.SettingsList)
+	require.Len(t, list.Items, 1)
+	require.Equal(t, "current", list.Items[0].Name)
+	require.True(t, list.Items[0].Spec.Enabled)
+	require.Equal(t, map[string]any{"key": "value"}, list.Items[0].Spec.JsonData.Object)
+}
+
+func TestSettingsCreate(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	input := &apppluginv0alpha1.Settings{
+		ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+		Spec: apppluginv0alpha1.SettingsSpec{
+			Enabled: true,
+			Pinned:  true,
+		},
+	}
+
+	obj, err := storage.Create(ctx, input, nil, nil)
+	require.NoError(t, err)
+
+	settings := obj.(*apppluginv0alpha1.Settings)
+	require.True(t, settings.Spec.Enabled)
+	require.True(t, settings.Spec.Pinned)
+}
+
+func TestSettingsCreate_WithValidation(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	input := &apppluginv0alpha1.Settings{
+		ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+	}
+
+	validationErr := apierrors.NewBadRequest("validation failed")
+	validator := func(_ context.Context, _ runtime.Object) error {
+		return validationErr
+	}
+
+	obj, err := storage.Create(ctx, input, validator, nil)
+	require.Nil(t, obj)
+	require.ErrorIs(t, err, validationErr)
+}
+
+func TestSettingsUpdate(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{
+		"test-app": {
+			PluginID: "test-app",
+			OrgID:    1,
+			Enabled:  true,
+			Pinned:   false,
+		},
+	})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+
+	updater := rest.DefaultUpdatedObjectInfo(
+		&apppluginv0alpha1.Settings{
+			ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+			Spec: apppluginv0alpha1.SettingsSpec{
+				Enabled: false,
+				Pinned:  true,
+			},
+		},
 	)
-	plugin := testPlugin()
 
-	tests := []struct {
-		name          string
-		pluginSetting *pluginsettings.DTO
-		updateChecker pluginUpdateChecker
-		hasUpdate     bool
-		latestVersion string
-	}{
-		{
-			name:          "defaults with no persisted settings",
-			pluginSetting: nil,
-			hasUpdate:     false,
-			latestVersion: "",
-		},
-		{
-			name: "with persisted settings overriding enabled/pinned and jsonData",
-			pluginSetting: &pluginsettings.DTO{
-				PluginID: "test-app",
-				OrgID:    1,
-				Enabled:  false,
-				Pinned:   true,
-				JSONData: map[string]any{"apiUrl": "https://api.example.com", "timeout": float64(30)},
-				SecureJSONData: map[string][]byte{
-					"apiKey": []byte("secret-key"),
-				},
-			},
-			hasUpdate:     false,
-			latestVersion: "",
-		},
-		{
-			name: "with persisted settings and empty jsonData",
-			pluginSetting: &pluginsettings.DTO{
-				PluginID: "test-app",
-				OrgID:    1,
-				Enabled:  true,
-				Pinned:   false,
-				JSONData: map[string]any{},
-			},
-			hasUpdate:     false,
-			latestVersion: "",
-		},
-		{
-			name:          "with available update",
-			pluginSetting: nil,
-			updateChecker: &fakeUpdateChecker{updates: map[string]string{"test-app": "1.2.4"}},
-			hasUpdate:     true,
-			latestVersion: "1.2.4",
-		},
-	}
+	obj, created, err := storage.Update(ctx, "current", updater, nil, nil, false, nil)
+	require.NoError(t, err)
+	require.False(t, created)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fakeSettings := &pluginsettings.FakePluginSettings{
-				Plugins: map[string]*pluginsettings.DTO{},
-			}
-			if tt.pluginSetting != nil {
-				fakeSettings.Plugins[plugin.ID] = tt.pluginSetting
-			}
-
-			store := pluginstore.NewFakePluginStore(plugin)
-
-			storage := &settingsStorage{
-				pluginID:             plugin.ID,
-				pluginStore:          store,
-				pluginSettings:       fakeSettings,
-				pluginsUpdateChecker: tt.updateChecker,
-				pluginAssets:         pAssets,
-				cfg:                  cfg,
-			}
-
-			ctx := request.WithNamespace(context.Background(), "default")
-
-			obj, err := storage.Get(ctx, "current", nil)
-			require.NoError(t, err)
-
-			settings := obj.(*apppluginv0alpha1.Settings)
-			specJSON, err := json.Marshal(settings.Spec)
-			require.NoError(t, err)
-
-			legacyDTO := buildLegacyDTO(plugin, cfg, tt.pluginSetting, tt.hasUpdate, tt.latestVersion)
-			legacyJSON, err := json.Marshal(legacyDTO)
-			require.NoError(t, err)
-
-			var specMap map[string]any
-			var legacyMap map[string]any
-			require.NoError(t, json.Unmarshal(specJSON, &specMap))
-			require.NoError(t, json.Unmarshal(legacyJSON, &legacyMap))
-
-			require.Equal(t, legacyMap, specMap)
-		})
-	}
+	settings := obj.(*apppluginv0alpha1.Settings)
+	require.False(t, settings.Spec.Enabled)
+	require.True(t, settings.Spec.Pinned)
 }
 
-func testPlugin() pluginstore.Plugin {
-	return pluginstore.Plugin{
-		JSONData: plugins.JSONData{
-			ID:          "test-app",
-			Type:        plugins.TypeApp,
-			Name:        "Test App",
-			AutoEnabled: true,
-			Info: plugins.Info{
-				Author:      plugins.InfoLink{Name: "Test Author", URL: "https://example.com/author"},
-				Description: "A test app plugin",
-				Links: []plugins.InfoLink{
-					{Name: "Website", URL: "https://example.com"},
-					{Name: "License", URL: "https://example.com/license"},
-				},
-				Logos: plugins.Logos{Small: "public/img/small.png", Large: "public/img/large.png"},
-				Build: plugins.BuildInfo{Time: 1234567890},
-				Screenshots: []plugins.Screenshots{
-					{Name: "screenshot1", Path: "public/img/ss1.png"},
-				},
-				Version:  "1.2.3",
-				Updated:  "2025-01-15",
-				Keywords: []string{"test", "app"},
-			},
-			Includes: []*plugins.Includes{
-				{
-					Name:       "Dashboard",
-					Path:       "dashboards/overview.json",
-					Type:       "dashboard",
-					Component:  "",
-					Role:       "Viewer",
-					Action:     "plugins.app:access",
-					AddToNav:   true,
-					DefaultNav: true,
-					Slug:       "overview",
-					Icon:       "icon-dashboard",
-					UID:        "include-uid-1",
-				},
-			},
-			Dependencies: plugins.Dependencies{
-				GrafanaDependency: ">=10.0.0",
-				GrafanaVersion:    "10.0.0",
-				Plugins: []plugins.Dependency{
-					{ID: "dep-datasource", Type: "datasource", Name: "Dep DS"},
-				},
-				Extensions: plugins.ExtensionsDependencies{
-					ExposedComponents: []string{"myOrg-myApp-app/component/v1"},
-				},
-			},
-			Extensions: plugins.Extensions{
-				AddedLinks: []plugins.AddedLink{
-					{Targets: []string{"grafana/dashboard/panel/menu"}, Title: "My Link", Description: "A link"},
-				},
-				AddedComponents: []plugins.AddedComponent{
-					{Targets: []string{"grafana/dashboard/panel/menu"}, Title: "My Component", Description: "A component"},
-				},
-				ExposedComponents: []plugins.ExposedComponent{
-					{Id: "myOrg-myApp-app/component/v1", Title: "My Exposed", Description: "An exposed component"},
-				},
-				ExtensionPoints: []plugins.ExtensionPoint{
-					{Id: "myOrg-myApp-app/ep/v1", Title: "My EP", Description: "An extension point"},
-				},
-				AddedFunctions: []plugins.AddedFunction{
-					{Targets: []string{"grafana/alerting/rule-action"}, Title: "My Function", Description: "A function"},
-				},
-			},
-			State: plugins.ReleaseStateAlpha,
+func TestSettingsDelete_NotSupported(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, _, err := storage.Delete(ctx, "current", nil, nil)
+	require.Nil(t, obj)
+	require.Error(t, err)
+	require.True(t, apierrors.IsMethodNotSupported(err))
+}
+
+func TestSettingsDeleteCollection_NotSupported(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{})
+
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, err := storage.DeleteCollection(ctx, nil, nil, nil)
+	require.Nil(t, obj)
+	require.Error(t, err)
+	require.True(t, apierrors.IsMethodNotSupported(err))
+}
+
+func TestSettingsConvertToTable(t *testing.T) {
+	storage := newTestStorage(map[string]*pluginsettings.DTO{
+		"test-app": {
+			PluginID: "test-app",
+			OrgID:    1,
+			Enabled:  true,
 		},
-		Signature:       plugins.SignatureStatusValid,
-		SignatureType:   plugins.SignatureTypeGrafana,
-		SignatureOrg:    "grafana",
-		Module:          "public/plugins/test-app/module.js",
-		BaseURL:         "public/plugins/test-app",
-		DefaultNavURL:   "/plugins/test-app/",
-		Angular:         plugins.AngularMeta{Detected: false},
-		LoadingStrategy: plugins.LoadingStrategyScript,
-		Translations:    map[string]string{"en": "public/locales/en.json"},
-	}
-}
+	})
 
-// buildLegacyDTO replicates the logic in pkg/api/plugins.go GetPluginSettingByID
-// for building the legacy DTO, skipping auth checks, pluginErrorResolver, and update checker.
-func buildLegacyDTO(
-	plugin pluginstore.Plugin,
-	cfg *setting.Cfg,
-	ps *pluginsettings.DTO,
-	hasUpdate bool,
-	latestVersion string,
-) *dtos.PluginSetting {
-	dto := &dtos.PluginSetting{
-		Type:             string(plugin.Type),
-		Id:               plugin.ID,
-		Name:             plugin.Name,
-		Info:             plugin.Info,
-		Dependencies:     plugin.Dependencies,
-		Includes:         plugin.Includes,
-		BaseUrl:          plugin.BaseURL,
-		Module:           plugin.Module,
-		DefaultNavUrl:    path.Join(cfg.AppSubURL, plugin.DefaultNavURL),
-		State:            plugin.State,
-		Signature:        plugin.Signature,
-		SignatureType:    plugin.SignatureType,
-		SignatureOrg:     plugin.SignatureOrg,
-		SecureJsonFields: map[string]bool{},
-		AngularDetected:  plugin.Angular.Detected,
-		LoadingStrategy:  plugin.LoadingStrategy,
-		Extensions:       plugin.Extensions,
-		Translations:     plugin.Translations,
-		LatestVersion:    latestVersion,
-		HasUpdate:        hasUpdate,
-	}
+	ctx := request.WithNamespace(context.Background(), "default")
+	obj, err := storage.Get(ctx, "current", nil)
+	require.NoError(t, err)
 
-	if plugin.IsApp() {
-		dto.Enabled = plugin.AutoEnabled
-		dto.Pinned = plugin.AutoEnabled
-		dto.AutoEnabled = plugin.AutoEnabled
-	}
-
-	if ps != nil {
-		dto.Enabled = ps.Enabled
-		dto.Pinned = ps.Pinned
-		dto.JsonData = ps.JSONData
-		for k, v := range ps.SecureJSONData {
-			if len(v) > 0 {
-				dto.SecureJsonFields[k] = true
-			}
-		}
-	}
-
-	return dto
-}
-
-type fakeUpdateChecker struct {
-	updates map[string]string
-}
-
-func (f *fakeUpdateChecker) HasUpdate(_ context.Context, pluginID string) (string, bool) {
-	v, ok := f.updates[pluginID]
-	return v, ok
+	table, err := storage.ConvertToTable(ctx, obj, &metav1.TableOptions{})
+	require.NoError(t, err)
+	require.Len(t, table.Rows, 1)
 }
