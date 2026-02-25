@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 
-import { test, expect, DashboardPage, E2ESelectorGroups } from '@grafana/plugin-e2e';
+import { test, expect, DashboardPage, E2ESelectorGroups, DEFAULT_A11Y_TAGS } from '@grafana/plugin-e2e';
 
 import { getCell, waitForTableLoad, getColumnIdx, getCellHeight } from './table-utils';
 
@@ -86,7 +86,9 @@ test.describe('Panels test: Table - Nested', { tag: ['@panels', '@table'] }, () 
     await expect(page.locator('[role="row"]').filter({ visible: true })).not.toHaveCount(3);
 
     const report = await scanForA11yViolations({
-      runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'],
+      options: {
+        runOnly: [...DEFAULT_A11Y_TAGS, 'best-practice'],
+      },
     });
     expect(report).toHaveNoA11yViolations({ ignoredRules: ['page-has-heading-one', 'region'] });
   });

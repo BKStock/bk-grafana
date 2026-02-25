@@ -1,6 +1,6 @@
 import { Page, Locator } from '@playwright/test';
 
-import { test, expect, E2ESelectorGroups } from '@grafana/plugin-e2e';
+import { test, expect, E2ESelectorGroups, DEFAULT_A11Y_TAGS } from '@grafana/plugin-e2e';
 
 import { getCell, getCellHeight, getColumnIdx, waitForTableLoad } from './table-utils';
 
@@ -32,7 +32,9 @@ test.describe('Panels test: Table - Kitchen Sink', { tag: ['@panels', '@table'] 
     ).toBeVisible();
     await waitForTableLoad(page);
     const report = await scanForA11yViolations({
-      runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'],
+      options: {
+        runOnly: [...DEFAULT_A11Y_TAGS, 'best-practice'],
+      },
     });
     expect(report).toHaveNoA11yViolations({ ignoredRules: ['page-has-heading-one', 'region', 'color-contrast'] });
   });
