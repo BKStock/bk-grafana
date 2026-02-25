@@ -143,7 +143,7 @@ function getStyles(theme: GrafanaTheme2, alwaysVisible: boolean) {
       height: theme.spacing(2.5),
       borderRadius: theme.shape.radius.sm,
       border: 'none',
-      background: 'oklch(66.6% 0.179 58.318)',
+      background: theme.colors.primary.main,
       color: theme.colors.primary.contrastText,
       cursor: 'pointer',
       padding: 0,
@@ -170,7 +170,7 @@ function getStyles(theme: GrafanaTheme2, alwaysVisible: boolean) {
       }),
 
       '&:hover': {
-        background: 'oklch(55.5% 0.163 48.998)',
+        background: theme.colors.primary.shade,
       },
 
       '&:active': {

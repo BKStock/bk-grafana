@@ -5,7 +5,7 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { IconButton, useStyles2 } from '@grafana/ui';
 
-import { QUERY_EDITOR_COLORS, SidebarSize } from '../../constants';
+import { SidebarSize } from '../../constants';
 
 interface SidebarHeaderActionsProps {
   sidebarSize: SidebarSize;
@@ -36,7 +36,7 @@ export function SidebarHeaderActions({ sidebarSize, setSidebarSize, children }: 
 function getStyles(theme: GrafanaTheme2) {
   return {
     header: css({
-      background: QUERY_EDITOR_COLORS.card.headerBg,
+      background: theme.colors.background.secondary,
       padding: theme.spacing(0.5, 1.5),
       minHeight: theme.spacing(5),
       display: 'flex',

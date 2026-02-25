@@ -111,6 +111,7 @@ export const TIME_OPTION_PLACEHOLDER = '1h';
 export const SIDEBAR_CARD_HEIGHT = 30;
 export const SIDEBAR_CARD_SPACING = 1;
 export const SIDEBAR_CARD_INDENT = 2;
+export const FOOTER_HEIGHT = 32;
 
 export const CONTENT_SIDE_BAR = {
   fieldLabelWidth: 130,

@@ -4,7 +4,7 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { Icon, Stack, Text, useStyles2 } from '@grafana/ui';
 
-import { QUERY_EDITOR_COLORS, QueryEditorType } from '../../constants';
+import { FOOTER_HEIGHT, QueryEditorType } from '../../constants';
 import {
   useAlertingContext,
   usePanelContext,
@@ -55,12 +55,14 @@ function getStyles(theme: GrafanaTheme2) {
   return {
     footer: css({
       marginTop: 'auto',
-      background: QUERY_EDITOR_COLORS.sidebarFooterBackground,
-      padding: theme.spacing(1, 1.5),
+      background: theme.colors.background.primary,
+      padding: theme.spacing(0, 1.5),
+      height: FOOTER_HEIGHT,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       borderRadius: `0 0 ${theme.shape.radius.default} ${theme.shape.radius.default}`,
+      borderTop: `1px solid ${theme.colors.border.weak}`,
     }),
     icon: css({
       color: theme.colors.text.secondary,
