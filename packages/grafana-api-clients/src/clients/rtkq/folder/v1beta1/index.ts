@@ -3,43 +3,24 @@ import { generatedAPI as dashboardAPI } from '../../dashboard/v0alpha1';
 
 import { generatedAPI as rawAPI } from './endpoints.gen';
 
+const invalidateDashboardSearch = {
+  onQueryStarted: (
+    _arg: unknown,
+    { dispatch, queryFulfilled }: { dispatch: (action: unknown) => void; queryFulfilled: Promise<unknown> }
+  ) => {
+    queryFulfilled.then(() => {
+      dispatch(dashboardAPI.util.invalidateTags(['Search']));
+    });
+  },
+};
+
 export * from './endpoints.gen';
 export const generatedAPI = rawAPI.enhanceEndpoints({
   endpoints: {
-    createFolder: {
-      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(() => {
-          dispatch(dashboardAPI.util.invalidateTags(['Search']));
-        });
-      },
-    },
-    deletecollectionFolder: {
-      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(() => {
-          dispatch(dashboardAPI.util.invalidateTags(['Search']));
-        });
-      },
-    },
-    replaceFolder: {
-      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(() => {
-          dispatch(dashboardAPI.util.invalidateTags(['Search']));
-        });
-      },
-    },
-    deleteFolder: {
-      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(() => {
-          dispatch(dashboardAPI.util.invalidateTags(['Search']));
-        });
-      },
-    },
-    updateFolder: {
-      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(() => {
-          dispatch(dashboardAPI.util.invalidateTags(['Search']));
-        });
-      },
-    },
+    createFolder: invalidateDashboardSearch,
+    deletecollectionFolder: invalidateDashboardSearch,
+    replaceFolder: invalidateDashboardSearch,
+    deleteFolder: invalidateDashboardSearch,
+    updateFolder: invalidateDashboardSearch,
   },
 });

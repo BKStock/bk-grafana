@@ -1,3 +1,4 @@
+import { skipToken } from '@reduxjs/toolkit/query';
 import memoizeOne from 'memoize-one';
 import Skeleton from 'react-loading-skeleton';
 
@@ -36,7 +37,7 @@ const getColumns = memoizeOne((): Array<Column<DashboardHit>> => {
 });
 
 const getSkeletonData = memoizeOne(() =>
-  new Array(3).fill(null).map((_, index) => ({
+  Array.from({ length: 3 }, (_, index) => ({
     name: `loading-folder-${index}`,
     resource: 'folder',
     title: t('teams.team-pages.team-folders.loading', 'Loading...'),
@@ -50,8 +51,7 @@ const getSkeletonData = memoizeOne(() =>
  */
 export function TeamFolders({ teamUid }: { teamUid: string }) {
   const { data, isLoading, error } = useSearchDashboardsAndFoldersQuery(
-    { ownerReference: [`iam.grafana.app/Team/${teamUid}`], type: 'folder' },
-    { skip: !teamUid }
+    teamUid ? { ownerReference: [`iam.grafana.app/Team/${teamUid}`], type: 'folder' } : skipToken
   );
 
   const folders = data?.hits ?? [];
@@ -84,12 +84,10 @@ export function TeamFolders({ teamUid }: { teamUid: string }) {
 function ParentFolderCell({ parentUid }: { parentUid?: string }) {
   // Not having a parent folder on a resource is the same as being in root or general folder but in case somebody just
   // passes general folder UID explicitly let's normalize that a bit
-  if (parentUid === GENERAL_FOLDER_UID) {
-    parentUid = undefined;
-  }
+  const normalizedParentUid = parentUid === GENERAL_FOLDER_UID ? undefined : parentUid;
 
   // If parentUid is undefined, this just skips
-  const { data: parentFolder, isLoading, isError } = useGetFolderQueryFacade(parentUid);
+  const { data: parentFolder, isLoading, isError } = useGetFolderQueryFacade(normalizedParentUid);
 
   if (isLoading) {
     return <Skeleton width={100} />;
