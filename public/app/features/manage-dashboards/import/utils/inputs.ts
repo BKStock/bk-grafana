@@ -181,22 +181,6 @@ export function extractV2Inputs(dashboard: unknown): DashboardInputs {
 
   const dsTypes: { [label: string]: string } = {};
 
-  if (dashboard.elements) {
-    for (const element of Object.values(dashboard.elements)) {
-      if (element.kind === 'Panel' && element.spec.data?.kind === 'QueryGroup') {
-        for (const query of element.spec.data.spec.queries) {
-          if (query.kind === 'PanelQuery') {
-            const dsType = query.spec.query?.group;
-            const exportLabel = getExportLabel(query.spec.query.labels);
-            if (dsType && exportLabel) {
-              dsTypes[exportLabel] = dsType;
-            }
-          }
-        }
-      }
-    }
-  }
-
   if (dashboard.variables) {
     for (const variable of dashboard.variables) {
       if (variable.kind === 'QueryVariable') {
