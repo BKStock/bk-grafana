@@ -1,7 +1,7 @@
 import { css, cx, keyframes } from '@emotion/css';
 import { useCallback, useState } from 'react';
 
-import { GrafanaTheme2, colorManipulator } from '@grafana/data';
+import { GrafanaTheme2 } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { Icon, useStyles2 } from '@grafana/ui';
 
@@ -141,7 +141,8 @@ function getStyles(
     isError: item.isError,
   });
 
-  const backgroundColor = isSelected ? colorManipulator.alpha(borderColor, 0.08) : QUERY_EDITOR_COLORS.card.hoverBg;
+  const selectedBg = `color-mix(in srgb, ${borderColor} 8%, ${theme.colors.background.primary})`;
+  const backgroundColor = isSelected ? selectedBg : QUERY_EDITOR_COLORS.card.hoverBg;
   const hoverActions = css({
     position: 'absolute',
     right: 0,
@@ -211,7 +212,7 @@ function getStyles(
       alignItems: 'center',
       justifyContent: 'space-between',
       width: '100%',
-      background: isSelected ? colorManipulator.alpha(borderColor, 0.08) : 'none',
+      background: isSelected ? selectedBg : 'none',
       borderLeft: `${isSelected ? 3 : 1}px solid ${borderColor}`,
       cursor: 'pointer',
 
