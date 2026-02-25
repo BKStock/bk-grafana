@@ -387,8 +387,8 @@ export function TableNG(props: TableNGProps) {
   }, [rowHeight, defaultNestedRowHeight, isExpanded]);
 
   const renderRow = useMemo(
-    () => renderRowFactory(data.fields, panelContext, isExpanded, enableSharedCrosshair),
-    [data.fields, panelContext, isExpanded, enableSharedCrosshair]
+    () => renderRowFactory(data.fields, panelContext, isExpanded, hasNestedFrames, enableSharedCrosshair),
+    [data.fields, panelContext, , isExpanded, hasNestedFrames, enableSharedCrosshair]
   );
 
   const commonDataGridProps = useMemo(
@@ -883,7 +883,13 @@ export function TableNG(props: TableNGProps) {
 
     // pre-calculate renderRow and expandedColumns based on the first nested frame's fields.
     const hasNestedHeaders = firstRowNestedData.meta?.custom?.noHeader !== true;
-    const renderRow = renderRowFactory(firstRowNestedData.fields, panelContext, isExpanded, enableSharedCrosshair);
+    const renderRow = renderRowFactory(
+      firstRowNestedData.fields,
+      panelContext,
+      isExpanded,
+      false,
+      enableSharedCrosshair
+    );
 
     const expanderCellRenderer: CellRootRenderer = (key, props) => <Cell key={key} {...props} />;
     result.cellRootRenderers[EXPANDED_COLUMN_KEY] = expanderCellRenderer;
@@ -1015,6 +1021,7 @@ const renderRowFactory = (
   fields: Field[],
   panelContext: PanelContext,
   isExpanded: (row: TableRow) => boolean,
+  hasNestedFrames: boolean,
   enableSharedCrosshair: boolean
 ) => {
   const onMouseLeave = () => {
@@ -1049,9 +1056,10 @@ const renderRowFactory = (
       handlers.onMouseLeave = onMouseLeave;
     }
 
-    const a11yProps: AriaAttributes = {
-      'aria-level': row.__depth + 1,
-    };
+    const a11yProps: AriaAttributes = {};
+    if (hasNestedFrames) {
+      a11yProps['aria-level'] = row.__depth + 1;
+    }
     if (row.__depth > 0) {
       a11yProps['aria-expanded'] = isExpanded(row);
     }
