@@ -41,11 +41,11 @@ func TestSettingsGet_NoPersistedSettings(t *testing.T) {
 	storage := newTestStorage(map[string]*pluginsettings.DTO{})
 
 	ctx := request.WithNamespace(context.Background(), "default")
-	obj, err := storage.Get(ctx, "current", nil)
+	obj, err := storage.Get(ctx, "test-app", nil)
 	require.NoError(t, err)
 
 	settings := obj.(*apppluginv0alpha1.Settings)
-	require.Equal(t, "current", settings.Name)
+	require.Equal(t, "test-app", settings.Name)
 	require.Equal(t, "default", settings.Namespace)
 	require.False(t, settings.Spec.Enabled)
 	require.False(t, settings.Spec.Pinned)
@@ -64,7 +64,7 @@ func TestSettingsGet_WithPersistedSettings(t *testing.T) {
 	})
 
 	ctx := request.WithNamespace(context.Background(), "default")
-	obj, err := storage.Get(ctx, "current", nil)
+	obj, err := storage.Get(ctx, "test-app", nil)
 	require.NoError(t, err)
 
 	settings := obj.(*apppluginv0alpha1.Settings)
@@ -90,7 +90,7 @@ func TestSettingsList(t *testing.T) {
 
 	list := obj.(*apppluginv0alpha1.SettingsList)
 	require.Len(t, list.Items, 1)
-	require.Equal(t, "current", list.Items[0].Name)
+	require.Equal(t, "test-app", list.Items[0].Name)
 	require.True(t, list.Items[0].Spec.Enabled)
 	require.Equal(t, map[string]any{"key": "value"}, list.Items[0].Spec.JsonData.Object)
 }
@@ -100,7 +100,7 @@ func TestSettingsCreate(t *testing.T) {
 
 	ctx := request.WithNamespace(context.Background(), "default")
 	input := &apppluginv0alpha1.Settings{
-		ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-app", Namespace: "default"},
 		Spec: apppluginv0alpha1.SettingsSpec{
 			Enabled: true,
 			Pinned:  true,
@@ -120,7 +120,7 @@ func TestSettingsCreate_WithValidation(t *testing.T) {
 
 	ctx := request.WithNamespace(context.Background(), "default")
 	input := &apppluginv0alpha1.Settings{
-		ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-app", Namespace: "default"},
 	}
 
 	validationErr := apierrors.NewBadRequest("validation failed")
@@ -147,7 +147,7 @@ func TestSettingsUpdate(t *testing.T) {
 
 	updater := rest.DefaultUpdatedObjectInfo(
 		&apppluginv0alpha1.Settings{
-			ObjectMeta: metav1.ObjectMeta{Name: "current", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "test-app", Namespace: "default"},
 			Spec: apppluginv0alpha1.SettingsSpec{
 				Enabled: false,
 				Pinned:  true,
@@ -155,7 +155,7 @@ func TestSettingsUpdate(t *testing.T) {
 		},
 	)
 
-	obj, created, err := storage.Update(ctx, "current", updater, nil, nil, false, nil)
+	obj, created, err := storage.Update(ctx, "test-app", updater, nil, nil, false, nil)
 	require.NoError(t, err)
 	require.False(t, created)
 
@@ -168,7 +168,7 @@ func TestSettingsDelete_NotSupported(t *testing.T) {
 	storage := newTestStorage(map[string]*pluginsettings.DTO{})
 
 	ctx := request.WithNamespace(context.Background(), "default")
-	obj, _, err := storage.Delete(ctx, "current", nil, nil)
+	obj, _, err := storage.Delete(ctx, "test-app", nil, nil)
 	require.Nil(t, obj)
 	require.Error(t, err)
 	require.True(t, apierrors.IsMethodNotSupported(err))
@@ -194,7 +194,7 @@ func TestSettingsConvertToTable(t *testing.T) {
 	})
 
 	ctx := request.WithNamespace(context.Background(), "default")
-	obj, err := storage.Get(ctx, "current", nil)
+	obj, err := storage.Get(ctx, "test-app", nil)
 	require.NoError(t, err)
 
 	table, err := storage.ConvertToTable(ctx, obj, &metav1.TableOptions{})

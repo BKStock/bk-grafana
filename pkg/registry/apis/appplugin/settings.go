@@ -51,7 +51,7 @@ func (s *settingsStorage) ConvertToTable(ctx context.Context, object runtime.Obj
 }
 
 func (s *settingsStorage) Get(ctx context.Context, name string, _ *metav1.GetOptions) (runtime.Object, error) {
-	if name != "current" {
+	if name != s.pluginID {
 		return nil, apierrors.NewNotFound(s.resource, name)
 	}
 
@@ -90,7 +90,7 @@ func (s *settingsStorage) Get(ctx context.Context, name string, _ *metav1.GetOpt
 }
 
 func (s *settingsStorage) List(ctx context.Context, _ *internalversion.ListOptions) (runtime.Object, error) {
-	obj, err := s.Get(ctx, "current", nil)
+	obj, err := s.Get(ctx, s.pluginID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -131,12 +131,12 @@ func (s *settingsStorage) Update(ctx context.Context, name string, objInfo rest.
 
 func (s *settingsStorage) Delete(_ context.Context, _ string, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// pluginSettings does not support deletion
-	return nil, false, apierrors.NewMethodNotSupported(s.resource, "delete")
+	return nil, false, nil
 }
 
 func (s *settingsStorage) DeleteCollection(_ context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *internalversion.ListOptions) (runtime.Object, error) {
 	// pluginSettings does not support deletion
-	return nil, apierrors.NewMethodNotSupported(s.resource, "deleteCollection")
+	return nil, nil
 }
 
 func (s *settingsStorage) save(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
@@ -160,5 +160,5 @@ func (s *settingsStorage) save(ctx context.Context, obj runtime.Object) (runtime
 		return nil, fmt.Errorf("failed to save plugin settings: %w", err)
 	}
 
-	return s.Get(ctx, "current", nil)
+	return s.Get(ctx, s.pluginID, nil)
 }
