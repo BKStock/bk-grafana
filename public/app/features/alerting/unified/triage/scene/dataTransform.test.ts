@@ -2,7 +2,34 @@ import { FieldType } from '@grafana/data';
 
 import { EmptyLabelValue } from '../types';
 
-import { convertToWorkbenchRows } from './dataTransform';
+import { convertToWorkbenchRows, normalizeFrame } from './dataTransform';
+
+describe('normalizeFrame', () => {
+  it('should return the same frame reference when no Value # fields exist', () => {
+    const frame = {
+      fields: [{ name: 'Value', type: FieldType.number, values: [1], config: {} }],
+      length: 1,
+    };
+
+    expect(normalizeFrame(frame)).toBe(frame);
+  });
+
+  it('should rename Value #<refId> field to Value and preserve its values', () => {
+    const frame = {
+      fields: [
+        { name: 'alertstate', type: FieldType.string, values: ['firing', 'pending'], config: {} },
+        { name: 'Value #B', type: FieldType.number, values: [3, 7], config: {} },
+      ],
+      length: 2,
+    };
+
+    const result = normalizeFrame(frame);
+
+    expect(result).not.toBe(frame);
+    expect(result.fields.map((f) => f.name)).toEqual(['alertstate', 'Value']);
+    expect(result.fields[1].values).toEqual([3, 7]);
+  });
+});
 
 /**
  * convertToWorkbenchRows transforms alert instance count data into a hierarchical structure of alert rules.

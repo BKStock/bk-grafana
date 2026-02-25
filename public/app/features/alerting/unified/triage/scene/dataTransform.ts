@@ -1,5 +1,6 @@
 import { DataFrame } from '@grafana/data';
 
+import { FIELD_NAMES } from '../constants';
 import { AlertRuleRow, EmptyLabelValue, GenericGroupedRow, InstanceCounts, WorkbenchRow } from '../types';
 
 const EMPTY_COUNTS: InstanceCounts = { firing: 0, pending: 0 };
@@ -27,8 +28,8 @@ function buildRuleCountsMap(
   fieldIndex: Map<string, number>,
   ruleUIDValues: DataFrame['fields'][number]['values']
 ): Map<string, InstanceCounts> {
-  const alertstateIdx = fieldIndex.get('alertstate');
-  const valueIdx = fieldIndex.get('Value');
+  const alertstateIdx = fieldIndex.get(FIELD_NAMES.alertstate);
+  const valueIdx = fieldIndex.get(FIELD_NAMES.value);
 
   if (alertstateIdx === undefined || valueIdx === undefined) {
     return new Map();
@@ -64,41 +65,54 @@ function buildRuleCountsMap(
   return result;
 }
 
+/**
+ * Normalizes a DataFrame by renaming any "Value #<refId>" field back to "Value".
+ * This rename is introduced by the Prometheus plugin when multiple queries share
+ * a Scenes query runner.
+ */
+export function normalizeFrame(frame: DataFrame): DataFrame {
+  const hasRenamedValue = frame.fields.some((f) => f.name.startsWith(FIELD_NAMES.valuePrefix));
+  if (!hasRenamedValue) {
+    return frame;
+  }
+  return {
+    ...frame,
+    fields: frame.fields.map((f) =>
+      f.name.startsWith(FIELD_NAMES.valuePrefix) ? { ...f, name: FIELD_NAMES.value } : f
+    ),
+  };
+}
+
 // Builds tree structure in one pass through data, avoiding intermediate row objects
 export function convertToWorkbenchRows(series: DataFrame[], groupBy: string[] = []): WorkbenchRow[] {
   if (!series.at(0)?.fields.length) {
     return [];
   }
 
-  const frame = series[0];
+  const frame = normalizeFrame(series[0]);
 
   // Build field index map
-  // When multiple queries share a Scenes query runner, the Prometheus plugin
-  // renames "Value" to "Value #<refId>" (e.g. "Value #B"). Normalize it back.
   const fieldIndex = new Map<string, number>();
   for (let i = 0; i < frame.fields.length; i++) {
     const name = frame.fields[i].name;
     fieldIndex.set(name, i);
-    if (name.startsWith('Value #')) {
-      fieldIndex.set('Value', i);
-    }
   }
 
   // Validate required fields exist
   if (
-    !fieldIndex.has('Time') ||
-    !fieldIndex.has('alertname') ||
-    !fieldIndex.has('grafana_folder') ||
-    !fieldIndex.has('grafana_rule_uid') ||
-    !fieldIndex.has('alertstate')
+    !fieldIndex.has(FIELD_NAMES.time) ||
+    !fieldIndex.has(FIELD_NAMES.alertname) ||
+    !fieldIndex.has(FIELD_NAMES.grafanaFolder) ||
+    !fieldIndex.has(FIELD_NAMES.grafanaRuleUID) ||
+    !fieldIndex.has(FIELD_NAMES.alertstate)
   ) {
     return [];
   }
 
   // Get required field value arrays (direct columnar access)
-  const alertnameIndex = fieldIndex.get('alertname');
-  const folderIndex = fieldIndex.get('grafana_folder');
-  const ruleUIDIndex = fieldIndex.get('grafana_rule_uid');
+  const alertnameIndex = fieldIndex.get(FIELD_NAMES.alertname);
+  const folderIndex = fieldIndex.get(FIELD_NAMES.grafanaFolder);
+  const ruleUIDIndex = fieldIndex.get(FIELD_NAMES.grafanaRuleUID);
 
   // These should always exist due to validation above, but handle gracefully
   if (alertnameIndex === undefined || folderIndex === undefined || ruleUIDIndex === undefined) {
