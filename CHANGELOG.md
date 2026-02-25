@@ -67,6 +67,7 @@
 - **Dashboards:** Remove deprecated dashboard id endpoints [#117227](https://github.com/grafana/grafana/pull/117227), [@stephaniehingtgen](https://github.com/stephaniehingtgen)
 - **DataSources:** Deprecate api routes with name and internal IDs [#116391](https://github.com/grafana/grafana/pull/116391), [@ryantxu](https://github.com/ryantxu)
 - **Datagrid:** Deprecate panel [#116071](https://github.com/grafana/grafana/pull/116071), [@natellium](https://github.com/natellium)
+- **Datagrid:** Remove deprecated DataGrid panel and enableDatagridEditing feature toggle
 - **Datasources:** Support new temp creds AWS datasources in auth service (Enterprise)
 - **Docs:** Add Knowledge Graph trace & profile configuration section [#117155](https://github.com/grafana/grafana/pull/117155), [@github-actions[bot]](https://github.com/github-actions[bot])
 - **Docs:** Cleanup enterprise tag usage (Enterprise)
