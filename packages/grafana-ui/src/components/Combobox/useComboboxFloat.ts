@@ -22,6 +22,9 @@ const POPOVER_PADDING = 16;
 
 const SCROLL_CONTAINER_PADDING = 8;
 
+// 16px svg width + 12px Icon padding
+const ICON_WIDTH = 28;
+
 export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, isOpen: boolean) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const floatingRef = useRef<HTMLDivElement>(null);
@@ -65,13 +68,16 @@ export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, 
 
   const longestItemWidth = useMemo(() => {
     let longestLabel = '';
+    let longestLabelIndex = -1;
     let longestDescription = '';
+    // @todo sort by string length DESC
     const itemsToLookAt = Math.min(items.length, WIDTH_CALCULATION_LIMIT_ITEMS);
 
     for (let i = 0; i < itemsToLookAt; i++) {
       const itemLabel = items[i].label ?? items[i].value.toString();
       if (itemLabel.length > longestLabel.length) {
         longestLabel = itemLabel;
+        longestLabelIndex = i;
       }
       const itemDescription = items[i].description ?? '';
       if (itemDescription.length > longestDescription.length) {
@@ -83,8 +89,9 @@ export const useComboboxFloat = (items: Array<ComboboxOption<string | number>>, 
     const descriptionWidth = longestDescription
       ? measureText(longestDescription, MENU_ITEM_DESCRIPTION_FONT_SIZE).width
       : 0;
+    const iconSize = longestLabelIndex > -1 && items[longestLabelIndex].icon ? ICON_WIDTH : 0;
 
-    return Math.max(labelWidth, descriptionWidth) + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth;
+    return Math.max(labelWidth, descriptionWidth) + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth + iconSize;
   }, [items, scrollbarWidth]);
 
   const floatStyles = {
