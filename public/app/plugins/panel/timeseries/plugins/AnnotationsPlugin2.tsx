@@ -10,7 +10,6 @@ import {
   colorManipulator,
   DataFrame,
   DataTopic,
-  FieldType,
   InterpolateFunction,
 } from '@grafana/data';
 import { maybeSortFrame } from '@grafana/data/internal';
@@ -26,12 +25,9 @@ import {
 
 import { AnnotationMarker2 } from './annotations2/AnnotationMarker2';
 import { ANNOTATION_LANE_SIZE, getXAnnotationFrames, getXYAnnotationFrames } from './utils';
-
-// (copied from TooltipPlugin2)
-interface TimeRange2 {
-  from: number;
-  to: number;
-}
+import { useAnnotationClustering } from './annotations2/useAnnotationClustering';
+import { useAnnotations } from './annotations2/useAnnotations';
+import { TimeRange2 } from '@grafana/ui/internal';
 
 interface AnnotationsPluginProps {
   config: UPlotConfigBuilder;
@@ -138,138 +134,11 @@ export const AnnotationsPlugin2 = ({
     };
   }, [annotations, newRange]);
 
+  const _annos = useAnnotations({ annotations, newRange });
+
   console.log('xAnnos (before cluster)', xAnnos);
 
-  const { clusteredAnnos } = useMemo(() => {
-    const clusteredAnnos: DataFrame[] = [];
-
-    // 15min in millis
-    // todo: compute this from pixel space, to make dynamic, like 10px -> millis
-    let mergeThreshold = (3600 / 4) * 1e3;
-
-    // per-frame clustering
-    if (clusteringMode === ClusteringMode.Render) {
-      for (let i = 0; i < xAnnos.length; i++) {
-        let frame = xAnnos[i];
-
-        let timeVals = frame.fields.find((f) => f.name === 'time')?.values;
-        let colorVals = frame.fields.find((f) => f.name === 'color')?.values;
-
-        if (timeVals && timeVals.length > 1) {
-          let isRegionVals =
-            frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
-
-          let len = timeVals.length;
-
-          let clusterIdx = Array(timeVals.length).fill(null);
-          let clusters: number[][] = [];
-
-          let thisCluster: number[] = [];
-          let prevIdx = null;
-
-          for (let j = 0; j < len; j++) {
-            let time = timeVals[j];
-
-            if (!isRegionVals[j]) {
-              if (prevIdx != null) {
-                if (time - timeVals[prevIdx] <= mergeThreshold) {
-                  console.log('merge threshold hit');
-                  // open cluster
-                  if (thisCluster.length === 0) {
-                    thisCluster.push(prevIdx);
-                    clusterIdx[prevIdx] = clusters.length;
-                  }
-                  thisCluster.push(j);
-                  clusterIdx[j] = clusters.length;
-                } else {
-                  // close cluster
-                  if (thisCluster.length > 0) {
-                    clusters.push(thisCluster);
-                    thisCluster = [];
-                  }
-                }
-              }
-
-              prevIdx = j;
-            }
-          }
-
-          // close cluster
-          if (thisCluster.length > 0) {
-            clusters.push(thisCluster);
-          }
-
-          console.log('clusters', clusters);
-
-          let clusteredFrame: DataFrame = {
-            ...frame,
-            fields: frame.fields
-              .map((field) => ({
-                ...field,
-                values: field.values.slice(),
-              }))
-              // append cluster indices
-              .concat({
-                type: FieldType.number,
-                name: 'clusterIdx',
-                values: clusterIdx,
-                config: {},
-              }),
-          };
-
-          let hasTimeEndField = clusteredFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
-
-          if (!hasTimeEndField) {
-            clusteredFrame.fields.push({
-              type: FieldType.time,
-              name: 'timeEnd',
-              values: Array(clusteredFrame.fields[0].values.length).fill(null),
-              config: {},
-            });
-          }
-
-          // append cluster regions to frame
-          clusters.forEach((idxs, ci) => {
-            clusteredFrame.fields.forEach((field) => {
-              let vals = field.values;
-
-              if (field.name === 'time') {
-                vals.push(timeVals[idxs[0]]);
-              } else if (field.name === 'timeEnd') {
-                let lastIdx = idxs.length - 1;
-                vals.push(timeVals[idxs[lastIdx]]);
-              } else if (field.name === 'isRegion') {
-                vals.push(true);
-              } else if (field.name === 'color') {
-                vals.push(colorVals?.[idxs[0]]);
-              } else if (field.name === 'title') {
-                vals.push(`Cluster ${ci}`);
-              } else if (field.name === 'text') {
-                vals.push(idxs.join());
-              } else if (field.name === 'clusterIdx') {
-                vals.push(ci);
-              } else {
-                vals.push(null);
-              }
-            });
-          });
-
-          clusteredFrame.length = clusteredFrame.fields[0].values.length;
-
-          console.log('clusteredFrame', clusteredFrame);
-          clusteredAnnos.push(clusteredFrame);
-        } else {
-          console.log('regular ol frame', frame);
-          clusteredAnnos.push(frame);
-        }
-      }
-    } else if (clusteringMode === ClusteringMode.Hover) {
-      // TODO
-    }
-
-    return { clusteredAnnos: clusteredAnnos.length > 0 ? clusteredAnnos : xAnnos };
-  }, [xAnnos, clusteringMode]);
-
+  const clusteredAnnos = useAnnotationClustering({ annotations: _annos, clusteringMode });
   const exitWipEdit = useCallback(() => {
     setNewRange(null);
   }, [setNewRange]);
