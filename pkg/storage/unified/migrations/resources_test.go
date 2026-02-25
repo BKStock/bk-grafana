@@ -282,20 +282,20 @@ func TestResourceMigration_AutoMigrateEnablesMode5(t *testing.T) {
 			// Create the migration with options
 			var opts []ResourceMigrationOption
 			if tt.autoMigrate {
-				opts = append(opts, WithAutoMigrate(tt.cfg))
+				opts = append(opts, WithAutoMigrate())
 			}
 
 			def := MigrationDefinition{
 				MigrationID: "test-auto-migrate",
 				Resources: func() []ResourceInfo {
 					var infos []ResourceInfo
-					for _, r := range resources {
-						infos = append(infos, ResourceInfo{GroupResource: r})
+					for _, r := range resourceInfos {
+						infos = append(infos, ResourceInfo{GroupResource: r.GroupResource})
 					}
 					return infos
 				}(),
 			}
-			m := NewResourceMigration(nil, nil, nil, def, nil, opts...)
+			m := NewResourceMigration(nil, nil, nil, tt.cfg, def, nil, opts...)
 
 			// Simulate what happens at the end of a successful migration
 			// This is the logic from MigrationRunner.Run() that we're testing

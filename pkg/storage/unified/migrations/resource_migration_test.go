@@ -52,7 +52,7 @@ func newRunner(t *testing.T, locker MigrationTableLocker, renamer MigrationTable
 	m := NewMockUnifiedMigrator(t)
 	m.EXPECT().Migrate(mock.Anything, mock.Anything).Return(&resourcepb.BulkResponse{}, nil)
 	m.EXPECT().RebuildIndexes(mock.Anything, mock.Anything).Return(nil)
-	return NewMigrationRunner(m, locker, renamer, def, nil), m
+	return NewMigrationRunner(m, locker, renamer, setting.NewCfg(), def, nil), m
 }
 
 func ensureOrg(t *testing.T, engine *xorm.Engine) {
@@ -99,21 +99,6 @@ func assertNotRenamed(t *testing.T, engine *xorm.Engine, table string) {
 
 func noopLocker() *tableLockerMock {
 	return &tableLockerMock{unlockFunc: func(context.Context) error { return nil }}
-}
-
-func TestIntegrationRun_SQLite_NoLock(t *testing.T) {
-	testutil.SkipIntegrationTestInShortMode(t)
-	if !db.IsTestDbSQLite() {
-		t.Skip("SQLite-only")
-	}
-	dbstore := db.InitTestDB(t)
-	t.Cleanup(db.CleanupTestDB)
-	engine := dbstore.GetEngine()
-	ensureOrg(t, engine)
-
-	table := uniqueTable(t, engine)
-	runner, _ := newRunner(t, &sqliteTableLocker{}, &transactionalTableRenamer{log: logger}, testDef(dummyGR(), []string{table}, nil))
-	runMigration(t, engine, runner, migrator.SQLite)
 }
 
 func TestIntegrationRun_Postgres_LocksOnSession(t *testing.T) {

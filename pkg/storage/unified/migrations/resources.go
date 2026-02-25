@@ -28,7 +28,7 @@ func registerMigrations(ctx context.Context,
 		}
 
 		if shouldAutoMigrate(ctx, def, cfg, sqlStore) {
-			registerMigration(mg, migrator, tableLocker, tableRenamer, cfg, client, def, WithAutoMigrate(cfg))
+			registerMigration(mg, migrator, tableLocker, tableRenamer, cfg, client, def, WithAutoMigrate())
 			continue
 		}
 
@@ -55,8 +55,7 @@ func registerMigration(mg *sqlstoremigrator.Migrator,
 	opts ...ResourceMigrationOption,
 ) {
 	validators := def.CreateValidators(client, mg.Dialect.DriverName())
-	migration := NewResourceMigration(migrator, tableLocker, tableRenamer, def, validators, opts...)
-	migration.runner.cfg = cfg
+	migration := NewResourceMigration(migrator, tableLocker, tableRenamer, cfg, def, validators, opts...)
 	mg.AddMigration(def.MigrationID, migration)
 }
 

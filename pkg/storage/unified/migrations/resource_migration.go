@@ -20,9 +20,8 @@ import (
 type MigrationRunnerOption func(*MigrationRunner)
 
 // WithAutoEnableMode5 configures the runner to auto-enable mode 5 after successful migration.
-func WithAutoEnableMode5(cfg *setting.Cfg) MigrationRunnerOption {
+func WithAutoEnableMode5() MigrationRunnerOption {
 	return func(r *MigrationRunner) {
-		r.cfg = cfg
 		r.autoEnableMode5 = true
 	}
 }
@@ -41,13 +40,14 @@ type MigrationRunner struct {
 }
 
 // NewMigrationRunner creates a new migration runner.
-func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, tableRenamer MigrationTableRenamer, def MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
+func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, tableRenamer MigrationTableRenamer, cfg *setting.Cfg, def MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
 	r := &MigrationRunner{
 		unifiedMigrator: unifiedMigrator,
 		tableLocker:     tableLocker,
 		tableRenamer:    tableRenamer,
+		cfg:             cfg,
 		definition:      def,
-		log:             log.New("storage.unified.migration_runner." + definition.ID),
+		log:             log.New("storage.unified.migration_runner." + def.ID),
 		resources:       def.GetGroupResources(),
 		validators:      validators,
 	}
@@ -144,7 +144,7 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migra
 	}
 
 	// Auto-enable mode 5 for resources after successful migration
-	if r.autoEnableMode5 && r.cfg != nil {
+	if r.autoEnableMode5 {
 		for _, gr := range r.resources {
 			r.log.Info("Auto-enabling mode 5 for resource", "resource", gr.Resource+"."+gr.Group)
 			r.cfg.EnableMode5(gr.Resource + "." + gr.Group)
@@ -298,10 +298,9 @@ type ResourceMigration struct {
 type ResourceMigrationOption func(*ResourceMigration, *MigrationRunner)
 
 // WithAutoMigrate configures the migration to auto-migrate resource if count is below threshold.
-func WithAutoMigrate(cfg *setting.Cfg) ResourceMigrationOption {
+func WithAutoMigrate() ResourceMigrationOption {
 	return func(m *ResourceMigration, r *MigrationRunner) {
 		m.autoMigrate = true
-		r.cfg = cfg
 		r.autoEnableMode5 = true
 	}
 }
@@ -312,11 +311,12 @@ func NewResourceMigration(
 	unifiedMigrator UnifiedMigrator,
 	tableLocker MigrationTableLocker,
 	tableRenamer MigrationTableRenamer,
+	cfg *setting.Cfg,
 	def MigrationDefinition,
 	validators []Validator,
 	opts ...ResourceMigrationOption,
 ) *ResourceMigration {
-	runner := NewMigrationRunner(unifiedMigrator, tableLocker, tableRenamer, def, validators)
+	runner := NewMigrationRunner(unifiedMigrator, tableLocker, tableRenamer, cfg, def, validators)
 	m := &ResourceMigration{
 		runner:      runner,
 		resources:   def.GetGroupResources(),
