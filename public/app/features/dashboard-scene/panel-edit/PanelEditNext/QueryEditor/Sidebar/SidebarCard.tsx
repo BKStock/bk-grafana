@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { Icon, useStyles2 } from '@grafana/ui';
+import { useStyles2 } from '@grafana/ui';
 
 import { ActionItem, Actions } from '../../Actions';
 import { QUERY_EDITOR_COLORS, QueryEditorType, SIDEBAR_CARD_HEIGHT, SIDEBAR_CARD_INDENT } from '../../constants';
@@ -96,11 +96,6 @@ export const SidebarCard = ({
       >
         <div className={cx(styles.cardContent, { [styles.hidden]: item.isHidden })}>{children}</div>
         <div>
-          {item.isError && (
-            <div className={styles.errorIcon}>
-              <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />
-            </div>
-          )}
           {hasActions && (
             <div className={cx(styles.hoverActions, { [styles.hoverActionsVisible]: hasFocusWithin })}>
               <Actions
@@ -295,10 +290,6 @@ function getStyles(
       [theme.transitions.handleMotion('no-preference')]: {
         animation: `${ghostCardPulse} 3s ease-in-out infinite`,
       },
-    }),
-
-    errorIcon: css({
-      paddingRight: theme.spacing(1),
     }),
   };
 }
