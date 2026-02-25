@@ -165,6 +165,7 @@ Clicking **+ Add from saved queries** adds an additional query, while clicking *
 Learn more about saved queries:
 
 - [Roles, permission, and RBAC](#roles-permissions-and-rbac)
+- [How to save a query](#save-a-query)
 - [Variables in saved queries](#variables-in-saved-queries)
 - [Known limitations](#known-limitations)
 
