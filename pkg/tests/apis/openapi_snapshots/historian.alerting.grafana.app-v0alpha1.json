@@ -1269,6 +1269,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "enrichments": {
+            "type": "object",
+            "additionalProperties": {}
+          },
           "labels": {
             "type": "object",
             "additionalProperties": {
@@ -1308,6 +1312,14 @@
           },
           "groupLabels": {
             "description": "GroupLabels optionally filters the entries by matching group labels.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/com.github.grafana.grafana.apps.alerting.historian.pkg.apis.alertinghistorian.v0alpha1.CreateNotificationqueryMatchers"
+              }
+            ]
+          },
+          "labels": {
+            "description": "Labels optionally filters the entries by matching alert labels.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/com.github.grafana.grafana.apps.alerting.historian.pkg.apis.alertinghistorian.v0alpha1.CreateNotificationqueryMatchers"

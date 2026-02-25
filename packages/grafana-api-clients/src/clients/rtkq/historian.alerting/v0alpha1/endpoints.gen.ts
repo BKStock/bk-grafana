@@ -604,6 +604,9 @@ export type CreateNotificationqueryNotificationEntryAlert = {
     [key: string]: string;
   };
   endsAt: string;
+  enrichments?: {
+    [key: string]: any;
+  };
   labels: {
     [key: string]: string;
   };
@@ -652,6 +655,8 @@ export type CreateNotificationqueryRequestBody = {
   from?: string;
   /** GroupLabels optionally filters the entries by matching group labels. */
   groupLabels?: CreateNotificationqueryMatchers;
+  /** Labels optionally filters the entries by matching alert labels. */
+  labels?: CreateNotificationqueryMatchers;
   /** Limit is the maximum number of entries to return. */
   limit?: number;
   /** Outcome optionally filters the entries to only either successful or failed attempts. */
