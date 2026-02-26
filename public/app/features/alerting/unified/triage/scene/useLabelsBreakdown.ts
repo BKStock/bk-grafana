@@ -10,14 +10,12 @@ import { useQueryFilter } from './utils';
 
 export interface LabelValueCount {
   value: string;
-  count: number;
   firing: number;
   pending: number;
 }
 
 export interface LabelStats {
   key: string;
-  count: number;
   firing: number;
   pending: number;
   values: LabelValueCount[];
@@ -87,14 +85,12 @@ export function computeLabelStats(series: Array<Record<string, string>>): LabelS
     .sort((a, b) => b[1].count - a[1].count)
     .map(([key, stats]) => ({
       key,
-      count: stats.count,
       firing: stats.firing,
       pending: stats.pending,
       values: [...stats.values.entries()]
         .sort((a, b) => b[1].count - a[1].count)
         .map(([value, vs]) => ({
           value,
-          count: vs.count,
           firing: vs.firing,
           pending: vs.pending,
         })),

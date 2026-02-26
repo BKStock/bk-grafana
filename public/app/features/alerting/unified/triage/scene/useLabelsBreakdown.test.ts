@@ -31,19 +31,14 @@ describe('computeLabelStats', () => {
     expect(result).toHaveLength(6);
     // team appears in all 5
     expect(result[0].key).toBe('team');
-    expect(result[0].count).toBe(5);
     // env appears in 4
     expect(result[1].key).toBe('env');
-    expect(result[1].count).toBe(4);
     // region appears in 3
     expect(result[2].key).toBe('region');
-    expect(result[2].count).toBe(3);
     // service appears in 3
     expect(result[3].key).toBe('service');
-    expect(result[3].count).toBe(3);
     // severity appears in 2
     expect(result[4].key).toBe('severity');
-    expect(result[4].count).toBe(2);
   });
 
   it('should include value distributions sorted by count', () => {
@@ -59,11 +54,10 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('team');
-    expect(result[0].count).toBe(6);
     expect(result[0].values).toEqual([
-      { value: 'infra', count: 3, firing: 0, pending: 0 },
-      { value: 'platform', count: 2, firing: 0, pending: 0 },
-      { value: 'backend', count: 1, firing: 0, pending: 0 },
+      { value: 'infra', firing: 0, pending: 0 },
+      { value: 'platform', firing: 0, pending: 0 },
+      { value: 'backend', firing: 0, pending: 0 },
     ]);
   });
 
@@ -82,7 +76,6 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('host');
-    expect(result[0].count).toBe(15);
     expect(result[0].values).toHaveLength(15);
   });
 
@@ -107,7 +100,6 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
 
     expect(result[0].key).toBe('host');
-    expect(result[0].count).toBe(15);
     expect(result[0].values).toHaveLength(15);
   });
 
@@ -124,12 +116,10 @@ describe('computeLabelStats', () => {
     const team = result.find((r) => r.key === 'team')!;
     expect(team.firing).toBe(2);
     expect(team.pending).toBe(2);
-    expect(team.count).toBe(4);
 
     const env = result.find((r) => r.key === 'env')!;
     expect(env.firing).toBe(2);
     expect(env.pending).toBe(2);
-    expect(env.count).toBe(4);
   });
 
   it('should count firing and pending per label value', () => {
@@ -148,12 +138,10 @@ describe('computeLabelStats', () => {
     const infra = team.values.find((v) => v.value === 'infra')!;
     expect(infra.firing).toBe(2);
     expect(infra.pending).toBe(1);
-    expect(infra.count).toBe(3);
 
     const platform = team.values.find((v) => v.value === 'platform')!;
     expect(platform.firing).toBe(1);
     expect(platform.pending).toBe(2);
-    expect(platform.count).toBe(3);
   });
 
   it('should report zero firing or pending when state is absent', () => {
@@ -201,7 +189,6 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
-    expect(team.count).toBe(3);
     expect(team.firing).toBe(0);
     expect(team.pending).toBe(0);
   });
@@ -217,12 +204,10 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
-    expect(team.count).toBe(4);
     expect(team.firing).toBe(1);
     expect(team.pending).toBe(1);
 
     const infraValue = team.values.find((v) => v.value === 'infra')!;
-    expect(infraValue.count).toBe(4);
     expect(infraValue.firing).toBe(1);
     expect(infraValue.pending).toBe(1);
   });
@@ -233,9 +218,8 @@ describe('computeLabelStats', () => {
     const result = computeLabelStats(series);
     const team = result.find((r) => r.key === 'team')!;
 
-    expect(team.count).toBe(3);
     expect(team.values).toHaveLength(2);
-    expect(team.values[0]).toEqual({ value: '', count: 2, firing: 0, pending: 0 });
-    expect(team.values[1]).toEqual({ value: 'infra', count: 1, firing: 0, pending: 0 });
+    expect(team.values[0]).toEqual({ value: '', firing: 0, pending: 0 });
+    expect(team.values[1]).toEqual({ value: 'infra', firing: 0, pending: 0 });
   });
 });

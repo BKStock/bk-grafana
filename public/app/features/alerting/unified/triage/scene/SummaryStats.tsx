@@ -5,7 +5,7 @@ import { DataFrameView, GrafanaTheme2 } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
 import { SceneObjectBase, SceneObjectState } from '@grafana/scenes';
 import { useQueryRunner, useSceneContext } from '@grafana/scenes-react';
-import { Box, Button, ErrorBoundaryAlert, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
+import { Box, Button, Divider, ErrorBoundaryAlert, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
 import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { AllLabelsDrawer } from './AllLabelsDrawer';
@@ -66,11 +66,11 @@ interface CompactStatRowProps {
 
 function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: CompactStatRowProps) {
   const styles = useStyles2(getCompactStatStyles);
-  const colorClass = color === 'error' ? styles.errorColor : styles.warningColor;
+  const iconColor = color === 'error' ? styles.errorColor : styles.warningColor;
 
   return (
     <div className={styles.statRow}>
-      <Icon name={icon} size="sm" className={colorClass} />
+      <Icon name={icon} size="sm" className={iconColor} />
       <Text element="span" weight="medium" color={color}>
         {stateLabel === 'firing' ? (
           <Trans i18nKey="alerting.triage.compact-firing">firing</Trans>
@@ -78,11 +78,11 @@ function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: C
           <Trans i18nKey="alerting.triage.compact-pending">pending</Trans>
         )}
       </Text>
-      <span className={`${styles.statValue} ${colorClass}`}>{instanceCount}</span>
+      <span className={`${styles.statValue} ${iconColor}`}>{instanceCount}</span>
       <Text element="span" color="secondary" variant="bodySmall">
         <Trans i18nKey="alerting.triage.compact-instances">instances</Trans>
       </Text>
-      <span className={`${styles.statValue} ${colorClass}`}>{ruleCount}</span>
+      <span className={`${styles.statValue} ${iconColor}`}>{ruleCount}</span>
       <Text element="span" color="secondary" variant="bodySmall">
         <Trans i18nKey="alerting.triage.compact-rules">rules</Trans>
       </Text>
@@ -93,8 +93,6 @@ function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: C
 const TOOLTIP_MAX_VALUES = 10;
 
 function LabelTooltipContent({ label }: { label: LabelStats }) {
-  const styles = useStyles2(getTooltipStyles);
-
   const visibleValues = label.values.slice(0, TOOLTIP_MAX_VALUES);
   const hiddenCount = label.values.length - visibleValues.length;
 
@@ -106,7 +104,7 @@ function LabelTooltipContent({ label }: { label: LabelStats }) {
           <LabelBadgeCounts firing={label.firing} pending={label.pending} />
         </Stack>
       </Box>
-      <div className={styles.tooltipDivider} />
+      <Divider spacing={0.5} />
       {visibleValues.map(({ value, firing, pending }) => (
         <Stack key={value} direction="row" justifyContent="space-between" gap={2}>
           <span>{value}</span>
@@ -272,7 +270,10 @@ const getCompactStatStyles = (theme: GrafanaTheme2) => ({
     fontSize: theme.typography.body.fontSize,
   }),
   statRow: css({
-    display: 'contents',
+    gridColumn: '1 / -1',
+    display: 'grid',
+    gridTemplateColumns: 'subgrid',
+    alignItems: 'center',
   }),
   statValue: css({
     fontWeight: theme.typography.fontWeightBold,
@@ -285,13 +286,6 @@ const getCompactStatStyles = (theme: GrafanaTheme2) => ({
   }),
   warningColor: css({
     color: theme.colors.warning.text,
-  }),
-});
-
-const getTooltipStyles = (theme: GrafanaTheme2) => ({
-  tooltipDivider: css({
-    borderBottom: `1px solid ${theme.colors.border.medium}`,
-    marginBottom: theme.spacing(0.5),
   }),
 });
 
