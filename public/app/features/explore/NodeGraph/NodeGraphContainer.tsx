@@ -55,6 +55,7 @@ export function UnconnectedNodeGraphContainer(props: Props) {
     // We don't need proper replace here as it is only used in getLinks and we use getFieldLinks
     replaceVariables: (value) => value,
     theme,
+    featureToggles: config.featureToggles,
   });
 
   const { nodes } = useCategorizeFrames(frames);

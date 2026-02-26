@@ -194,6 +194,7 @@ export class InspectDataTab extends PureComponent<Props, State> {
       fieldConfig: fieldConfigCleaned,
       timeZone,
       replaceVariables: (value, scopedVars, format) => getTemplateSrv().replace(value, scopedVars, format),
+      featureToggles: config.featureToggles,
     });
   }
 

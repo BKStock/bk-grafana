@@ -30,7 +30,7 @@ import {
   StreamingDataFrame,
   DataTopic,
 } from '@grafana/data';
-import { toDataQueryError } from '@grafana/runtime';
+import { config, toDataQueryError } from '@grafana/runtime';
 import { ExpressionDatasourceRef } from '@grafana/runtime/internal';
 import { isStreamingDataFrame } from 'app/features/live/data/utils';
 import { getDatasourceSrv } from 'app/features/plugins/datasource_srv';
@@ -187,6 +187,7 @@ export class PanelQueryRunner {
                     timeZone: data.request?.timezone ?? 'browser',
                     data: processedData.series,
                     ...fieldConfig!,
+                    featureToggles: config.featureToggles,
                   }),
                 };
                 if (processedData.annotations) {
@@ -197,6 +198,7 @@ export class PanelQueryRunner {
                       defaults: {},
                       overrides: [],
                     },
+                    featureToggles: config.featureToggles,
                   });
                 }
                 isFirstPacket = false;

@@ -136,6 +136,7 @@ export class TableContainer extends PureComponent<Props, State> {
           overrides: [],
         },
         dataLinkPostProcessor,
+        featureToggles: config.featureToggles,
       });
     }
 

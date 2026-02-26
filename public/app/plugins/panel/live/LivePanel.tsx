@@ -168,6 +168,7 @@ export class LivePanel extends PureComponent<Props, State> {
               defaults: {},
               overrides: [],
             },
+            featureToggles: config.featureToggles,
           }),
           state: LoadingState.Streaming,
         } as PanelData;

@@ -50,6 +50,7 @@ export const PrometheusQueryResultsContainer = (props: PrometheusQueryResultsV1P
         replaceVariables: getTemplateSrv().replace.bind(getTemplateSrv()),
         fieldConfig: { defaults: {}, overrides: [] },
         dataLinkPostProcessor: props.dataLinkPostProcessor,
+        featureToggles: config.featureToggles,
       });
     }
     return cloned;

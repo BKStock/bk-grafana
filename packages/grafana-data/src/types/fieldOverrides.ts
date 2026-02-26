@@ -123,7 +123,9 @@ export type DataLinkPostProcessorOptions = {
 
 export type DataLinkPostProcessor = (options: DataLinkPostProcessorOptions) => LinkModel<Field> | undefined;
 
-export interface ApplyFieldOverrideOptions {
+export interface ApplyFieldOverrideOptions<
+  TFeatureToggles extends Record<string, boolean | undefined> = Record<string, boolean | undefined>,
+> {
   data?: DataFrame[];
   fieldConfig: FieldConfigSource;
   fieldConfigRegistry?: FieldConfigOptionsRegistry;
@@ -131,6 +133,7 @@ export interface ApplyFieldOverrideOptions {
   theme: GrafanaTheme2;
   timeZone?: TimeZone;
   dataLinkPostProcessor?: DataLinkPostProcessor;
+  featureToggles?: TFeatureToggles;
 }
 
 export enum FieldConfigProperty {

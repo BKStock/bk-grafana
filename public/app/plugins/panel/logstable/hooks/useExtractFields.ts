@@ -10,7 +10,7 @@ import {
   transformDataFrame,
   useDataLinksContext,
 } from '@grafana/data';
-import { getTemplateSrv } from '@grafana/runtime';
+import { config, getTemplateSrv } from '@grafana/runtime';
 import { useTheme2 } from '@grafana/ui';
 import { replaceVariables } from '@grafana-plugins/loki/querybuilder/parsingUtils';
 
@@ -50,6 +50,7 @@ export function useExtractFields({ rawTableFrame, fieldConfig, timeZone }: Props
           theme,
           timeZone,
           dataLinkPostProcessor,
+          featureToggles: config.featureToggles,
         });
         if (isMounted()) {
           setExtractedFrame(extractedFrames[0]);

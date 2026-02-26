@@ -18,7 +18,7 @@ import {
   ThresholdsConfig,
   TimeRange,
 } from '@grafana/data';
-import { PanelRenderer } from '@grafana/runtime';
+import { config, PanelRenderer } from '@grafana/runtime';
 import {
   GraphDrawStyle,
   GraphFieldConfig,
@@ -134,6 +134,7 @@ export function ExploreGraph({
       replaceVariables: (value) => value, // We don't need proper replace here as it is only used in getLinks and we use getFieldLinks
       theme,
       fieldConfigRegistry,
+      featureToggles: config.featureToggles,
     });
   }, [fieldConfigRegistry, data, timeZone, theme, styledFieldConfig]);
 
@@ -148,6 +149,7 @@ export function ExploreGraph({
       replaceVariables: (value) => value,
       theme,
       dataLinkPostProcessor,
+      featureToggles: config.featureToggles,
     });
   }, [annotations, timeZone, theme, dataLinkPostProcessor]);
 

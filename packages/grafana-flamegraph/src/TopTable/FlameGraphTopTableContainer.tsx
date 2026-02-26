@@ -12,6 +12,7 @@ import {
   MappingType,
   escapeStringForRegex,
 } from '@grafana/data';
+import { config } from '@grafana/runtime';
 import {
   IconButton,
   Table,
@@ -255,6 +256,7 @@ function buildTableDataFrame(
     },
     replaceVariables: (value: string) => value,
     theme,
+    featureToggles: config.featureToggles,
   });
 
   return dataFrames[0];

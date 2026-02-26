@@ -152,6 +152,7 @@ export function LogsTable(props: Props) {
           },
           overrides: [],
         },
+        featureToggles: config.featureToggles,
       });
       // `getLinks` and `applyFieldOverrides` are taken from TableContainer.tsx
       for (const [fieldIdx, field] of frameWithOverrides.fields.entries()) {

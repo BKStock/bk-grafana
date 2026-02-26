@@ -39,6 +39,8 @@ interface OverrideProps {
   properties: DynamicConfigValue[];
 }
 
+type FieldOverrideFeatureToggles = {};
+
 export function findNumericFieldMinMax(data: DataFrame[]): NumericRange {
   let min: number | null = null;
   let max: number | null = null;
@@ -70,7 +72,7 @@ export function findNumericFieldMinMax(data: DataFrame[]): NumericRange {
  * Return a copy of the DataFrame with all rules applied
  */
 export function applyFieldOverrides(
-  options: ApplyFieldOverrideOptions,
+  options: ApplyFieldOverrideOptions<FieldOverrideFeatureToggles>,
   data: DataFrame[] | undefined = options.data
 ): DataFrame[] {
   if (!data) {
@@ -603,7 +605,8 @@ export function useFieldOverrides(
   data: PanelData | undefined,
   timeZone: string,
   theme: GrafanaTheme2,
-  replace: InterpolateFunction
+  replace: InterpolateFunction,
+  featureToggles?: FieldOverrideFeatureToggles
 ): PanelData | undefined {
   const fieldConfigRegistry = plugin?.fieldConfigRegistry;
   const structureRev = useRef(0);
@@ -638,6 +641,7 @@ export function useFieldOverrides(
         theme,
         timeZone,
         dataLinkPostProcessor,
+        featureToggles,
       }),
     };
     if (data.annotations && data.annotations.length > 0) {
@@ -651,10 +655,21 @@ export function useFieldOverrides(
         theme,
         timeZone,
         dataLinkPostProcessor,
+        featureToggles,
       });
     }
     return panelData;
-  }, [fieldConfigRegistry, fieldConfig, data, prevSeries, timeZone, theme, replace, dataLinkPostProcessor]);
+  }, [
+    fieldConfigRegistry,
+    fieldConfig,
+    data,
+    prevSeries,
+    timeZone,
+    theme,
+    replace,
+    dataLinkPostProcessor,
+    featureToggles,
+  ]);
 }
 
 /**

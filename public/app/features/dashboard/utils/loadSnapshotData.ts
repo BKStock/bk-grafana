@@ -36,6 +36,7 @@ export function loadSnapshotData(panel: PanelModel, dashboard: DashboardModel): 
       fieldConfigRegistry: panel.plugin!.fieldConfigRegistry,
       theme: config.theme2,
       timeZone: dashboard.getTimezone(),
+      featureToggles: config.featureToggles,
     }),
     structureRev: 1,
     annotations,
