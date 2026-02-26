@@ -617,7 +617,7 @@ func runTestWithMoreEvents(ctx context.Context, t *testing.T, ns string, backend
 }
 
 func runTestIntegrationBackendListModifiedSinceWithLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-history-ns-with-lookback"
+	ns := nsPrefix + "-history-ns-lb"
 	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("includes events on or before sinceRV due to lookback", func(t *testing.T) {
@@ -645,7 +645,7 @@ func runTestIntegrationBackendListModifiedSinceWithLookback(t *testing.T, backen
 }
 
 func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-history-ns-no-lookback"
+	ns := nsPrefix + "-history-ns-no-lb"
 	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("no events for subsequent ListModifiedSince calls", func(t *testing.T) {
@@ -667,7 +667,7 @@ func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, bac
 }
 
 func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-modified-since-ns"
+	ns := nsPrefix + "-ms-ns"
 	ctx, rvCreated, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("will list latest modified event when resource has multiple events", func(t *testing.T) {
