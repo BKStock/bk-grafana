@@ -149,7 +149,7 @@ function getStyles(
   });
 
   const selectedBg = `color-mix(in srgb, ${borderColor} 10%, ${theme.colors.background.primary})`;
-  const backgroundColor = isSelected ? selectedBg : QUERY_EDITOR_COLORS.card.hoverBg;
+  const backgroundColor = isSelected ? selectedBg : theme.isDark ? QUERY_EDITOR_COLORS.card.hoverBg : '#F5F5F5';
   const hoverActions = css({
     position: 'absolute',
     right: 0,
@@ -161,7 +161,7 @@ function getStyles(
     // increasing the left padding lets the gradient become transparent before the first button rather than behind the first button
     paddingLeft: theme.spacing(3),
     borderRadius: `0 ${theme.shape.radius.default} ${theme.shape.radius.default} 0`,
-    background: `linear-gradient(270deg, ${backgroundColor} 80%, rgba(32, 38, 47, 0.00) 100%)`,
+    background: `linear-gradient(270deg, ${backgroundColor} 70%, ${theme.isDark ? 'rgba(32, 38, 47, 0.00)' : 'rgba(255, 255, 255, 0.00)'}  100%)`,
     opacity: 0,
     transform: 'translateX(8px)',
     pointerEvents: 'none',
