@@ -16,7 +16,7 @@ labels:
 
 <!-- # Trace to profiles  -->
 
-Using Trace to profiles, you can use Grafana's ability to correlate different signals by adding the functionality to link between traces and profiles.
+Using Trace to profiles, you can use the ability to correlate different signals in Grafana by adding the functionality to link between traces and profiles.
 
 **Trace to profiles** lets you link your Grafana Pyroscope data source to tracing data.
 When configured, this connection lets you run queries from a trace span into the profile data using **Explore**.
