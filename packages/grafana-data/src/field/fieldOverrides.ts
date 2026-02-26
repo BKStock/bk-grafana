@@ -205,11 +205,12 @@ export function applyFieldOverrides(
       );
 
       if (field.type === FieldType.nestedFrames) {
-        for (const nestedFrames of field.values) {
+        const newValues: DataFrame[][] = Array(field.values.length);
+        for (let idx = 0; idx < field.values.length; idx++) {
+          const nestedFrames = field.values[idx];
           for (let nfIndex = 0; nfIndex < nestedFrames.length; nfIndex++) {
-            // TODO: should we apply fieldOverrides to nested frames?
-
-            for (const valueField of nestedFrames[nfIndex].fields) {
+            const nestedFrame = nestedFrames[nfIndex];
+            for (const valueField of nestedFrame.fields) {
               // Get display processor for nested fields
               valueField.display = getDisplayProcessor({
                 field: valueField,
@@ -222,7 +223,7 @@ export function applyFieldOverrides(
                   __dataContext: {
                     value: {
                       data: nestedFrames,
-                      frame: nestedFrames[nfIndex],
+                      frame: nestedFrame,
                       frameIndex: nfIndex,
                       field: valueField,
                     },
@@ -231,7 +232,7 @@ export function applyFieldOverrides(
               };
 
               valueField.getLinks = getLinksSupplier(
-                nestedFrames[nfIndex],
+                nestedFrame,
                 valueField,
                 valueField.state!.scopedVars,
                 context.replaceVariables,
@@ -240,10 +241,10 @@ export function applyFieldOverrides(
               );
             }
           }
+          newValues[idx] = applyFieldOverrides(options, nestedFrames);
         }
-      }
-
-      if (field.type === FieldType.frame) {
+        field.values = newValues;
+      } else if (field.type === FieldType.frame) {
         field.values = applyFieldOverrides(
           options,
           field.values.map((nestedFrame: DataFrame | undefined): DataFrame => {
@@ -255,14 +256,6 @@ export function applyFieldOverrides(
             return result;
           })
         );
-      }
-
-      if (field.type === FieldType.nestedFrames) {
-        let newValues: DataFrame[][] = Array.from({ length: field.values.length });
-        for (let i = 0; i < field.values.length; i++) {
-          newValues[i] = applyFieldOverrides(options, field.values[i]);
-        }
-        field.values = newValues;
       }
     }
   }
