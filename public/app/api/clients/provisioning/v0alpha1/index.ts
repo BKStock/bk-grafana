@@ -175,15 +175,6 @@ export const provisioningAPIv0alpha1 = generatedAPI.enhanceEndpoints({
               )
             );
           }
-          if (jobSpec.fixFolderMetadata) {
-            dispatch(
-              notifyApp(
-                createSuccessNotification(
-                  t('provisioning.fix-folder-metadata.success-job-started', 'Fix folder metadata job started')
-                )
-              )
-            );
-          }
         } catch (e) {
           if (jobSpec.fixFolderMetadata) {
             handleError(

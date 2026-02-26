@@ -12659,8 +12659,7 @@
     "fix-folder-metadata": {
       "button": "Fix folder IDs",
       "error-fixing": "Error fixing folder metadata",
-      "fixing": "Fixing...",
-      "success-job-started": "Fix folder metadata job started"
+      "fixing": "Fixing..."
     },
     "folder-permissions": {
       "loading": "Loading..."

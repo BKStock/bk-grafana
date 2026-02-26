@@ -9,7 +9,7 @@ import { Repository, ResourceCount } from 'app/api/clients/provisioning/v0alpha1
 
 import { RecentJobs } from '../Job/RecentJobs';
 import { FreeTierLimitNote } from '../Shared/FreeTierLimitNote';
-import { RepoMissingFolderMetadataBanner } from '../components/Folders/MissingFolderMetadataBanner';
+import { MissingFolderMetadataBanner } from '../components/Folders/MissingFolderMetadataBanner';
 import { useRepoHasMissingFolderMetadata } from '../hooks/useRepoHasMissingFolderMetadata';
 import { formatTimestamp } from '../utils/time';
 
@@ -60,7 +60,9 @@ export function RepositoryOverview({ repo }: { repo: Repository }) {
   return (
     <Box padding={2}>
       <Stack direction="column" gap={2}>
-        {showFolderMetadataCheck && hasMissing && <RepoMissingFolderMetadataBanner repositoryName={repoName} />}
+        {showFolderMetadataCheck && hasMissing && (
+          <MissingFolderMetadataBanner repositoryName={repoName} variant="repo" />
+        )}
         <Grid columns={{ xs: 1, sm: 2, lg: lgColumn, xxl: xxlColumn }} gap={2} alignItems={'flex-start'}>
           <div className={styles.cardContainer}>
             <Card noMargin className={styles.card}>
