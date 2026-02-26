@@ -3,7 +3,7 @@ import { lastValueFrom, of } from 'rxjs';
 import { AdHocVariableFilter } from '@grafana/data';
 import { BackendSrvRequest, config, TemplateSrv } from '@grafana/runtime';
 
-import { queryBuilder } from '../../../features/variables/shared/testing/builders';
+import { queryBuilder } from './test/helpers/queryVariableBuilder';
 
 import { BROWSER_MODE_DISABLED_MESSAGE } from './constants';
 import InfluxDatasource from './datasource';
