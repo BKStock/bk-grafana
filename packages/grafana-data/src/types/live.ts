@@ -173,7 +173,13 @@ export function parseLiveChannelAddress(id?: string): LiveChannelAddress | undef
  *
  * @alpha -- experimental
  */
-export function isValidLiveChannelAddress(addr?: LiveChannelAddress): addr is LiveChannelAddress {
+export function isValidLiveChannelAddress(
+  addr?: LiveChannelAddress & { namespace?: string }
+): addr is LiveChannelAddress {
+  // convert requested namespace into "stream" property
+  if (addr?.namespace && !addr?.stream?.length) {
+    addr.stream = addr.namespace;
+  }
   return !!(addr?.path && addr.stream && addr.scope);
 }
 
@@ -182,17 +188,22 @@ export function isValidLiveChannelAddress(addr?: LiveChannelAddress): addr is Li
  *
  * @alpha -- experimental
  */
-export function toLiveChannelId(addr: LiveChannelAddress): LiveChannelId {
-  if (!addr.scope) {
+export function toLiveChannelId(addr: LiveChannelAddress & { namespace?: string }): LiveChannelId {
+  let { scope, stream, path, namespace } = addr;
+  if (!stream && namespace) {
+    stream = namespace;
+  }
+
+  if (!scope?.length) {
     return '';
   }
-  let id: string = addr.scope;
-  if (!addr.stream) {
+  let id: string = scope;
+  if (!stream?.length) {
     return id;
   }
-  id += '/' + addr.stream;
-  if (!addr.path) {
+  id += '/' + stream;
+  if (!path?.length) {
     return id;
   }
-  return id + '/' + addr.path;
+  return id + '/' + path;
 }
