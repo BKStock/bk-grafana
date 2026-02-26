@@ -422,7 +422,7 @@ export function setFieldConfigDefaults(config: FieldConfig, defaults: FieldConfi
         return;
       }
 
-      if (item?.shouldApply(context.field!)) {
+      if (item.shouldApply(context.field!)) {
         const val = item.process(get(source, item.path), context, item.settings);
         if (val != null) {
           set(destination, item.path, val);
