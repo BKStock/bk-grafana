@@ -2,8 +2,8 @@ import { Page, Locator } from '@playwright/test';
 
 import { expect } from '@grafana/plugin-e2e';
 
-export const getCell = (loc: Page | Locator, rowIdx: number, colIdx: number) =>
-  loc
+export const getCell = (tableLoc: Page | Locator, rowIdx: number, colIdx: number) =>
+  tableLoc
     .locator('>[role="row"]')
     .nth(rowIdx)
     .locator(rowIdx === 0 ? '>[role="columnheader"]' : '>[role="gridcell"]')
