@@ -20,7 +20,6 @@ import {
   DynamicConfigValue,
   ApplyFieldOverrideOptions,
   FieldOverrideContext,
-  FieldConfigPropertyItem,
   DataLinkPostProcessor,
   FieldConfigSource,
 } from '../types/fieldOverrides';
@@ -70,14 +69,17 @@ export function findNumericFieldMinMax(data: DataFrame[]): NumericRange {
 /**
  * Return a copy of the DataFrame with all rules applied
  */
-export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFrame[] {
-  if (!options.data) {
+export function applyFieldOverrides(
+  options: ApplyFieldOverrideOptions,
+  data: DataFrame[] | undefined = options.data
+): DataFrame[] {
+  if (!data) {
     return [];
   }
 
   const source = options.fieldConfig;
   if (!source) {
-    return options.data;
+    return data;
   }
 
   const fieldConfigRegistry = options.fieldConfigRegistry ?? standardFieldConfigEditorRegistry;
@@ -99,27 +101,36 @@ export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFra
     }
   }
 
-  return options.data.map((originalFrame, index) => {
+  const result: DataFrame[] = Array(data.length);
+  for (let index = 0; index < data.length; index++) {
+    const originalFrame = data[index];
     // Need to define this new frame here as it's passed to the getLinkSupplier function inside the fields loop
-    const newFrame: DataFrame = { ...originalFrame };
-    // Copy fields
-    newFrame.fields = newFrame.fields.map((field) => {
-      return {
-        ...field,
-        config: cloneDeep(field.config),
+    const newFrame = (result[index] = { ...originalFrame });
+    const newFields: Field[] = Array(newFrame.fields.length);
+
+    // start by making a copy. looping twice is currently unavoidable, as methods downstream (like the displayName
+    // uniqueness check) depend on clone already being present in the fields array.
+    for (let fieldIndex = 0; fieldIndex < newFrame.fields.length; fieldIndex++) {
+      const originalField = newFrame.fields[fieldIndex];
+
+      newFields[fieldIndex] = {
+        ...originalField,
+        config: cloneDeep(originalField.config),
         state: {
-          ...field.state,
+          ...originalField.state,
         },
       };
-    });
+    }
 
-    for (const field of newFrame.fields) {
+    // now that the frame has the new fields, we can mutate the fields in place.
+    newFrame.fields = newFields;
+    for (const field of newFields) {
       const config = field.config;
 
       field.state!.scopedVars = {
         __dataContext: {
           value: {
-            data: options.data!,
+            data,
             frame: newFrame,
             frameIndex: index,
             field: field,
@@ -128,8 +139,8 @@ export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFra
       };
 
       const context = {
-        field: field,
-        data: options.data!,
+        field,
+        data,
         dataFrameIndex: index,
         replaceVariables: options.replaceVariables,
         fieldConfigRegistry: fieldConfigRegistry,
@@ -141,7 +152,7 @@ export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFra
 
       // Find any matching rules and then override
       for (const rule of override) {
-        if (rule.match(field, newFrame, options.data!)) {
+        if (rule.match(field, newFrame, data)) {
           for (const prop of rule.properties) {
             // config.scopedVars is set already here
             setDynamicConfigValue(config, prop, context);
@@ -159,7 +170,7 @@ export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFra
       }
 
       // Set the Min/Max value automatically
-      const { range, newGlobalRange } = calculateRange(config, field, globalRange, options.data!);
+      const { range, newGlobalRange } = calculateRange(config, field, globalRange, data);
       globalRange = newGlobalRange;
 
       // Clear any cached displayName as it can change during field overrides process
@@ -236,33 +247,30 @@ export function applyFieldOverrides(options: ApplyFieldOverrideOptions): DataFra
       }
 
       if (field.type === FieldType.frame) {
-        field.values = applyFieldOverrides({
-          ...options,
-          // nested frames can be `undefined` in certain situations, like after `merge` transform due to padding the value array.
-          // let's replace them with empty frames to avoid errors applying overrides
-          data: field.values.map((nestedFrame: DataFrame | undefined): DataFrame => {
+        field.values = applyFieldOverrides(
+          options,
+          field.values.map((nestedFrame: DataFrame | undefined): DataFrame => {
             const result = nestedFrame ?? createDataFrame({ fields: [] });
             result.fields = result.fields.map((newField) => {
               newField.config = defaultsDeep(newField.config || {}, config);
               return newField;
             });
             return result;
-          }),
-        });
+          })
+        );
       }
 
       if (field.type === FieldType.nestedFrames) {
-        field.values = field.values.map((nestedFrames: DataFrame[]) => {
-          return applyFieldOverrides({
-            ...options,
-            data: nestedFrames,
-          });
-        });
+        let newValues: DataFrame[][] = Array.from({ length: field.values.length });
+        for (let i = 0; i < field.values.length; i++) {
+          newValues[i] = applyFieldOverrides(options, field.values[i]);
+        }
+        field.values = newValues;
       }
     }
+  }
 
-    return newFrame;
-  });
+  return result;
 }
 
 function calculateRange(
@@ -297,20 +305,17 @@ function calculateRange(
   return { range: { min, max, delta: max! - min! }, newGlobalRange };
 }
 
+type dispCache = Map<unknown, DisplayValue>;
+const initCache = () => new Map<number, dispCache>(Array.from({ length: 16 }, (_, i) => [i - 1, new Map()]));
+
 // this is a significant optimization for streaming, where we currently re-process all values in the buffer on ech update
 // via field.display(value). this can potentially be removed once we...
 // 1. process data packets incrementally and/if cache the results in the streaming datafame (maybe by buffer index)
 // 2. have the ability to selectively get display color or text (but not always both, which are each quite expensive)
 // 3. sufficently optimize text formatting and threshold color determinitation
 function cachingDisplayProcessor(disp: DisplayProcessor, maxCacheSize = 2500): DisplayProcessor {
-  type dispCache = Map<unknown, DisplayValue>;
-  // decimals -> cache mapping, -1 is unspecified decimals
-  const caches = new Map<number, dispCache>();
-
-  // pre-init caches for up to 15 decimals
-  for (let i = -1; i <= 15; i++) {
-    caches.set(i, new Map());
-  }
+  // decimals -> cache mapping, -1 is unspecified decimals. pre-init caches for up to 15 decimals
+  const caches = initCache();
 
   return (value: unknown, decimals?: DecimalCount) => {
     let cache = caches.get(decimals ?? -1)!;
@@ -402,41 +407,33 @@ export function setFieldConfigDefaults(config: FieldConfig, defaults: FieldConfi
   ) {
     config.thresholds.steps = [defaultBaseStep, ...config.thresholds.steps];
   }
+
   for (const fieldConfigProperty of context.fieldConfigRegistry.list()) {
-    if (fieldConfigProperty.isCustom && !config.custom) {
-      config.custom = {};
-    }
-    processFieldConfigValue(
-      fieldConfigProperty.isCustom ? config.custom : config,
-      fieldConfigProperty.isCustom ? defaults.custom : defaults,
-      fieldConfigProperty,
-      context
-    );
-  }
-
-  validateFieldConfig(config);
-}
-
-function processFieldConfigValue(
-  destination: Record<string, unknown>, // it's mutable
-  source: Record<string, unknown>,
-  fieldConfigProperty: FieldConfigPropertyItem,
-  context: FieldOverrideEnv
-) {
-  const currentConfig = get(destination, fieldConfigProperty.path);
-  if (currentConfig === null || currentConfig === undefined) {
-    const item = context.fieldConfigRegistry.getIfExists(fieldConfigProperty.id);
-    if (!item) {
-      return;
+    let destination = config;
+    let source = defaults;
+    if (fieldConfigProperty.isCustom) {
+      config.custom ??= {};
+      destination = config.custom;
+      source = defaults.custom;
     }
 
-    if (item && item.shouldApply(context.field!)) {
-      const val = item.process(get(source, item.path), context, item.settings);
-      if (val !== undefined && val !== null) {
-        set(destination, item.path, val);
+    const currentConfig = get(destination, fieldConfigProperty.path);
+    if (currentConfig == null) {
+      const item = context.fieldConfigRegistry.getIfExists(fieldConfigProperty.id);
+      if (!item) {
+        return;
+      }
+
+      if (item && item.shouldApply(context.field!)) {
+        const val = item.process(get(source, item.path), context, item.settings);
+        if (val !== undefined && val !== null) {
+          set(destination, item.path, val);
+        }
       }
     }
   }
+
+  validateFieldConfig(config);
 }
 
 /**
@@ -459,7 +456,7 @@ export function validateFieldConfig(config: FieldConfig) {
   }
 
   // Verify that max > min (swap if necessary)
-  if (config.hasOwnProperty('min') && config.hasOwnProperty('max') && config.min! > config.max!) {
+  if (config.min != null && config.max != null && config.min > config.max) {
     const tmp = config.max;
     config.max = config.min;
     config.min = tmp;
