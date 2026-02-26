@@ -142,7 +142,7 @@ function getStyles(
     isError: !!item.error,
   });
 
-  const selectedBg = `color-mix(in srgb, ${borderColor} 8%, ${theme.colors.background.primary})`;
+  const selectedBg = `color-mix(in srgb, ${borderColor} 10%, ${theme.colors.background.primary})`;
   const backgroundColor = isSelected ? selectedBg : QUERY_EDITOR_COLORS.card.hoverBg;
   const hoverActions = css({
     position: 'absolute',

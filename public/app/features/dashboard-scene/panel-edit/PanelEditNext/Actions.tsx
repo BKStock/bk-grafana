@@ -144,6 +144,7 @@ export function Actions({
               name="exclamation-triangle"
               aria-label={t('query-editor-next.action.error', 'Error')}
               className={styles.errorIcon}
+              color={QUERY_EDITOR_COLORS.error}
             />
           </Tooltip>
         )}
@@ -170,7 +171,6 @@ export function Actions({
 
 const getStyles = (theme: GrafanaTheme2) => ({
   errorIcon: css({
-    color: QUERY_EDITOR_COLORS.error,
-    marginLeft: theme.spacing(0.5),
+    margin: theme.spacing(0, 0.5, 0, 0.5),
   }),
 });
