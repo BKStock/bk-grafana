@@ -545,7 +545,8 @@ func addDurationToSnowflake(snowflakeID int64, duration time.Duration) int64 {
 
 func setupListModifiedSince(t *testing.T, ns string, backend resource.StorageBackend) (context.Context, int64, int64) {
 	ctx := testutil.NewTestContext(t, time.Now().Add(30*time.Second))
-	rvCreated, _ := WriteEvent(ctx, backend, "item1", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
+	rvCreated, err := WriteEvent(ctx, backend, "item1", resourcepb.WatchEvent_ADDED, WithNamespace(ns))
+	require.NoError(t, err)
 	require.Greater(t, rvCreated, int64(0))
 	rvUpdated, err := WriteEvent(ctx, backend, "item1", resourcepb.WatchEvent_MODIFIED, WithNamespaceAndRV(ns, rvCreated))
 	require.NoError(t, err)
@@ -616,7 +617,7 @@ func runTestWithMoreEvents(ctx context.Context, t *testing.T, ns string, backend
 }
 
 func runTestIntegrationBackendListModifiedSinceWithLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-history-ns"
+	ns := nsPrefix + "-history-ns-with-lookback"
 	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("includes events on or before sinceRV due to lookback", func(t *testing.T) {
@@ -644,7 +645,7 @@ func runTestIntegrationBackendListModifiedSinceWithLookback(t *testing.T, backen
 }
 
 func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-history-ns"
+	ns := nsPrefix + "-history-ns-no-lookback"
 	ctx, _, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("no events for subsequent ListModifiedSince calls", func(t *testing.T) {
@@ -656,7 +657,7 @@ func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, bac
 		latestRv, seq := backend.ListModifiedSince(ctx, key, rvDeleted)
 		require.GreaterOrEqual(t, latestRv, rvDeleted)
 
-		isEmpty(t, seq)
+		isEmpty(t, seq, rvDeleted+1)
 	})
 
 	t.Run("everything all at once", func(t *testing.T) {
@@ -666,7 +667,7 @@ func runTestIntegrationBackendListModifiedSinceWithoutLookback(t *testing.T, bac
 }
 
 func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
-	ns := nsPrefix + "-history-ns"
+	ns := nsPrefix + "-modified-since-ns"
 	ctx, rvCreated, rvDeleted := setupListModifiedSince(t, ns, backend)
 
 	t.Run("will list latest modified event when resource has multiple events", func(t *testing.T) {
@@ -695,10 +696,11 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 		}
 		// 1 second is longer than the current lookback period -- no events
 		// should be returned in this case.
-		latestRv, seq := backend.ListModifiedSince(ctx, key, addDurationToSnowflake(rvDeleted, time.Second))
+		futureRV := addDurationToSnowflake(rvDeleted, time.Second)
+		latestRv, seq := backend.ListModifiedSince(ctx, key, futureRV)
 		require.GreaterOrEqual(t, latestRv, rvDeleted)
 
-		isEmpty(t, seq)
+		isEmpty(t, seq, futureRV)
 	})
 
 	t.Run("will only return modified events for the given key", func(t *testing.T) {
@@ -726,12 +728,17 @@ func runTestIntegrationBackendListModifiedSince(t *testing.T, backend resource.S
 	})
 }
 
-func isEmpty(t *testing.T, seq iter.Seq2[*resource.ModifiedResource, error]) {
-	counter := 0
-	for range seq {
-		counter++
+func isEmpty(t *testing.T, seq iter.Seq2[*resource.ModifiedResource, error], sinceRV int64) {
+	var modified []string
+	for res, err := range seq {
+		require.NoError(t, err)
+		modified = append(modified, fmt.Sprintf(
+			"{action=%d, ns=%s, name=%s, rv=%d}",
+			res.Action, res.Key.Namespace, res.Key.Name, res.ResourceVersion,
+		))
 	}
-	require.Equal(t, 0, counter)
+
+	require.Empty(t, modified, "sinceRV = %d", sinceRV)
 }
 
 func runTestIntegrationBackendListHistory(t *testing.T, backend resource.StorageBackend, nsPrefix string) {
