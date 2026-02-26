@@ -152,16 +152,6 @@ func notServiceAccount(dialect migrator.Dialect) string {
 func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetSystemStatsQuery) (result *stats.SystemStats, err error) {
 	dialect := ss.db.GetDialect()
 
-	// Check existence of tables that may have been renamed after migration to unified storage.
-	dashboardProvisioningExists, err := ss.db.GetEngine().IsTableExist("dashboard_provisioning")
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if dashboard_provisioning table exists: %w", err)
-	}
-	dashboardVersionExists, err := ss.db.GetEngine().IsTableExist("dashboard_version")
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if dashboard_version table exists: %w", err)
-	}
-
 	err = ss.db.WithDbSession(ctx, func(dbSession *db.Session) error {
 		sb := &db.SQLBuilder{}
 		sb.Write("SELECT ")
@@ -184,17 +174,9 @@ func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetS
 		monthlyActiveUserDeadlineDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		sb.Write(`(SELECT COUNT(*) FROM `+dialect.Quote("user")+` WHERE `+
 			notServiceAccount(dialect)+` AND last_seen_at > ?) AS monthly_active_users,`, monthlyActiveUserDeadlineDate)
-		if dashboardProvisioningExists {
-			sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_provisioning") + `) AS provisioned_dashboards,`)
-		} else {
-			sb.Write(`0 AS provisioned_dashboards,`)
-		}
+		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_provisioning") + `) AS provisioned_dashboards,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_snapshot") + `) AS snapshots,`)
-		if dashboardVersionExists {
-			sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_version") + `) AS dashboard_versions,`)
-		} else {
-			sb.Write(`0 AS dashboard_versions,`)
-		}
+		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_version") + `) AS dashboard_versions,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("annotation") + `) AS annotations,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("team") + `) AS teams,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("user_auth_token") + `) AS auth_tokens,`)
