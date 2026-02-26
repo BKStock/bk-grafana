@@ -1,34 +1,26 @@
+import { ResourceListItem } from 'app/api/clients/provisioning/v0alpha1';
+
 import { FOLDER_METADATA_FILE } from '../constants';
+
+import { mergeFilesAndResources } from './treeUtils';
 
 export function getFolderMetadataPath(sourcePath?: string): string {
   return sourcePath ? `${sourcePath}/${FOLDER_METADATA_FILE}` : FOLDER_METADATA_FILE;
 }
 
 /**
- * Given a flat list of file objects (each with a `path` string), returns true
- * if any inferred folder is missing its `_folder.json` metadata file.
+ * Returns true if any provisioned folder (resource type 'folders') is missing
+ * its `_folder.json` metadata file. Only checks folders that have a resource
+ * entry — no more inferring folders from file paths.
  */
-export function checkFilesForMissingMetadata(files: Array<{ path: string }>): boolean {
-  const filePaths = new Set(files.map((f) => f.path));
-  const folders = new Set<string>();
+export function checkFilesForMissingMetadata(files: unknown[], resources: ResourceListItem[]): boolean {
+  const merged = mergeFilesAndResources(files, resources);
+  const paths = new Set(merged.map((item) => item.path));
 
-  for (const { path } of files) {
-    const parts = path.split('/');
-    for (let i = 1; i < parts.length; i++) {
-      folders.add(parts.slice(0, i).join('/'));
+  return merged.some((item) => {
+    if (item.resource?.resource !== 'folders') {
+      return false;
     }
-  }
-
-  // Check root-level metadata
-  if (folders.size > 0 && !filePaths.has(FOLDER_METADATA_FILE)) {
-    return true;
-  }
-
-  for (const folder of folders) {
-    if (!filePaths.has(`${folder}/${FOLDER_METADATA_FILE}`)) {
-      return true;
-    }
-  }
-
-  return false;
+    return !paths.has(getFolderMetadataPath(item.path));
+  });
 }

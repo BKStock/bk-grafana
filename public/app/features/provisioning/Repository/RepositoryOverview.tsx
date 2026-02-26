@@ -29,7 +29,7 @@ export function RepositoryOverview({ repo }: { repo: Repository }) {
   const styles = useStyles2(getStyles);
   const repoName = repo.metadata?.name ?? '';
   const showFolderMetadataCheck = config.featureToggles.provisioningFolderMetadata;
-  const { status: folderMetadataStatus } = useRepoMetadataStatus(repoName);
+  const { status: folderMetadataStatus } = useRepoMetadataStatus(showFolderMetadataCheck ? repoName : '');
 
   const status = repo.status;
   const webhookURL = getWebhookURL(repo);

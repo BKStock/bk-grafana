@@ -10,7 +10,8 @@ import { useGetActiveJob } from '../useGetActiveJob';
 export function useFixFolderMetadata(repositoryName: string) {
   const [createJob, jobQuery] = useCreateRepositoryJobsMutation();
   const activeJob = useGetActiveJob(repositoryName);
-  const isJobRunning = jobQuery.isLoading || activeJob?.status?.state === 'working';
+  const isJobRunning =
+    jobQuery.isLoading || activeJob?.status?.state === 'working' || activeJob?.status?.state === 'pending';
 
   const onFixFolderMetadata = () => {
     if (!repositoryName || isJobRunning) {
