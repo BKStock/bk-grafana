@@ -10,7 +10,17 @@ import { VisualizationSuggestions } from './VisualizationSuggestions';
 
 jest.mock('../../suggestions/getAllSuggestions');
 jest.mock('./VisualizationSuggestionCard', () => ({
-  VisualizationSuggestionCard: () => <div data-testid="suggestion-card">Mocked Card</div>,
+  VisualizationSuggestionCard: ({
+    suggestion,
+    onClick,
+  }: {
+    suggestion: { name: string; hash: string };
+    onClick: () => void;
+  }) => (
+    <div data-testid={`suggestion-card-${suggestion.hash}`} onClick={onClick}>
+      {suggestion.name}
+    </div>
+  ),
 }));
 jest.mock('./VizTypePickerPlugin', () => ({
   VizTypePickerPlugin: ({ plugin, onSelect }: { plugin: { id: string; name: string }; onSelect: () => void }) => (
@@ -345,6 +355,33 @@ describe('VisualizationSuggestions', () => {
     });
   });
 
+  it('should call onChange with withModKey: false when a suggestion card is clicked', async () => {
+    const mockOnChange = jest.fn();
+    const dataWithSeries: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    render(<VisualizationSuggestions onChange={mockOnChange} data={dataWithSeries} panel={undefined} searchQuery="" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+    expect(mockOnChange).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'timeseries', withModKey: false }));
+  });
+
   describe('no-data panel list', () => {
     const emptyData: PanelData = {
       series: [],
@@ -394,7 +431,7 @@ describe('VisualizationSuggestions', () => {
       await waitForSuggestionsToLoad();
 
       await waitFor(() => {
-        expect(screen.getByTestId('suggestion-card')).toBeInTheDocument();
+        expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
       });
 
       expect(screen.queryByText('Start without data')).not.toBeInTheDocument();
