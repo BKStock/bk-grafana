@@ -341,9 +341,6 @@ export function getFieldSeriesColor(field: Field, theme: GrafanaTheme2): ColorSc
 
   const scale = getScaleCalculator(field, theme);
   let stat: string = field.config.color?.seriesBy ?? 'last';
-  if (stat === 'last') {
-    stat = 'lastNotNull';
-  }
   const calcs = reduceField({ field, reducers: [stat] });
   const value = calcs[stat] ?? 0;
 

@@ -251,6 +251,10 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn = ({
 
   for (let i = 1; i < frame.fields.length; i++) {
     const field = frame.fields[i];
+    let originField = field;
+    if (field.state?.origin) {
+      originField = allFrames[field.state.origin.frameIndex]?.fields[field.state.origin.fieldIndex];
+    }
 
     const config: FieldConfig<GraphFieldConfig> = {
       ...field.config,
@@ -280,8 +284,8 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn = ({
       });
     }
     const scaleKey = buildScaleKey(config, field.type);
-    const colorMode = getFieldColorModeForField(field);
-    const scaleColor = getFieldSeriesColor(field, theme);
+    const colorMode = getFieldColorModeForField(originField);
+    const scaleColor = getFieldSeriesColor(originField, theme);
     const seriesColor = scaleColor.color;
 
     // The builder will manage unique scaleKeys and combine where appropriate
@@ -473,10 +477,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn = ({
         indexByName = getNamesToFieldIndex(frame, allFrames);
       }
 
-      const originFrame = allFrames[field.state.origin.frameIndex];
-      const originField = originFrame?.fields[field.state.origin.fieldIndex];
-
-      const dispName = getFieldDisplayName(originField ?? field, originFrame, allFrames);
+      const dispName = getFieldDisplayName(originField, allFrames[field.state.origin.frameIndex], allFrames);
 
       // disable default renderers
       if (customRenderedFields.indexOf(dispName) >= 0) {
