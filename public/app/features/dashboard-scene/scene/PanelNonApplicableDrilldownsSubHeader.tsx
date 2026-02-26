@@ -23,8 +23,7 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
 
   const filtersState = filtersVar?.useState();
   const groupByState = groupByVar?.useState();
-  // Re-render when query data changes (applicability is resolved before each query)
-  queryRunner.useState();
+  const queryRunnerState = queryRunner.useState();
 
   const [visibleCount, setVisibleCount] = useState<number>(0);
 
@@ -34,21 +33,27 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
       return [];
     }
 
-    const labels: string[] = [];
+    const items: Array<{ label: string; reason?: string }> = [];
 
     const filters = filtersState?.filters ?? [];
     const originFilters = filtersState?.originFilters ?? [];
     const filterValues = [...filters, ...originFilters];
 
     if (filterValues.length) {
-      const nonApplicableFilters = filterValues.filter((filter) => {
-        const result = applicability.find((entry) => entry.key === filter.key && entry.origin === filter.origin);
-        return result && !result.applicable;
-      });
-      labels.push(
-        ...nonApplicableFilters.map((filter) => {
+      const nonApplicableFilters = filterValues
+        .map((filter) => {
+          const result = applicability.find((entry) => entry.key === filter.key && entry.origin === filter.origin);
+          if (result && !result.applicable) {
+            return { filter, reason: result.reason };
+          }
+          return null;
+        })
+        .filter(Boolean) as Array<{ filter: (typeof filterValues)[number]; reason?: string }>;
+
+      items.push(
+        ...nonApplicableFilters.map(({ filter, reason }) => {
           const displayValue = filter.values?.length ? filter.values.join(', ') : filter.value;
-          return `${filter.key} ${filter.operator} ${displayValue}`;
+          return { label: `${filter.key} ${filter.operator} ${displayValue}`, reason };
         })
       );
     }
@@ -59,22 +64,21 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
     if (groupByValues.length) {
       const groupByApplicability = groupByState?.keysApplicability;
 
-      const nonApplicableKeys = groupByValues
-        .filter((groupByKey) => {
-          const apiResult = applicability.find((entry) => entry.key === groupByKey);
-          if (apiResult) {
-            return !apiResult.applicable;
-          }
-          const stateResult = groupByApplicability?.find((entry) => entry.key === groupByKey);
-          return stateResult && !stateResult.applicable;
-        })
-        .map((key) => String(key));
-
-      labels.push(...nonApplicableKeys);
+      for (const groupByKey of groupByValues) {
+        const apiResult = applicability.find((entry) => entry.key === groupByKey);
+        if (apiResult && !apiResult.applicable) {
+          items.push({ label: String(groupByKey), reason: apiResult.reason });
+          continue;
+        }
+        const stateResult = groupByApplicability?.find((entry) => entry.key === groupByKey);
+        if (stateResult && !stateResult.applicable) {
+          items.push({ label: String(groupByKey), reason: stateResult.reason });
+        }
+      }
     }
 
-    return labels;
-  }, [filtersState, groupByState, queryRunner]);
+    return items;
+  }, [filtersState, groupByState, queryRunner, queryRunnerState]);
 
   useLayoutEffect(() => {
     if (!nonApplicable.length) {
@@ -82,17 +86,24 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
       return;
     }
 
-    setVisibleCount(calculateVisibleCount(nonApplicable, containerWidth, theme));
+    setVisibleCount(
+      calculateVisibleCount(
+        nonApplicable.map((item) => item.label),
+        containerWidth,
+        theme
+      )
+    );
   }, [containerWidth, nonApplicable, theme]);
 
   if (nonApplicable.length === 0) {
     return null;
   }
 
-  const visibleFilters = nonApplicable.slice(0, visibleCount);
+  const visibleItems = nonApplicable.slice(0, visibleCount);
   const remainingCount = nonApplicable.length - visibleCount;
   const hasOverflow = remainingCount > 0;
-  const remainingFilters = nonApplicable.slice(visibleCount);
+  const remainingItems = nonApplicable.slice(visibleCount);
+  const defaultReason = 'Filter is not applicable';
 
   return (
     <div
@@ -100,13 +111,13 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
       className={styles.container}
       data-testid={selectors.components.Panels.Panel.PanelNonApplicableDrilldownsSubHeader}
     >
-      {visibleFilters.map((filter, index) => (
-        <div key={`${filter}-${index}`} className={cx(styles.disabledPill, styles.strikethrough, styles.pill)}>
-          {filter}
-        </div>
+      {visibleItems.map((item, index) => (
+        <Tooltip key={`${item.label}-${index}`} content={item.reason ?? defaultReason} placement="bottom">
+          <div className={cx(styles.disabledPill, styles.strikethrough, styles.pill)}>{item.label}</div>
+        </Tooltip>
       ))}
       {hasOverflow && (
-        <Tooltip content={remainingFilters.join(', ')}>
+        <Tooltip content={remainingItems.map((item) => item.label).join(', ')} placement="bottom">
           <div className={cx(styles.disabledPill, styles.pill)}>+{remainingCount}</div>
         </Tooltip>
       )}
