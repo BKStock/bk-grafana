@@ -43,7 +43,7 @@ export function setDashboardPanelContext(vizPanel: VizPanel, context: PanelConte
       return Boolean(dashboard.state.meta.annotationsPermissions?.dashboard.canEdit);
     }
 
-    return Boolean(dashboard.state.meta.annotationsPermissions?.organization.canEdit);
+    return false;
   };
 
   context.canDeleteAnnotations = (dashboardUID?: string) => {
@@ -53,7 +53,7 @@ export function setDashboardPanelContext(vizPanel: VizPanel, context: PanelConte
       return Boolean(dashboard.state.meta.annotationsPermissions?.dashboard.canDelete);
     }
 
-    return Boolean(dashboard.state.meta.annotationsPermissions?.organization.canDelete);
+    return false;
   };
 
   context.onAnnotationCreate = async (event: AnnotationEventUIModel) => {
