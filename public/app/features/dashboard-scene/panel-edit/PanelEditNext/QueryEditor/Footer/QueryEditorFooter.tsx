@@ -184,7 +184,6 @@ function getStyles(theme: GrafanaTheme2) {
       transform: 'rotate(180deg)',
     }),
     queryOptionsWrapper: css({
-      position: 'relative',
       flexShrink: 0,
       display: 'flex',
       alignItems: 'center',
