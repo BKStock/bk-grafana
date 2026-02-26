@@ -78,9 +78,11 @@ export const useCorrelationsK8s = (limit = 100, page: number) => {
 
   const enrichedCorrelations =
     currentData !== undefined
-      ? pagedData.filter((i) => i.metadata.name !== undefined).map((item) => toEnrichedCorrelationDataK8s(item))
-      : // .filter((i) => i !== undefined)
-        [];
+      ? pagedData
+          .filter((i) => i.metadata.name !== undefined)
+          .map((item) => toEnrichedCorrelationDataK8s(item))
+          .filter((i) => i !== undefined)
+      : [];
 
   const fmtedError = error ? handleRequestError(error) : undefined;
 

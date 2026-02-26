@@ -43,12 +43,14 @@ const renderWithContext = async (datasources: ConstructorParameters<typeof MockD
         uid: ref,
         name: `${type}-1`,
         type: type,
+        meta: { info: { logos: { small: '' } } },
       } as unknown as DataSourceInstanceSettings;
     } else {
       return {
         uid: ref.uid,
         name: `${ref.type}-1`,
         type: ref.type,
+        meta: { info: { logos: { small: '' } } },
       } as unknown as DataSourceInstanceSettings;
     }
   };
