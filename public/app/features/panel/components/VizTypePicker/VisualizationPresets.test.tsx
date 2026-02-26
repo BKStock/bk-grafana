@@ -5,8 +5,10 @@ import { LoadingState, PanelData, toDataFrame, FieldType, getDefaultTimeRange } 
 
 import { VisualizationPresets } from './VisualizationPresets';
 
-jest.mock('./VisualizationCardGrid', () => ({
-  VisualizationCardGrid: () => <div data-testid="card-grid">Mocked Card Grid</div>,
+jest.mock('./VisualizationSuggestionCard', () => ({
+  VisualizationSuggestionCard: ({ onClick, suggestion }: { onClick: () => void; suggestion: { name: string } }) => (
+    <div onClick={onClick}>{suggestion.name}</div>
+  ),
 }));
 
 describe('VisualizationPresets', () => {
@@ -116,7 +118,30 @@ describe('VisualizationPresets', () => {
     expect(mockOnSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('should render card grid with presets', () => {
+  it('should call onApply with the correct preset when a card is clicked', async () => {
+    const mockOnApply = jest.fn();
+    const user = userEvent.setup();
+
+    render(
+      <VisualizationPresets
+        presets={mockPresets}
+        data={mockData}
+        suggestion={mockSuggestion}
+        onPreview={jest.fn()}
+        onApply={mockOnApply}
+        onSkip={jest.fn()}
+        onBack={jest.fn()}
+      />
+    );
+
+    await user.click(screen.getByText('Default'));
+    expect(mockOnApply).toHaveBeenCalledWith(mockPresets[0]);
+
+    await user.click(screen.getByText('Test preset'));
+    expect(mockOnApply).toHaveBeenCalledWith(mockPresets[1]);
+  });
+
+  it('should render a card for each preset', () => {
     render(
       <VisualizationPresets
         presets={mockPresets}
@@ -129,6 +154,7 @@ describe('VisualizationPresets', () => {
       />
     );
 
-    expect(screen.getByTestId('card-grid')).toBeInTheDocument();
+    expect(screen.getByText('Default')).toBeInTheDocument();
+    expect(screen.getByText('Test preset')).toBeInTheDocument();
   });
 });
