@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/db"
 	"github.com/grafana/grafana/pkg/services/accesscontrol"
 	"github.com/grafana/grafana/pkg/services/accesscontrol/acimpl"
+	"github.com/grafana/grafana/pkg/services/apiserver"
 	"github.com/grafana/grafana/pkg/services/dashboards"
 	"github.com/grafana/grafana/pkg/services/folder"
 	"github.com/grafana/grafana/pkg/services/org"
@@ -1000,7 +1001,7 @@ func CreateOrg(t *testing.T, db db.DB, cfg *setting.Cfg) int64 {
 	require.NoError(t, err)
 	dashSvc := &dashboards.FakeDashboardService{}
 	dashSvc.On("DeleteAllDashboards", mock.Anything, mock.Anything).Return(nil)
-	deleteOrgService, err := orgimpl.ProvideDeletionService(db, cfg, dashSvc, acimpl.ProvideAccessControlTest())
+	deleteOrgService, err := orgimpl.ProvideDeletionService(db, cfg, dashSvc, acimpl.ProvideAccessControlTest(), apiserver.WithoutRestConfig)
 	require.NoError(t, err)
 	orgID, err := orgService.GetOrCreate(context.Background(), "test-org")
 	require.NoError(t, err)

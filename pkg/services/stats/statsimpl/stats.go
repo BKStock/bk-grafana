@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	playlistv1 "github.com/grafana/grafana/apps/playlist/pkg/apis/playlist/v1"
 	provisioningv1 "github.com/grafana/grafana/apps/provisioning/pkg/apis/provisioning/v0alpha1"
 	"github.com/grafana/grafana/pkg/apimachinery/identity"
 	"github.com/grafana/grafana/pkg/infra/db"
@@ -93,24 +94,24 @@ func (ss *sqlStatsService) getFolderCount(ctx context.Context, orgs []*org.OrgDT
 	return total, nil
 }
 
-func (ss *sqlStatsService) getRepositoryCount(ctx context.Context, orgs []*org.OrgDTO) (int64, error) {
-	total := int64(0)
+func (ss *sqlStatsService) getResourceCounts(ctx context.Context, orgs []*org.OrgDTO, kinds []string) (map[string]int64, error) {
+	totals := make(map[string]int64, len(kinds))
 	for _, org := range orgs {
 		ctx, _ = identity.WithServiceIdentity(ctx, org.ID)
 		resp, err := ss.unifiedStorage.GetStats(ctx, &resourcepb.ResourceStatsRequest{
 			Namespace: ss.namespacer(org.ID),
-			Kinds: []string{
-				provisioningv1.GROUP + "/" + provisioningv1.RepositoryResourceInfo.GroupResource().Resource,
-			},
+			Kinds:     kinds,
 		})
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
-		if len(resp.Stats) != 0 {
-			total += resp.Stats[0].Count
+		for i, s := range resp.Stats {
+			if s != nil && i < len(kinds) {
+				totals[kinds[i]] += s.Count
+			}
 		}
 	}
-	return total, nil
+	return totals, nil
 }
 
 func (ss *sqlStatsService) GetAlertNotifiersUsageStats(ctx context.Context, query *stats.GetAlertNotifierUsageStatsQuery) (result []*stats.NotifierUsageStats, err error) {
@@ -150,13 +151,24 @@ func notServiceAccount(dialect migrator.Dialect) string {
 
 func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetSystemStatsQuery) (result *stats.SystemStats, err error) {
 	dialect := ss.db.GetDialect()
+
+	// Check existence of tables that may have been renamed after migration to unified storage.
+	dashboardProvisioningExists, err := ss.db.GetEngine().IsTableExist("dashboard_provisioning")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if dashboard_provisioning table exists: %w", err)
+	}
+	dashboardVersionExists, err := ss.db.GetEngine().IsTableExist("dashboard_version")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if dashboard_version table exists: %w", err)
+	}
+
 	err = ss.db.WithDbSession(ctx, func(dbSession *db.Session) error {
 		sb := &db.SQLBuilder{}
 		sb.Write("SELECT ")
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("user") + ` WHERE ` + notServiceAccount(dialect) + `) AS users,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("data_source") + `) AS datasources,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("star") + `) AS stars,`)
-		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("playlist") + `) AS playlists,`)
+		sb.Write(`0 AS playlists,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("alert") + `) AS alerts,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("correlation") + `) AS correlations,`)
 
@@ -172,9 +184,17 @@ func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetS
 		monthlyActiveUserDeadlineDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		sb.Write(`(SELECT COUNT(*) FROM `+dialect.Quote("user")+` WHERE `+
 			notServiceAccount(dialect)+` AND last_seen_at > ?) AS monthly_active_users,`, monthlyActiveUserDeadlineDate)
-		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_provisioning") + `) AS provisioned_dashboards,`)
+		if dashboardProvisioningExists {
+			sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_provisioning") + `) AS provisioned_dashboards,`)
+		} else {
+			sb.Write(`0 AS provisioned_dashboards,`)
+		}
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_snapshot") + `) AS snapshots,`)
-		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_version") + `) AS dashboard_versions,`)
+		if dashboardVersionExists {
+			sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("dashboard_version") + `) AS dashboard_versions,`)
+		} else {
+			sb.Write(`0 AS dashboard_versions,`)
+		}
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("annotation") + `) AS annotations,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("team") + `) AS teams,`)
 		sb.Write(`(SELECT COUNT(id) FROM ` + dialect.Quote("user_auth_token") + `) AS auth_tokens,`)
@@ -226,11 +246,14 @@ func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetS
 	}
 	result.Folders = folderCount
 
-	repositoryCount, err := ss.getRepositoryCount(ctx, orgs)
+	kindPlaylist := playlistv1.APIGroup + "/playlists"
+	kindRepository := provisioningv1.GROUP + "/" + provisioningv1.RepositoryResourceInfo.GroupResource().Resource
+	resourceCounts, err := ss.getResourceCounts(ctx, orgs, []string{kindPlaylist, kindRepository})
 	if err != nil {
 		return result, err
 	}
-	result.Repositories = repositoryCount
+	result.Playlists = resourceCounts[kindPlaylist]
+	result.Repositories = resourceCounts[kindRepository]
 
 	return result, err
 }
@@ -276,10 +299,7 @@ func (ss *sqlStatsService) GetAdminStats(ctx context.Context, query *stats.GetAd
 			SELECT COUNT(*)
 			FROM ` + dialect.Quote("data_source") + `
 		) AS datasources,
-		(
-			SELECT COUNT(*)
-			FROM ` + dialect.Quote("playlist") + `
-		) AS playlists,
+		0 AS playlists,
 		(
 			SELECT COUNT(*)
 			FROM ` + dialect.Quote("star") + `
@@ -342,6 +362,13 @@ func (ss *sqlStatsService) GetAdminStats(ctx context.Context, query *stats.GetAd
 		return result, err
 	}
 	result.Tags = tagCount
+
+	kindPlaylist := playlistv1.APIGroup + "/playlists"
+	resourceCounts, err := ss.getResourceCounts(ctx, orgs, []string{kindPlaylist})
+	if err != nil {
+		return result, err
+	}
+	result.Playlists = resourceCounts[kindPlaylist]
 
 	return result, err
 }
