@@ -43,6 +43,7 @@ type TenantWatcher struct {
 	writeEvent         EventAppender
 	ctx                context.Context
 	stopCh             chan struct{}
+	factory            dynamicinformer.DynamicSharedInformerFactory
 }
 
 // TenantWatcherConfig holds configuration for the TenantWatcher.
@@ -64,9 +65,6 @@ type TenantWatcherConfig struct {
 // when required settings are missing.
 func NewTenantWatcherConfig(cfg *setting.Cfg) *TenantWatcherConfig {
 	logger := log.New("tenant-watcher")
-	if logger == nil {
-		logger = log.NewNopLogger()
-	}
 
 	if cfg == nil {
 		logger.Info("tenant watcher not initialized, config is nil")
@@ -164,8 +162,8 @@ func NewTenantWatcher(ctx context.Context, ds *dataStore, writeEvent EventAppend
 		stopCh:             make(chan struct{}),
 	}
 
-	factory := dynamicinformer.NewDynamicSharedInformerFactory(client, resync)
-	informer := factory.ForResource(tenantGVR).Informer()
+	tw.factory = dynamicinformer.NewDynamicSharedInformerFactory(client, resync)
+	informer := tw.factory.ForResource(tenantGVR).Informer()
 
 	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -179,15 +177,18 @@ func NewTenantWatcher(ctx context.Context, ds *dataStore, writeEvent EventAppend
 		return nil, err
 	}
 
-	factory.Start(tw.stopCh)
+	tw.factory.Start(tw.stopCh)
 	logger.Info("tenant watcher started")
 
 	return tw, nil
 }
 
-// Stop stops the tenant watcher.
+// Stop stops the tenant watcher and waits for the informer goroutines to exit.
 func (tw *TenantWatcher) Stop() {
 	close(tw.stopCh)
+	if tw.factory != nil {
+		tw.factory.Shutdown()
+	}
 }
 
 func (tw *TenantWatcher) handleTenant(tenant *unstructured.Unstructured) {

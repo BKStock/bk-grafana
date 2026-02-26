@@ -90,6 +90,7 @@ var _ KVBackend = &kvStorageBackend{}
 type KVBackend interface {
 	StorageBackend
 	resourcepb.DiagnosticsServer
+	Stop()
 }
 
 type KVBackendOptions struct {
@@ -206,6 +207,13 @@ func (k *kvStorageBackend) IsHealthy(ctx context.Context, _ *resourcepb.HealthCh
 		}
 	}
 	return &resourcepb.HealthCheckResponse{Status: resourcepb.HealthCheckResponse_SERVING}, nil
+}
+
+// Stop shuts down background goroutines owned by the backend.
+func (k *kvStorageBackend) Stop() {
+	if k.tenantWatcher != nil {
+		k.tenantWatcher.Stop()
+	}
 }
 
 // runCleanups starts periodically cleans up old events and last import times.
