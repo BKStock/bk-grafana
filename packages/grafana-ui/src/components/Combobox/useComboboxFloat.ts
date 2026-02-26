@@ -32,6 +32,9 @@ interface UseComboboxFloatReturn {
   };
 }
 
+// 16px svg width + 12px Icon padding
+const ICON_WIDTH = 28;
+
 export const useComboboxFloat = (
   items: Array<ComboboxOption<string | number>>,
   isOpen: boolean
@@ -78,16 +81,21 @@ export const useComboboxFloat = (
 
   const longestItemWidth = useMemo(() => {
     let longestItem = '';
+    let longestItemIndex = -1;
+    // @todo sort by string length DESC
     const itemsToLookAt = Math.min(items.length, WIDTH_CALCULATION_LIMIT_ITEMS);
 
     for (let i = 0; i < itemsToLookAt; i++) {
       const itemLabel = items[i].label ?? items[i].value.toString();
-      longestItem = itemLabel.length > longestItem.length ? itemLabel : longestItem;
+      if (itemLabel.length > longestItem.length) {
+        longestItem = itemLabel;
+        longestItemIndex = i;
+      }
     }
 
     const size = measureText(longestItem, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width;
-
-    return size + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth;
+    const iconSize = longestItemIndex > -1 && items[longestItemIndex].icon ? ICON_WIDTH : 0;
+    return size + SCROLL_CONTAINER_PADDING + MENU_ITEM_PADDING * 2 + scrollbarWidth + iconSize;
   }, [items, scrollbarWidth]);
 
   const floatStyles = {

@@ -59,8 +59,10 @@ func GetWebAssets(ctx context.Context, cfg *setting.Cfg, license licensing.Licen
 		result, err = readWebAssetsFromCDN(ctx, cdn)
 	}
 
+	assetsFilename := "assets-manifest.json"
+
 	if result == nil {
-		result, err = ReadWebAssetsFromFile(filepath.Join(cfg.StaticRootPath, "build", "assets-manifest.json"))
+		result, err = ReadWebAssetsFromFile(filepath.Join(cfg.StaticRootPath, "build", assetsFilename))
 		if err == nil {
 			cdn, _ = cfg.GetContentDeliveryURL(license.ContentDeliveryPrefix())
 			if cdn != "" {
