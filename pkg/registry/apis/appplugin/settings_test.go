@@ -164,24 +164,23 @@ func TestSettingsUpdate(t *testing.T) {
 	require.True(t, settings.Spec.Pinned)
 }
 
-func TestSettingsDelete_NotSupported(t *testing.T) {
+func TestSettingsDelete_Noop(t *testing.T) {
 	storage := newTestStorage(map[string]*pluginsettings.DTO{})
 
 	ctx := request.WithNamespace(context.Background(), "default")
-	obj, _, err := storage.Delete(ctx, "test-app", nil, nil)
+	obj, deleted, err := storage.Delete(ctx, "test-app", nil, nil)
+	require.NoError(t, err)
 	require.Nil(t, obj)
-	require.Error(t, err)
-	require.True(t, apierrors.IsMethodNotSupported(err))
+	require.False(t, deleted)
 }
 
-func TestSettingsDeleteCollection_NotSupported(t *testing.T) {
+func TestSettingsDeleteCollection_Noop(t *testing.T) {
 	storage := newTestStorage(map[string]*pluginsettings.DTO{})
 
 	ctx := request.WithNamespace(context.Background(), "default")
 	obj, err := storage.DeleteCollection(ctx, nil, nil, nil)
+	require.NoError(t, err)
 	require.Nil(t, obj)
-	require.Error(t, err)
-	require.True(t, apierrors.IsMethodNotSupported(err))
 }
 
 func TestSettingsConvertToTable(t *testing.T) {
