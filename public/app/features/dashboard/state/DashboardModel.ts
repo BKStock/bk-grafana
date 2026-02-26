@@ -1248,29 +1248,17 @@ export class DashboardModel implements TimeModel {
   }
 
   canEditAnnotations(dashboardUID?: string) {
-    let canEdit = true;
-
-    // dashboardUID is falsy when it is an organizational annotation
     if (!dashboardUID) {
-      canEdit = !!this.meta.annotationsPermissions?.organization.canEdit;
-    } else {
-      canEdit = !!this.meta.annotationsPermissions?.dashboard.canEdit;
+      return false;
     }
-
-    return canEdit;
+    return !!this.meta.annotationsPermissions?.dashboard.canEdit;
   }
 
   canDeleteAnnotations(dashboardUID?: string) {
-    let canDelete = true;
-
-    // dashboardUID is falsy when it is an organizational annotation
     if (!dashboardUID) {
-      canDelete = !!this.meta.annotationsPermissions?.organization.canDelete;
-    } else {
-      canDelete = !!this.meta.annotationsPermissions?.dashboard.canDelete;
+      return false;
     }
-
-    return canDelete;
+    return !!this.meta.annotationsPermissions?.dashboard.canDelete;
   }
 
   canAddAnnotations() {

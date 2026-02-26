@@ -393,11 +393,6 @@ function buildTestScene(options: SceneOptions) {
           canEdit: options.canEdit ?? false,
           canDelete: options.canDelete ?? false,
         },
-        organization: {
-          canAdd: false,
-          canEdit: options.orgCanEdit ?? false,
-          canDelete: options.canDelete ?? false,
-        },
       },
     },
   });

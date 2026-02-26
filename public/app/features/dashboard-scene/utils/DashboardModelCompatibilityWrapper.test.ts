@@ -128,11 +128,6 @@ function setup() {
       canEdit: true,
       canMakeEditable: true,
       annotationsPermissions: {
-        organization: {
-          canEdit: true,
-          canAdd: true,
-          canDelete: true,
-        },
         dashboard: {
           canEdit: false,
           canAdd: false,
