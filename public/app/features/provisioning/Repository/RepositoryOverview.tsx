@@ -10,7 +10,7 @@ import { Repository, ResourceCount } from 'app/api/clients/provisioning/v0alpha1
 import { RecentJobs } from '../Job/RecentJobs';
 import { FreeTierLimitNote } from '../Shared/FreeTierLimitNote';
 import { MissingFolderMetadataBanner } from '../components/Folders/MissingFolderMetadataBanner';
-import { useRepoHasMissingFolderMetadata } from '../hooks/useRepoHasMissingFolderMetadata';
+import { useFolderMetadataStatus } from '../hooks/useFolderMetadataStatus';
 import { formatTimestamp } from '../utils/time';
 
 import { RepositoryHealthCard } from './RepositoryHealthCard';
@@ -30,7 +30,7 @@ export function RepositoryOverview({ repo }: { repo: Repository }) {
   const repoName = repo.metadata?.name ?? '';
   const showFolderMetadataCheck =
     config.featureToggles.provisioning && config.featureToggles.provisioningFolderMetadata;
-  const { hasMissing } = useRepoHasMissingFolderMetadata(repoName);
+  const { status: folderMetadataStatus } = useFolderMetadataStatus({ repositoryName: repoName });
 
   const status = repo.status;
   const webhookURL = getWebhookURL(repo);
@@ -60,7 +60,7 @@ export function RepositoryOverview({ repo }: { repo: Repository }) {
   return (
     <Box padding={2}>
       <Stack direction="column" gap={2}>
-        {showFolderMetadataCheck && hasMissing && (
+        {showFolderMetadataCheck && folderMetadataStatus === 'missing' && (
           <MissingFolderMetadataBanner repositoryName={repoName} variant="repo" />
         )}
         <Grid columns={{ xs: 1, sm: 2, lg: lgColumn, xxl: xxlColumn }} gap={2} alignItems={'flex-start'}>

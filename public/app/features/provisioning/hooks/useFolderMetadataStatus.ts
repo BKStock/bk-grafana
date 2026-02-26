@@ -1,10 +1,11 @@
 import { skipToken } from '@reduxjs/toolkit/query/react';
+import { useMemo } from 'react';
 
 import { isFetchError } from '@grafana/runtime';
-import { useGetRepositoryFilesWithPathQuery } from 'app/api/clients/provisioning/v0alpha1';
+import { useGetRepositoryFilesQuery, useGetRepositoryFilesWithPathQuery } from 'app/api/clients/provisioning/v0alpha1';
 import { AnnoKeySourcePath } from 'app/features/apiserver/types';
 
-import { getFolderMetadataPath } from '../utils/folderMetadata';
+import { checkFilesForMissingMetadata, getFolderMetadataPath } from '../utils/folderMetadata';
 
 import { useGetResourceRepositoryView } from './useGetResourceRepositoryView';
 
@@ -15,40 +16,76 @@ export interface FolderMetadataResult {
   repositoryName: string;
 }
 
+interface RepoLevelArgs {
+  repositoryName: string;
+}
+
 /**
- * Checks whether a provisioned folder has a `_folder.json` metadata file.
- * Only call this for folders already known to be provisioned — the caller
- * (FolderPermissions) gates on `isProvisionedFolder` before rendering the
- * component that uses this hook.
+ * Checks whether provisioned folders have a `_folder.json` metadata file.
+ *
+ * Two call patterns:
+ * - `useFolderMetadataStatus(folderUID)` — single-folder check via repository view + file path query
+ * - `useFolderMetadataStatus({ repositoryName })` — repo-level check using the full files listing
  */
-export function useFolderMetadataStatus(folderUID: string): FolderMetadataResult {
+export function useFolderMetadataStatus(args: string | RepoLevelArgs): FolderMetadataResult {
+  const isRepoLevel = typeof args === 'object';
+  const folderUID = isRepoLevel ? '' : args;
+  const repoLevelName = isRepoLevel ? args.repositoryName : '';
+
+  // --- Folder-level path (active when args is a string) ---
   const {
     repository,
     folder,
     isLoading: isRepoViewLoading,
   } = useGetResourceRepositoryView({
-    folderName: folderUID,
+    folderName: folderUID || undefined,
+    skipQuery: isRepoLevel,
   });
 
   const sourcePath = folder?.metadata?.annotations?.[AnnoKeySourcePath]?.replace(/\/+$/, '');
-  const repoName = repository?.name ?? '';
+  const folderRepoName = repository?.name ?? '';
   const folderJsonPath = getFolderMetadataPath(sourcePath);
 
-  const { error, isLoading: isFileLoading } = useGetRepositoryFilesWithPathQuery(
-    repoName ? { name: repoName, path: folderJsonPath } : skipToken
+  const { error: filePathError, isLoading: isFilePathLoading } = useGetRepositoryFilesWithPathQuery(
+    !isRepoLevel && folderRepoName ? { name: folderRepoName, path: folderJsonPath } : skipToken
   );
 
-  if (isRepoViewLoading || isFileLoading) {
-    return { status: 'loading', repositoryName: repoName };
+  // --- Repo-level path (active when args is an object) ---
+  const {
+    data: filesData,
+    isLoading: isFilesLoading,
+    error: filesError,
+  } = useGetRepositoryFilesQuery(repoLevelName ? { name: repoLevelName } : skipToken);
+
+  const hasMissing = useMemo(() => {
+    if (!isRepoLevel || isFilesLoading || !filesData?.items) {
+      return false;
+    }
+    return checkFilesForMissingMetadata(filesData.items);
+  }, [isRepoLevel, filesData?.items, isFilesLoading]);
+
+  // --- Return based on which path is active ---
+  if (isRepoLevel) {
+    if (isFilesLoading) {
+      return { status: 'loading', repositoryName: repoLevelName };
+    }
+    if (filesError) {
+      return { status: 'error', repositoryName: repoLevelName };
+    }
+    return { status: hasMissing ? 'missing' : 'ok', repositoryName: repoLevelName };
   }
 
-  if (isFetchError(error) && error.status === 404) {
-    return { status: 'missing', repositoryName: repoName };
+  if (isRepoViewLoading || isFilePathLoading) {
+    return { status: 'loading', repositoryName: folderRepoName };
   }
 
-  if (error) {
-    return { status: 'error', repositoryName: repoName };
+  if (isFetchError(filePathError) && filePathError.status === 404) {
+    return { status: 'missing', repositoryName: folderRepoName };
   }
 
-  return { status: 'ok', repositoryName: repoName };
+  if (filePathError) {
+    return { status: 'error', repositoryName: folderRepoName };
+  }
+
+  return { status: 'ok', repositoryName: folderRepoName };
 }
