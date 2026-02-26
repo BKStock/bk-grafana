@@ -210,6 +210,21 @@ export function flattenTree(items: TreeItem[], level = 0): FlatTreeItem[] {
 }
 
 /**
+ * Returns true if any node in the tree has `missingFolderMetadata` set.
+ */
+export function hasMissingFolderMetadata(tree: TreeItem[]): boolean {
+  for (const node of tree) {
+    if (node.missingFolderMetadata) {
+      return true;
+    }
+    if (node.children.length > 0 && hasMissingFolderMetadata(node.children)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Filter tree by search query (searches path and title).
  * Returns filtered tree including ancestor folders for matching items.
  */

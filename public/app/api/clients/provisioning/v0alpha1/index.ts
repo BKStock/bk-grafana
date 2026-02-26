@@ -167,16 +167,32 @@ export const provisioningAPIv0alpha1 = generatedAPI.enhanceEndpoints({
     createRepositoryJobs: {
       onQueryStarted: async ({ jobSpec }, { queryFulfilled, dispatch }) => {
         try {
-          const showMsg = jobSpec.action === 'pull' || jobSpec.action === 'migrate';
           await queryFulfilled;
-          if (showMsg) {
+          if (jobSpec.action === 'pull' || jobSpec.action === 'migrate') {
             dispatch(
               notifyApp(
                 createSuccessNotification(t('provisioning.sync-repository.success-pull-started', 'Pull started'))
               )
             );
           }
+          if (jobSpec.fixFolderMetadata) {
+            dispatch(
+              notifyApp(
+                createSuccessNotification(
+                  t('provisioning.fix-folder-metadata.success-job-started', 'Fix folder metadata job started')
+                )
+              )
+            );
+          }
         } catch (e) {
+          if (jobSpec.fixFolderMetadata) {
+            handleError(
+              e,
+              dispatch,
+              t('provisioning.fix-folder-metadata.error-fixing', 'Error fixing folder metadata')
+            );
+            return;
+          }
           if (e instanceof Error) {
             dispatch(
               notifyApp(
