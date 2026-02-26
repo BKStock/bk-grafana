@@ -300,7 +300,8 @@ export function useFiltersOverviewState({
       if (allowCustom) {
         const exactMatch = filtered.some((o) => o.value === inputValue);
         if (!exactMatch) {
-          filtered.push({
+          filtered.unshift({
+            label: inputValue,
             value: inputValue,
             description: t('dashboard.filters-overview.use-custom-value', 'Use custom value'),
           });

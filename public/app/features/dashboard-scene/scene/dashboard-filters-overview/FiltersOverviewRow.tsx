@@ -1,9 +1,9 @@
-import { css } from '@emotion/css';
-import { memo } from 'react';
+import { css, cx } from '@emotion/css';
+import { memo, useMemo, useState } from 'react';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { Checkbox, Combobox, ComboboxOption, Icon, IconButton, MultiCombobox, Tooltip, useStyles2 } from '@grafana/ui';
+import { Checkbox, ComboboxOption, getInputStyles, Icon, MultiSelect, Select, Tooltip, useStyles2 } from '@grafana/ui';
 
 interface GroupHeaderProps {
   group: string;
@@ -33,6 +33,14 @@ export const GroupHeader = memo(({ group, isOpen, onToggle }: GroupHeaderProps) 
 
 GroupHeader.displayName = 'GroupHeader';
 
+const OPERATOR_MENU_MIN_WIDTH = 200;
+
+const WideMenu = ({ children, innerRef, innerProps }: { children: React.ReactNode; innerRef: React.Ref<HTMLDivElement>; innerProps: React.HTMLAttributes<HTMLDivElement> & { style?: React.CSSProperties } }) => (
+  <div ref={innerRef} {...innerProps} style={{ ...innerProps.style, minWidth: OPERATOR_MENU_MIN_WIDTH }}>
+    {children}
+  </div>
+);
+
 interface FilterRowProps {
   keyOption: SelectableValue<string>;
   keyValue: string;
@@ -44,7 +52,7 @@ interface FilterRowProps {
   isOrigin: boolean;
   isRestorable: boolean;
   hasGroupByVariable: boolean;
-  operatorOptions: Array<ComboboxOption<string>>;
+  operatorOptions: Array<SelectableValue<string>>;
   onOperatorChange: (key: string, operator: string) => void;
   onSingleValueChange: (key: string, value: string) => void;
   onMultiValuesChange: (key: string, values: string[]) => void;
@@ -76,6 +84,55 @@ export const FilterRow = memo(
     const styles = useStyles2(getRowStyles);
     const label = keyOption.label ?? keyValue;
 
+    const [valueOptions, setValueOptions] = useState<Array<SelectableValue<string>>>([]);
+    const [isLoadingValues, setIsLoadingValues] = useState(false);
+    const [isValuesMenuOpen, setIsValuesMenuOpen] = useState(false);
+
+    const handleOpenValuesMenu = async () => {
+      setIsLoadingValues(true);
+      const options = await getValueOptions(keyValue, operatorValue, '');
+      setValueOptions(options as Array<SelectableValue<string>>);
+      setIsLoadingValues(false);
+      setIsValuesMenuOpen(true);
+    };
+
+    const handleCloseValuesMenu = () => {
+      setIsValuesMenuOpen(false);
+    };
+
+    const restoreIndicator = useMemo(() => {
+      if (!isRestorable) {
+        return undefined;
+      }
+      return {
+        IndicatorsContainer: (props: React.PropsWithChildren) => (
+          <div className={styles.indicators}>
+            <Tooltip content={t('dashboard.filters-overview.restore', 'Restore default value')}>
+              <span
+                role="button"
+                tabIndex={0}
+                className={styles.restoreButton}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore(keyValue);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    onRestore(keyValue);
+                  }
+                }}
+              >
+                <Icon name="history" />
+              </span>
+            </Tooltip>
+            {props.children}
+          </div>
+        ),
+      };
+    }, [isRestorable, keyValue, onRestore, styles.indicators, styles.restoreButton]);
+
     return (
       <div className={styles.row}>
         {/* Label cell */}
@@ -89,13 +146,14 @@ export const FilterRow = memo(
 
         {/* Operator cell */}
         <div className={styles.operatorCell}>
-          <Combobox
+          <Select<string>
             aria-label={t('dashboard.filters-overview.operator', 'Operator')}
             options={operatorOptions}
             value={operatorValue}
             placeholder={t('dashboard.filters-overview.operator.placeholder', 'Select operator')}
             disabled={isOrigin}
-            onChange={(option: ComboboxOption<string>) => {
+            components={{ Menu: WideMenu }}
+            onChange={(option) => {
               if (option?.value) {
                 onOperatorChange(keyValue, option.value);
               }
@@ -103,46 +161,46 @@ export const FilterRow = memo(
           />
         </div>
 
-        {/* Value + Restore group */}
-        <div className={styles.valueGroup}>
-          <div className={styles.valueCell}>
-            {isMultiOperator ? (
-              <MultiCombobox
-                aria-label={t('dashboard.filters-overview.value', 'Value')}
-                options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
-                value={multiValues}
-                placeholder={t('dashboard.filters-overview.value.placeholder', 'Select values')}
-                isClearable={true}
-                onChange={(selections: Array<ComboboxOption<string>>) => {
-                  onMultiValuesChange(
-                    keyValue,
-                    selections.map((s) => s.value)
-                  );
-                }}
-              />
-            ) : (
-              <Combobox
-                aria-label={t('dashboard.filters-overview.value', 'Value')}
-                options={(inputValue: string) => getValueOptions(keyValue, operatorValue, inputValue)}
-                value={singleValue ? { label: singleValue, value: singleValue } : null}
-                placeholder={t('dashboard.filters-overview.value.placeholder', 'Select value')}
-                isClearable={true}
-                onChange={(selection: ComboboxOption<string> | null) => {
-                  onSingleValueChange(keyValue, selection?.value ?? '');
-                }}
-              />
-            )}
-          </div>
-
-          {isRestorable && (
-            <div className={styles.restoreCell}>
-              <IconButton
-                name="history"
-                size="md"
-                tooltip={t('dashboard.filters-overview.restore', 'Restore default value')}
-                onClick={() => onRestore(keyValue)}
-              />
-            </div>
+        {/* Value cell */}
+        <div className={styles.valueCell}>
+          {isMultiOperator ? (
+            <MultiSelect<string>
+              aria-label={t('dashboard.filters-overview.value', 'Value')}
+              options={valueOptions}
+              value={multiValues.map((v) => ({ label: v, value: v }))}
+              placeholder={t('dashboard.filters-overview.value.placeholder', 'Select values')}
+              allowCustomValue
+              isClearable
+              isLoading={isLoadingValues}
+              isOpen={isValuesMenuOpen}
+              closeMenuOnSelect={false}
+              components={restoreIndicator}
+              onOpenMenu={handleOpenValuesMenu}
+              onCloseMenu={handleCloseValuesMenu}
+              onChange={(selections) => {
+                onMultiValuesChange(
+                  keyValue,
+                  selections.map((s) => s.value ?? '')
+                );
+              }}
+            />
+          ) : (
+            <Select<string>
+              aria-label={t('dashboard.filters-overview.value', 'Value')}
+              options={valueOptions}
+              value={singleValue ? { label: singleValue, value: singleValue } : null}
+              placeholder={t('dashboard.filters-overview.value.placeholder', 'Select value')}
+              allowCustomValue
+              isClearable
+              isLoading={isLoadingValues}
+              isOpen={isValuesMenuOpen}
+              components={restoreIndicator}
+              onOpenMenu={handleOpenValuesMenu}
+              onCloseMenu={handleCloseValuesMenu}
+              onChange={(selection) => {
+                onSingleValueChange(keyValue, selection?.value ?? '');
+              }}
+            />
           )}
         </div>
 
@@ -209,7 +267,8 @@ const getRowStyles = (theme: GrafanaTheme2) => {
     }),
     labelCell: css({
       ...cellLayering,
-      flex: '1 1 auto',
+      flex: '0 0 25%',
+      maxWidth: '25%',
       minWidth: 0,
     }),
     operatorCell: css({
@@ -217,7 +276,6 @@ const getRowStyles = (theme: GrafanaTheme2) => {
       flex: '0 0 auto',
       width: theme.spacing(8),
       marginLeft: -1,
-      // && doubles specificity (0-2-0) to override Combobox defaults (0-1-0)
       '&& > *': {
         width: '100%',
         paddingLeft: 0,
@@ -231,17 +289,11 @@ const getRowStyles = (theme: GrafanaTheme2) => {
         borderRadius: 'unset',
       },
     }),
-    valueGroup: css({
-      ...cellLayering,
-      flex: '0 0 auto',
-      width: theme.spacing(26),
-      marginLeft: -1,
-      display: 'flex',
-      alignItems: 'flex-start',
-    }),
     valueCell: css({
-      flex: '1 1 auto',
+      ...cellLayering,
+      flex: '1 1 0',
       minWidth: 0,
+      marginLeft: -1,
       '&& > *': {
         width: '100%',
         paddingLeft: 0,
@@ -257,12 +309,18 @@ const getRowStyles = (theme: GrafanaTheme2) => {
         borderBottomLeftRadius: 'unset',
       },
     }),
-    restoreCell: css({
-      flex: '0 0 auto',
+    indicators: cx(
+      getInputStyles({ theme, invalid: false }).suffix,
+      css({ position: 'relative' })
+    ),
+    restoreButton: css({
       display: 'flex',
       alignItems: 'center',
-      alignSelf: 'center',
-      marginLeft: theme.spacing(1),
+      cursor: 'pointer',
+      color: theme.colors.text.secondary,
+      '&:hover': {
+        color: theme.colors.text.primary,
+      },
     }),
     groupByCell: css({
       flex: '0 0 auto',
