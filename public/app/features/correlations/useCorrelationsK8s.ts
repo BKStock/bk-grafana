@@ -11,6 +11,7 @@ import { toEnrichedCorrelationData } from './useCorrelations';
 export const toEnrichedCorrelationDataK8s = (item: CorrelationK8s): CorrelationData | undefined => {
   const dsSrv = getDataSourceSrv();
   const sourceDS = dsSrv.getInstanceSettings({ type: item.spec.source.group, uid: item.spec.source.name });
+
   if (sourceDS !== undefined) {
     const baseCor = {
       uid: item.metadata.name!,
@@ -75,15 +76,11 @@ export const useCorrelationsK8s = (limit = 100, page: number) => {
   const startIdx = limit * (page - 1);
   const pagedData = currentData?.items.slice(startIdx, startIdx + limit) ?? [];
 
-  //console.log('k8 hook', JSON.stringify(currentData));
-
   const enrichedCorrelations =
     currentData !== undefined
-      ? pagedData
-          .filter((i) => i.metadata.name !== undefined)
-          .map((item) => toEnrichedCorrelationDataK8s(item))
-          .filter((i) => i !== undefined)
-      : [];
+      ? pagedData.filter((i) => i.metadata.name !== undefined).map((item) => toEnrichedCorrelationDataK8s(item))
+      : // .filter((i) => i !== undefined)
+        [];
 
   const fmtedError = error ? handleRequestError(error) : undefined;
 

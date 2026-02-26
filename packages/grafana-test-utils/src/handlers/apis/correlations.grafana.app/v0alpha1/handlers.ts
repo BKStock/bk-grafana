@@ -15,7 +15,7 @@ const generateCorrMetadata = (correlation: CorrelationSpec) => {
     kind: 'Correlation',
     apiVersion: 'correlations.grafana.app/v0alpha1',
     metadata: {
-      name: Math.floor(Math.random() * 1000),
+      name: Math.floor(Math.random() * 1000).toString(),
       namespace: 'default',
       labels: labels,
     },
@@ -80,7 +80,7 @@ const getCorrelationsHandler = () =>
 
     return HttpResponse.json({
       kind: 'CorrelationList',
-      apiVersion: 'orrelations.grafana.app/v0alpha1',
+      apiVersion: 'correlations.grafana.app/v0alpha1',
       metadata: {},
       code: 200,
       items: returnCorr.map((rc) => generateCorrMetadata(rc)),

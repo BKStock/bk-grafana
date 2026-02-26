@@ -3,7 +3,9 @@ import { TestProvider } from 'test/helpers/TestProvider';
 import { MockDataSourceApi } from 'test/mocks/datasource_srv';
 import { getGrafanaContextMock } from 'test/mocks/getGrafanaContextMock';
 
+import { DataSourceInstanceSettings } from '@grafana/data';
 import { DataSourceSrv, reportInteraction, setAppEvents, setDataSourceSrv, config } from '@grafana/runtime';
+import { DataSourceRef } from '@grafana/schema';
 import { appEvents } from 'app/core/app_events';
 import { contextSrv } from 'app/core/services/context_srv';
 import { configureStore } from 'app/store/configureStore';
@@ -32,6 +34,23 @@ const renderWithContext = async (datasources: ConstructorParameters<typeof MockD
       QueryEditor: () => <>{name} query editor</>,
     };
     return Promise.resolve(dsApi);
+  };
+
+  dsServer.getInstanceSettings = (ref: DataSourceRef | string) => {
+    if (typeof ref === 'string') {
+      const type = ref === 'lokiUID' ? 'loki' : 'prometheus';
+      return {
+        uid: ref,
+        name: `${type}-1`,
+        type: type,
+      } as unknown as DataSourceInstanceSettings;
+    } else {
+      return {
+        uid: ref.uid,
+        name: `${ref.type}-1`,
+        type: ref.type,
+      } as unknown as DataSourceInstanceSettings;
+    }
   };
 
   setDataSourceSrv(dsServer);
@@ -147,21 +166,21 @@ describe('CorrelationsPage - App Platform', () => {
       await renderWithContext({
         loki: mockDataSource(
           {
-            uid: 'loki',
+            uid: 'lokiUID',
             name: 'loki',
             readOnly: false,
             jsonData: {},
-            type: 'datasource',
+            type: 'loki',
           },
           { logs: true }
         ),
         prometheus: mockDataSource(
           {
-            uid: 'prometheus',
+            uid: 'prometheusUID',
             name: 'prometheus',
             readOnly: false,
             jsonData: {},
-            type: 'datasource',
+            type: 'prometheus',
           },
           { metrics: true, module: 'core:plugin/prometheus' }
         ),
