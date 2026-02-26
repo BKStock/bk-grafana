@@ -173,6 +173,8 @@ function getStyles(
     },
   });
 
+  const disabledBg = `color-mix(in srgb, ${theme.colors.background.secondary} 90%, transparent)`;
+
   return {
     cardContentIcons: css({
       display: 'flex',
@@ -184,7 +186,7 @@ function getStyles(
     wrapper: css({
       position: 'relative',
       marginLeft: theme.spacing(SIDEBAR_CARD_INDENT),
-      marginRight: theme.spacing(SIDEBAR_CARD_INDENT),
+      marginRight: theme.spacing(1),
 
       // Two slim pseudo-element strips extend the hover zone to the left and
       // below the card, covering the path to the "+" button without overlapping
@@ -222,33 +224,33 @@ function getStyles(
 
     card: css({
       position: 'relative',
-      minHeight: `${SIDEBAR_CARD_HEIGHT}px`,
+      minHeight: SIDEBAR_CARD_HEIGHT,
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       width: '100%',
-      background: isSelected ? selectedBg : 'transparent',
+      background: isSelected ? selectedBg : item.isHidden ? disabledBg : 'transparent',
       borderRadius: theme.shape.radius.default,
       overflow: 'hidden',
 
-      border: `1px solid ${isSelected ? `color-mix(in srgb, ${borderColor} 50%, transparent)` : `color-mix(in srgb, ${theme.colors.border.weak} 75%, transparent)`}`,
-      boxShadow: isSelected ? `0 0 4px 0 color-mix(in srgb, ${borderColor} 40%, transparent)` : 'none',
+      border: `1px solid ${isSelected ? borderColor : theme.colors.border.medium}`,
+      boxShadow: isSelected ? `0 0 2px 0 color-mix(in srgb, ${borderColor} 40%, transparent)` : 'none',
 
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: isSelected ? 3 : 1,
-        background: borderColor,
-        [theme.transitions.handleMotion('no-preference', 'reduce')]: {
-          transition: theme.transitions.create(['width'], {
-            duration: theme.transitions.duration.standard,
-          }),
-        },
-      },
+      // '&::before': {
+      //   content: '""',
+      //   position: 'absolute',
+      //   left: 0,
+      //   top: 0,
+      //   bottom: 0,
+      //   width: isSelected ? 3 : 1,
+      //   background: borderColor,
+      //   [theme.transitions.handleMotion('no-preference', 'reduce')]: {
+      //     transition: theme.transitions.create(['width'], {
+      //       duration: theme.transitions.duration.standard,
+      //     }),
+      //   },
+      // },
       cursor: 'pointer',
 
       // This transitions the background color of the card when it is hovered or selected.
