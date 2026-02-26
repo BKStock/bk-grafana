@@ -7,7 +7,7 @@ import { UPlotConfigBuilder } from '@grafana/ui';
 import { TimeRange2 } from '@grafana/ui/internal';
 
 import { AnnotationsPlugin2 } from './AnnotationsPlugin2';
-import { mockAnnotationFrame } from './mockAnnotationFrames';
+import { mockAnnotationFrame } from './mocks/mockAnnotationFrames';
 
 jest.mock('react-dom', () => ({
   ...jest.requireActual('react-dom'),
@@ -16,7 +16,6 @@ jest.mock('react-dom', () => ({
     return node;
   },
 }));
-
 jest.mock('uplot', () => {
   const setDataMock = jest.fn();
   const setSizeMock = jest.fn();

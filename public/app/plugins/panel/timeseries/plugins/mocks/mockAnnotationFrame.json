@@ -1,0 +1,208 @@
+[
+  {
+    "schema": {
+      "meta": {
+        "dataTopic": "annotations"
+      },
+      "fields": [
+        {
+          "name": "time",
+          "config": {},
+          "type": "time"
+        },
+        {
+          "name": "title",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "tags",
+          "config": {},
+          "type": "other"
+        },
+        {
+          "name": "source",
+          "config": {},
+          "type": "other"
+        },
+        {
+          "name": "color",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "isRegion",
+          "config": {},
+          "type": "boolean"
+        }
+      ]
+    },
+    "data": {
+      "values": [
+        [1759388895560, 1759388995560, 1759389995560],
+        ["HG Launch (ops) 1", "HG Launch (ops) 2", "HG Launch (ops) 3"],
+        [
+          "Launching HG Instance ops with hgrun version 1",
+          "Launching HG Instance ops with hgrun version 2",
+          "Launching HG Instance ops with hgrun version 3"
+        ],
+        [["tag1", "tag2"], ["tag2", "tag3"], []],
+        [
+          {
+            "__label__": "SOURCE_ANNOTATION_FIELD_VAL_1",
+            "datasource": {
+              "type": "loki",
+              "uid": "000000193"
+            },
+            "enable": true,
+            "expr": "{cluster=\"$cluster\", namespace=\"hosted-grafana\", slug=\"$slug\"} |= `msg=\"launching hosted grafana\"` | logfmt  ",
+            "iconColor": "dark-purple",
+            "instant": false,
+            "name": "HG Launch",
+            "tagKeys": "hg-launch",
+            "textFormat": "Launching HG Instance {{slug}} with hgrun {{version}}",
+            "titleFormat": "HG Launch ({{slug}})"
+          },
+          {
+            "__label__": "SOURCE_ANNOTATION_FIELD_VAL_2",
+            "datasource": {
+              "type": "loki",
+              "uid": "000000193"
+            },
+            "enable": true,
+            "expr": "{cluster=\"$cluster\", namespace=\"hosted-grafana\", slug=\"$slug\"} |= `msg=\"launching hosted grafana\"` | logfmt  ",
+            "iconColor": "dark-purple",
+            "instant": false,
+            "name": "HG Launch",
+            "tagKeys": "hg-launch",
+            "textFormat": "Launching HG Instance {{slug}} with hgrun {{version}}",
+            "titleFormat": "HG Launch ({{slug}})"
+          },
+          {
+            "__label__": "SOURCE_ANNOTATION_FIELD_VAL_3",
+            "datasource": {
+              "type": "loki",
+              "uid": "000000193"
+            },
+            "enable": true,
+            "expr": "{cluster=\"$cluster\", namespace=\"hosted-grafana\", slug=\"$slug\"} |= `msg=\"launching hosted grafana\"` | logfmt  ",
+            "iconColor": "dark-purple",
+            "instant": false,
+            "name": "HG Launch",
+            "tagKeys": "hg-launch",
+            "textFormat": "Launching HG Instance {{slug}} with hgrun {{version}}",
+            "titleFormat": "HG Launch ({{slug}})"
+          }
+        ],
+        ["#8F3BB8", "#8F3BB8", "#8F3BB8"],
+        ["HG Launch 1", "HG Launch 2", "HG Launch 3"],
+        [false, false, false]
+      ]
+    }
+  },
+  {
+    "schema": {
+      "meta": {
+        "dataTopic": "annotations"
+      },
+      "fields": [
+        {
+          "name": "time",
+          "config": {},
+          "type": "time"
+        },
+        {
+          "name": "title",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "tags",
+          "config": {},
+          "type": "other"
+        },
+        {
+          "name": "source",
+          "config": {},
+          "type": "other"
+        },
+        {
+          "name": "color",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "config": {},
+          "type": "string"
+        },
+        {
+          "name": "isRegion",
+          "config": {},
+          "type": "boolean"
+        },
+        {
+          "name": "avatarUrl",
+          "config": {},
+          "type": "string"
+        }
+      ]
+    },
+    "data": {
+      "values": [
+        [1759378500000, 1759378560000, 1759378620000, 1759378680000],
+        ["HG Launch (ops) 1", "HG Launch (ops) 2", "HG Launch (ops) 3", "HG Launch (ops) 4"],
+        [
+          "Launching HG Instance ops with hgrun version 1",
+          "Launching HG Instance ops with hgrun version 2",
+          "Launching HG Instance ops with hgrun version 3",
+          "Launching HG Instance ops with hgrun version 4"
+        ],
+        [[], [], [], []],
+        [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "000000193"
+            },
+            "enable": true,
+            "expr": "{cluster=\"$cluster\", namespace=\"hosted-grafana\", slug=\"$slug\"} |= `msg=\"launching hosted grafana\"` | logfmt  ",
+            "iconColor": "dark-purple",
+            "instant": false,
+            "name": "HG Launch",
+            "tagKeys": "hg-launch",
+            "textFormat": "Launching HG Instance {{slug}} with hgrun {{version}}",
+            "titleFormat": "HG Launch ({{slug}})"
+          },
+          null,
+          null,
+          null
+        ],
+        ["#00FFFF", "#00FFFF", "#00FFFF", "#00FF00"],
+        ["HG Launch", "HG Launch", "HG Launch", "HG Launch"],
+        [false, false, false, false],
+        [
+          "https://www.gravatar.com/avatar/592723e91b4f16fa4241f6818e601000?s=512&d=https%3A%2F%2Favatars.slack-edge.com%2F2024-07-01%2F7363759362996_d8a231a9ad749aac0a19_192.png",
+          "https://www.gravatar.com/avatar/592723e91b4f16fa4241f6818e601000?s=512&d=https%3A%2F%2Favatars.slack-edge.com%2F2024-07-01%2F7363759362996_d8a231a9ad749aac0a19_192.png",
+          "https://www.gravatar.com/avatar/592723e91b4f16fa4241f6818e601000?s=512&d=https%3A%2F%2Favatars.slack-edge.com%2F2024-07-01%2F7363759362996_d8a231a9ad749aac0a19_192.png",
+          "https://www.gravatar.com/avatar/592723e91b4f16fa4241f6818e601000?s=512&d=https%3A%2F%2Favatars.slack-edge.com%2F2024-07-01%2F7363759362996_d8a231a9ad749aac0a19_192.png"
+        ]
+      ]
+    }
+  }
+]
