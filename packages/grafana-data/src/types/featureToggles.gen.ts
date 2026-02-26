@@ -1508,6 +1508,11 @@ export interface FeatureToggles {
   */
   kubernetesTeamsHandlerRedirect?: boolean;
   /**
+  * Enables user APIs in the app platform
+  * @default false
+  */
+  kubernetesUsersApi?: boolean;
+  /**
   * Enables external group mapping APIs in the app platform
   * @default false
   */
@@ -1562,4 +1567,14 @@ export interface FeatureToggles {
   * @default false
   */
   managedPluginsV2?: boolean;
+  /**
+  * Remember the last viewed organization for users using SSO
+  * @default true
+  */
+  rememberUserOrgForSso?: boolean;
+  /**
+  * Registers the dsabstraction app for querying datasources via unified SQL
+  * @default false
+  */
+  dsAbstractionApp?: boolean;
 }
