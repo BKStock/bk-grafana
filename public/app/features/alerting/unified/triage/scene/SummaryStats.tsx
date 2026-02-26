@@ -4,7 +4,7 @@ import { DataFrameView, GrafanaTheme2 } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
 import { SceneObjectBase, SceneObjectState } from '@grafana/scenes';
 import { useQueryRunner } from '@grafana/scenes-react';
-import { Box, ErrorBoundaryAlert, Icon, Stack, Text, useStyles2 } from '@grafana/ui';
+import { Box, ErrorBoundaryAlert, Grid, Icon, type IconName, useStyles2 } from '@grafana/ui';
 import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
@@ -50,42 +50,66 @@ function countInstances(instanceDfv: DataFrameView<Frame>) {
   return { firing: getValue(PromAlertingRuleState.Firing), pending: getValue(PromAlertingRuleState.Pending) };
 }
 
-interface CompactStatRowProps {
+interface StatBoxProps {
+  i18nKey: string;
+  value: number;
   color: 'error' | 'warning';
-  icon: 'exclamation-circle' | 'circle';
-  instanceCount: number;
-  ruleCount: number;
-  stateLabel: AlertState;
+  icon?: IconName;
+  children: React.ReactNode;
 }
 
-function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: CompactStatRowProps) {
-  const styles = useStyles2(getCompactStatStyles);
+function StatBox({ i18nKey, value, color, icon, children }: StatBoxProps) {
+  const styles = useStyles2(getStatBoxStyles);
   const colorClass = color === 'error' ? styles.errorColor : styles.warningColor;
 
   return (
-    <div className={styles.statRow}>
-      <Icon name={icon} size="sm" className={colorClass} />
-      <Text element="span" weight="medium" color={color}>
-        {stateLabel === 'firing' ? (
-          <Trans i18nKey="alerting.triage.compact-firing">firing</Trans>
-        ) : (
-          <Trans i18nKey="alerting.triage.compact-pending">pending</Trans>
-        )}
-      </Text>
-      <span className={`${styles.statValue} ${colorClass}`}>{instanceCount}</span>
-      <Text element="span" color="secondary" variant="bodySmall">
-        <Trans i18nKey="alerting.triage.compact-instances">instances</Trans>
-      </Text>
-      <span className={`${styles.statValue} ${colorClass}`}>{ruleCount}</span>
-      <Text element="span" color="secondary" variant="bodySmall">
-        <Trans i18nKey="alerting.triage.compact-rules">rules</Trans>
-      </Text>
-    </div>
+    <Box
+      display="flex"
+      direction="column"
+      justifyContent="center"
+      alignItems="center"
+      padding={2}
+      backgroundColor="secondary"
+      borderRadius="default"
+      gap={1}
+      height="100%"
+    >
+      <div className={styles.label}>
+        {icon && <Icon name={icon} size="sm" className={colorClass} />}
+        {children}
+      </div>
+      <div className={`${styles.value} ${colorClass}`}>{value}</div>
+    </Box>
   );
 }
 
+const getStatBoxStyles = (theme: GrafanaTheme2) => ({
+  label: css({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing(0.5),
+    fontSize: theme.typography.bodySmall.fontSize,
+    color: theme.colors.text.primary,
+    wordWrap: 'break-word',
+    whiteSpace: 'normal',
+    textAlign: 'center',
+  }),
+  value: css({
+    fontSize: theme.typography.h1.fontSize,
+    fontWeight: theme.typography.fontWeightMedium,
+    lineHeight: 1.2,
+    textAlign: 'center',
+  }),
+  errorColor: css({
+    color: theme.colors.error.text,
+  }),
+  warningColor: css({
+    color: theme.colors.warning.text,
+  }),
+});
+
 function SummaryStatsContent() {
-  const styles = useStyles2(getCompactStatStyles);
   const { filter, alertStateFilter } = useQueryFilter();
 
   const instanceDataProvider = useQueryRunner({
@@ -119,34 +143,52 @@ function SummaryStatsContent() {
 
   const instances = countInstances(instanceDfv);
   const rules = countRules(ruleDfv);
-  const hasFiring = instances.firing > 0 || rules.firing > 0;
-  const hasPending = instances.pending > 0 || rules.pending > 0;
+  const showFiring = alertStateFilter !== 'pending' && (instances.firing > 0 || rules.firing > 0);
+  const showPending = alertStateFilter !== 'firing' && (instances.pending > 0 || rules.pending > 0);
 
   return (
-    <Stack direction="column" gap={2}>
-      <Box backgroundColor="secondary" borderRadius="default" padding={1.5}>
-        <div className={styles.statsGrid}>
-          {hasFiring && (
-            <CompactStatRow
-              color="error"
-              icon="exclamation-circle"
-              instanceCount={instances.firing}
-              ruleCount={rules.firing}
-              stateLabel={PromAlertingRuleState.Firing}
-            />
-          )}
-          {hasPending && (
-            <CompactStatRow
-              color="warning"
-              icon="circle"
-              instanceCount={instances.pending}
-              ruleCount={rules.pending}
-              stateLabel={PromAlertingRuleState.Pending}
-            />
-          )}
-        </div>
-      </Box>
-    </Stack>
+    <Grid gap={2}>
+      {showFiring && (
+        <Grid columns={2} gap={2}>
+          <StatBox
+            i18nKey="alerting.triage.firing-instances-count"
+            value={instances.firing}
+            color="error"
+            icon="exclamation-circle"
+          >
+            <Trans i18nKey="alerting.triage.firing-instances-count">Firing alert instances</Trans>
+          </StatBox>
+          <StatBox
+            i18nKey="alerting.triage.firing-rules-count"
+            value={rules.firing}
+            color="error"
+            icon="exclamation-circle"
+          >
+            <Trans i18nKey="alerting.triage.rules-with-firing-instances">Alert rules with firing instances</Trans>
+          </StatBox>
+        </Grid>
+      )}
+      {showPending && (
+        <Grid columns={2} gap={2}>
+          <StatBox
+            i18nKey="alerting.triage.pending-instances-count"
+            value={instances.pending}
+            color="warning"
+            icon="circle"
+          >
+            <Trans i18nKey="alerting.triage.pending-instances-count">Pending alert instances</Trans>
+          </StatBox>
+          <StatBox
+            i18nKey="alerting.triage.rules-with-pending-instances"
+            value={rules.pending}
+            color="warning"
+            icon="circle"
+          >
+            <Trans i18nKey="alerting.triage.rules-with-pending-instances">Alert rules with pending instances</Trans>
+          </StatBox>
+        </Grid>
+      )}
+    </Grid>
   );
 }
 
@@ -162,29 +204,3 @@ export function SummaryStatsReact() {
 export class SummaryStatsScene extends SceneObjectBase<SceneObjectState> {
   static Component = SummaryStatsReact;
 }
-
-const getCompactStatStyles = (theme: GrafanaTheme2) => ({
-  statsGrid: css({
-    display: 'grid',
-    gridTemplateColumns: 'max-content max-content max-content max-content max-content max-content',
-    alignItems: 'center',
-    columnGap: theme.spacing(1.5),
-    rowGap: theme.spacing(0.5),
-    fontSize: theme.typography.body.fontSize,
-  }),
-  statRow: css({
-    display: 'contents',
-  }),
-  statValue: css({
-    fontWeight: theme.typography.fontWeightBold,
-    fontSize: theme.typography.h4.fontSize,
-    textAlign: 'right',
-    fontVariantNumeric: 'tabular-nums',
-  }),
-  errorColor: css({
-    color: theme.colors.error.text,
-  }),
-  warningColor: css({
-    color: theme.colors.warning.text,
-  }),
-});
