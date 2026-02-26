@@ -61,7 +61,8 @@ export const removeTabCommand: MutationCommand<RemoveTabPayload> = {
 
       return {
         success: true,
-        changes: [{ path, previousValue: { title: resolved.item.state.title }, newValue: undefined }],
+        data: { path },
+        changes: [{ path, previousValue: { title: resolved.item.state.title }, newValue: null }],
       };
     } catch (error) {
       return {

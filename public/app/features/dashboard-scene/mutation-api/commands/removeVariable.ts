@@ -44,7 +44,8 @@ export const removeVariableCommand: MutationCommand<RemoveVariablePayload> = {
 
       return {
         success: true,
-        changes: [{ path: `/variables/${name}`, previousValue: previousState, newValue: undefined }],
+        data: { name },
+        changes: [{ path: `/variables/${name}`, previousValue: previousState, newValue: null }],
       };
     } catch (error) {
       return {

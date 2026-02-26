@@ -58,9 +58,9 @@ export const addVariableCommand: MutationCommand<AddVariablePayload> = {
 
       return {
         success: true,
-        data: { name, kind: variableKind.kind },
+        data: { variable: variableKind },
         changes: [
-          { path: `/variables/${name}`, previousValue: undefined, newValue: { kind: variableKind.kind, name } },
+          { path: `/variables/${name}`, previousValue: null, newValue: variableKind },
         ],
       };
     } catch (error) {

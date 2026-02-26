@@ -96,8 +96,8 @@ export const addRowCommand: MutationCommand<AddRowPayload> = {
 
       return {
         success: true,
-        data: { path: newPath },
-        changes: [{ path: newPath, previousValue: undefined, newValue: { title: row.spec.title } }],
+        data: { path: newPath, row: { kind: 'RowsLayoutRow', spec: row.spec } },
+        changes: [{ path: newPath, previousValue: null, newValue: { title: row.spec.title } }],
         warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {

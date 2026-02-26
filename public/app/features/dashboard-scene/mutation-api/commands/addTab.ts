@@ -90,8 +90,8 @@ export const addTabCommand: MutationCommand<AddTabPayload> = {
 
       return {
         success: true,
-        data: { path: newPath },
-        changes: [{ path: newPath, previousValue: undefined, newValue: { title: tab.spec.title } }],
+        data: { path: newPath, tab: { kind: 'TabsLayoutTab', spec: tab.spec } },
+        changes: [{ path: newPath, previousValue: null, newValue: { title: tab.spec.title } }],
         warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
