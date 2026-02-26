@@ -26,6 +26,7 @@ import TNil from '../types/TNil';
 import { SpanLinkFunc } from '../types/links';
 import { TraceSpan, CriticalPathSection } from '../types/trace';
 import { formatDuration } from '../utils/date';
+import { getServiceDisplayName } from '../utils/service-name';
 
 import SpanBar from './SpanBar';
 import { SpanLinksMenu } from './SpanLinks';
@@ -390,8 +391,9 @@ const UnthemedSpanBarRow = React.memo<SpanBarRowProps>((props) => {
     duration,
     hasChildren: isParent,
     operationName,
-    process: { serviceName },
+    process,
   } = span;
+  const serviceDisplayName = getServiceDisplayName(process);
   const label = formatDuration(duration);
 
   const viewBounds = getViewedBounds(span.startTime, span.startTime + span.duration);
@@ -399,7 +401,7 @@ const UnthemedSpanBarRow = React.memo<SpanBarRowProps>((props) => {
   const viewEnd = viewBounds.end;
   const styles = getStyles(theme, showSpanFilterMatchesOnly, color);
 
-  const labelDetail = `${serviceName}::${operationName}`;
+  const labelDetail = `${serviceDisplayName}::${operationName}`;
   let longLabel;
   let hintClassName;
   if (viewStart > 1 - viewEnd) {
@@ -508,7 +510,7 @@ const UnthemedSpanBarRow = React.memo<SpanBarRowProps>((props) => {
                   [styles.svcNameChildrenCollapsed]: isParent && !isChildrenExpanded,
                 })}
               >
-                {`${serviceName} `}
+                {`${serviceDisplayName} `}
               </span>
             )}
             {rpc && (
