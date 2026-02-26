@@ -105,7 +105,7 @@ func RegisterAPIService(
 
 	builder := &IdentityAccessManagementAPIBuilder{
 		store:                             store,
-		userLegacyStore:                   user.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
+		userLegacyStore:                   user.NewLegacyStore(store, accessClient, tracing),
 		saLegacyStore:                     serviceaccount.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
 		legacyTeamStore:                   team.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
 		teamBindingLegacyStore:            teambinding.NewLegacyBindingStore(store, enableAuthnMutation, tracing),
