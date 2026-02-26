@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	kvpkg "github.com/grafana/grafana/pkg/storage/unified/resource/kv"
@@ -27,9 +26,7 @@ type PendingDeleteRecord struct {
 // an in-memory cache of which tenants have records so that the common-path
 // "tenant is not pending delete" check is a map lookup with no I/O.
 type PendingDeleteStore struct {
-	kv KV
-
-	cacheMu     sync.RWMutex
+	kv          KV
 	cachedSet   map[string]struct{}
 	cacheExpiry time.Time
 }
@@ -41,10 +38,7 @@ func newPendingDeleteStore(kv KV) *PendingDeleteStore {
 // RefreshCache reloads the set of pending-delete tenant names from the KV
 // store if the cache has expired.
 func (s *PendingDeleteStore) RefreshCache(ctx context.Context) {
-	s.cacheMu.RLock()
-	fresh := time.Now().Before(s.cacheExpiry)
-	s.cacheMu.RUnlock()
-	if fresh {
+	if time.Now().Before(s.cacheExpiry) {
 		return
 	}
 
@@ -56,17 +50,13 @@ func (s *PendingDeleteStore) RefreshCache(ctx context.Context) {
 		set[key] = struct{}{}
 	}
 
-	s.cacheMu.Lock()
 	s.cachedSet = set
 	s.cacheExpiry = time.Now().Add(pendingDeleteCacheTTL)
-	s.cacheMu.Unlock()
 }
 
 // Has returns whether a tenant has a pending-delete record according to the
 // in-memory cache.
 func (s *PendingDeleteStore) Has(name string) bool {
-	s.cacheMu.RLock()
-	defer s.cacheMu.RUnlock()
 	_, ok := s.cachedSet[name]
 	return ok
 }
@@ -106,12 +96,10 @@ func (s *PendingDeleteStore) Upsert(ctx context.Context, name string, record Pen
 		return fmt.Errorf("closing writer: %w", err)
 	}
 
-	s.cacheMu.Lock()
 	if s.cachedSet == nil {
 		s.cachedSet = make(map[string]struct{})
 	}
 	s.cachedSet[name] = struct{}{}
-	s.cacheMu.Unlock()
 
 	return nil
 }
@@ -123,9 +111,7 @@ func (s *PendingDeleteStore) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
-	s.cacheMu.Lock()
 	delete(s.cachedSet, name)
-	s.cacheMu.Unlock()
 
 	return nil
 }

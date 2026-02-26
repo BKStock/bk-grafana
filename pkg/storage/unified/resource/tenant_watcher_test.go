@@ -71,7 +71,7 @@ func TestTenantAddPendingDeleted(t *testing.T) {
 		assert.Equal(t, "2026-03-01T00:00:00Z", record.DeleteAfter)
 	})
 
-	t.Run("does not overwrite existing record", func(t *testing.T) {
+	t.Run("does not overwrite existing record because it will exist in cache", func(t *testing.T) {
 		tw := newTestTenantWatcher(t)
 		tenant := pendingDeleteTenant("tenant-1", "2026-03-01T00:00:00Z")
 		tw.handleTenant(tenant)
@@ -82,7 +82,7 @@ func TestTenantAddPendingDeleted(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Handle the same tenant again — should be a no-op.
+		// Handle the same tenant again — should be a no-op because the record is in the cache
 		tw.handleTenant(tenant)
 
 		record, err := tw.pendingDeleteStore.Get(t.Context(), "tenant-1")
