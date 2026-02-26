@@ -4,7 +4,6 @@ import {
   MultiValueVariable,
   SceneVariables,
   sceneUtils,
-  SceneVariable,
 } from '@grafana/scenes';
 import {
   VariableModel,
