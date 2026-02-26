@@ -2428,7 +2428,6 @@
       "new-child": "New child policy",
       "new-policy": "Add new policy",
       "no-matchers": "No matchers",
-      "no-matching-policies": "No policies matching filters.",
       "reload-policies": "Reload policies",
       "reset-modal": {
         "permanently-reset": "This action will permanently reset the <1>{{routeName}}</1> notification policy to an empty state.",
