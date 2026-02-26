@@ -6,8 +6,8 @@ import { DashboardHit } from '@grafana/api-clients/rtkq/dashboard/v0alpha1';
 import { t } from '@grafana/i18n';
 import { Alert, Column, InteractiveTable, Text, TextLink } from '@grafana/ui';
 import { useSearchDashboardsAndFoldersQuery } from 'app/api/clients/dashboard/v0alpha1';
-import { useGetFolderQueryFacade } from 'app/api/clients/folder/v1beta1/hooks';
-import { GENERAL_FOLDER_TITLE, GENERAL_FOLDER_UID } from 'app/features/search/constants';
+import { FolderInfo, useGetFolderParentsQuery } from 'app/api/clients/folder/v1beta1';
+import { GENERAL_FOLDER_TITLE } from 'app/features/search/constants';
 
 import { extractErrorMessage } from '../../api/utils';
 
@@ -24,14 +24,14 @@ const getColumns = memoizeOne((): Array<Column<DashboardHit>> => {
           href={`/dashboards/f/${original.name}`}
           title={t('teams.team-pages.team-folders.open-folder', 'Open folder')}
         >
-          /{original.title}
+          {original.title}
         </TextLink>
       ),
     },
     {
       id: 'folder',
-      header: t('teams.team-pages.team-folders.table.parent-folder', 'Parent folder'),
-      cell: ({ row: { original } }) => <ParentFolderCell parentUid={original.folder} />,
+      header: t('teams.team-pages.team-folders.table.path', 'Full path'),
+      cell: ({ row: { original } }) => <FolderPathCell folderUid={original.name} folderTitle={original.title} />,
     },
   ];
 });
@@ -81,16 +81,11 @@ export function TeamFolders({ teamUid }: { teamUid: string }) {
   );
 }
 
-function ParentFolderCell({ parentUid }: { parentUid?: string }) {
-  // Not having a parent folder on a resource is the same as being in root or general folder but in case somebody just
-  // passes general folder UID explicitly let's normalize that a bit
-  const normalizedParentUid = parentUid === GENERAL_FOLDER_UID ? undefined : parentUid;
-
-  // If parentUid is undefined, this just skips
-  const { data: parentFolder, isLoading, isError } = useGetFolderQueryFacade(normalizedParentUid);
+function FolderPathCell({ folderUid, folderTitle }: { folderUid: string; folderTitle?: string }) {
+  const { data, isLoading, isError } = useGetFolderParentsQuery(folderUid ? { name: folderUid } : skipToken);
 
   if (isLoading) {
-    return <Skeleton width={100} />;
+    return <Skeleton width={220} />;
   }
 
   if (isError) {
@@ -98,14 +93,17 @@ function ParentFolderCell({ parentUid }: { parentUid?: string }) {
     return <>-</>;
   }
 
-  return (
-    <TextLink
-      color="primary"
-      inline={false}
-      href={`/dashboards/f/${parentUid ?? GENERAL_FOLDER_UID}`}
-      title={t('teams.team-pages.team-folders.open-parent-folder', 'Open parent folder')}
-    >
-      /{parentFolder?.title ?? GENERAL_FOLDER_TITLE}
-    </TextLink>
-  );
+  const path = buildFolderPath(data?.items ?? []);
+  return <>{path}</>;
+}
+
+function buildFolderPath(items: FolderInfo[]): string {
+  const parentTitles = items.map((item) => item.title).filter(Boolean);
+
+  const pathParts = [...parentTitles];
+  if (pathParts[0] !== GENERAL_FOLDER_TITLE) {
+    pathParts.unshift(GENERAL_FOLDER_TITLE);
+  }
+
+  return `/${pathParts.join('/')}`;
 }

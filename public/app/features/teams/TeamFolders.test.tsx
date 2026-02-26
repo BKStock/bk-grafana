@@ -24,14 +24,25 @@ describe('TeamFolders', () => {
               ? [{ name: 'team-folder-1', title: 'Team Folder', resource: 'folder', folder: 'general' }]
               : [],
         });
+      }),
+      http.get('/apis/folder.grafana.app/v1beta1/namespaces/:namespace/folders/:name/parents', ({ params }) => {
+        if (params.name !== 'team-folder-1') {
+          return HttpResponse.json({ items: [] });
+        }
+
+        return HttpResponse.json({
+          items: [
+            { name: 'general', title: 'Dashboards' },
+            { name: 'team-folder-1', title: 'Team Folder' },
+          ],
+        });
       })
     );
 
     render(<TeamFolders teamUid={MOCK_TEAMS[0].metadata.name} />);
 
-    const folderLinkLabel = await screen.findByText('/Team Folder');
+    const folderLinkLabel = await screen.findByText('Team Folder');
     expect(folderLinkLabel.closest('a')).toHaveAttribute('href', '/dashboards/f/team-folder-1');
-    const parentFolderLink = screen.getByText('/Dashboards');
-    expect(parentFolderLink.closest('a')).toHaveAttribute('href', '/dashboards/f/general');
+    expect(await screen.findByText('/Dashboards/Team Folder')).toBeInTheDocument();
   });
 });
