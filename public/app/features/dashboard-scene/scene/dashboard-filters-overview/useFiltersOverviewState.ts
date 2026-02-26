@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { fuzzySearch, SelectableValue } from '@grafana/data';
 import { t } from '@grafana/i18n';
@@ -150,6 +150,9 @@ export function useFiltersOverviewState({
   const [loading, setLoading] = useState(true);
   const [valueOptionsByKey, setValueOptionsByKey] = useState<Record<string, Array<ComboboxOption<string>>>>({});
 
+  const latestRef = useRef({ adhocFilters, groupByVariable, state, valueOptionsByKey });
+  latestRef.current = { adhocFilters, groupByVariable, state, valueOptionsByKey };
+
   const operatorConfig = useMemo(
     () => ({
       options: OPERATORS.map((op) => ({ label: op.value, value: op.value, description: op.description })),
@@ -238,50 +241,51 @@ export function useFiltersOverviewState({
     return buildListItems(ungroupedKeys, groupNames, groupedKeys, state.openGroups);
   }, [filteredKeys, state.openGroups]);
 
-  const actions: FiltersOverviewActions = {
-    toggleGroup: (group, isOpen) => {
-      setState((prev) => ({ ...prev, openGroups: { ...prev.openGroups, [group]: isOpen } }));
-    },
+  const toggleGroup = useCallback((group: string, isOpen: boolean) => {
+    setState((prev) => ({ ...prev, openGroups: { ...prev.openGroups, [group]: isOpen } }));
+  }, []);
 
-    setOperator: (key, operator) => {
-      setState((prev) => ({ ...prev, operatorsByKey: { ...prev.operatorsByKey, [key]: operator } }));
-    },
+  const setOperator = useCallback((key: string, operator: string) => {
+    setState((prev) => ({ ...prev, operatorsByKey: { ...prev.operatorsByKey, [key]: operator } }));
+  }, []);
 
-    setSingleValue: (key, value) => {
-      setState((prev) => ({ ...prev, singleValuesByKey: { ...prev.singleValuesByKey, [key]: value } }));
-    },
+  const setSingleValue = useCallback((key: string, value: string) => {
+    setState((prev) => ({ ...prev, singleValuesByKey: { ...prev.singleValuesByKey, [key]: value } }));
+  }, []);
 
-    setMultiValues: (key, values) => {
-      setState((prev) => ({ ...prev, multiValuesByKey: { ...prev.multiValuesByKey, [key]: values } }));
-    },
+  const setMultiValues = useCallback((key: string, values: string[]) => {
+    setState((prev) => ({ ...prev, multiValuesByKey: { ...prev.multiValuesByKey, [key]: values } }));
+  }, []);
 
-    toggleGroupBy: (key, nextValue) => {
-      setState((prev) => ({ ...prev, isGrouped: { ...prev.isGrouped, [key]: nextValue } }));
-    },
+  const toggleGroupBy = useCallback((key: string, nextValue: boolean) => {
+    setState((prev) => ({ ...prev, isGrouped: { ...prev.isGrouped, [key]: nextValue } }));
+  }, []);
 
-    restoreDefault: (key) => {
-      setState((prev) => {
-        const defaultValue = prev.defaultValuesByKey[key];
-        if (defaultValue === undefined) {
-          return prev;
-        }
-        return {
-          ...prev,
-          singleValuesByKey: { ...prev.singleValuesByKey, [key]: defaultValue },
-          multiValuesByKey: { ...prev.multiValuesByKey, [key]: [] },
-        };
-      });
-    },
+  const restoreDefault = useCallback((key: string) => {
+    setState((prev) => {
+      const defaultValue = prev.defaultValuesByKey[key];
+      if (defaultValue === undefined) {
+        return prev;
+      }
+      return {
+        ...prev,
+        singleValuesByKey: { ...prev.singleValuesByKey, [key]: defaultValue },
+        multiValuesByKey: { ...prev.multiValuesByKey, [key]: [] },
+      };
+    });
+  }, []);
 
-    getValueOptionsForKey: async (key, operator, inputValue) => {
-      if (!adhocFilters) {
+  const getValueOptionsForKey = useCallback(
+    async (key: string, operator: string, inputValue: string): Promise<Array<ComboboxOption<string>>> => {
+      const { adhocFilters: adhoc, valueOptionsByKey: cache } = latestRef.current;
+      if (!adhoc) {
         return [];
       }
 
-      let options = valueOptionsByKey[key];
+      let options = cache[key];
       if (!options) {
         const filter: AdHocFilterWithLabels = { key, operator, value: '' };
-        const values = await adhocFilters._getValuesFor(filter);
+        const values = await adhoc._getValuesFor(filter);
         options = values.map((v) => ({
           label: v.label ?? v.value ?? '',
           value: v.value ?? '',
@@ -296,7 +300,7 @@ export function useFiltersOverviewState({
       const lowered = inputValue.toLowerCase();
       const filtered = options.filter((o) => (o.label ?? o.value).toLowerCase().includes(lowered));
 
-      const allowCustom = adhocFilters.state.allowCustomValue ?? true;
+      const allowCustom = adhoc.state.allowCustomValue ?? true;
       if (allowCustom) {
         const exactMatch = filtered.some((o) => o.value === inputValue);
         if (!exactMatch) {
@@ -310,39 +314,56 @@ export function useFiltersOverviewState({
 
       return filtered;
     },
+    []
+  );
 
-    applyChanges: () => {
-      if (groupByVariable) {
-        const { nextValues, nextText } = buildGroupByUpdate(state.keys, state.isGrouped);
-        groupByVariable.changeValueTo(nextValues, nextText, true);
+  const applyChanges = useCallback(() => {
+    const { state: currentState, groupByVariable: gbVar, adhocFilters: adhoc } = latestRef.current;
 
-        if (groupByVariable.state.defaultValue) {
-          const isRestorable = groupByVariable.checkIfRestorable(nextValues);
-          if (isRestorable !== groupByVariable.state.restorable) {
-            groupByVariable.setState({ restorable: isRestorable });
-          }
+    if (gbVar) {
+      const { nextValues, nextText } = buildGroupByUpdate(currentState.keys, currentState.isGrouped);
+      gbVar.changeValueTo(nextValues, nextText, true);
+
+      if (gbVar.state.defaultValue) {
+        const isRestorable = gbVar.checkIfRestorable(nextValues);
+        if (isRestorable !== gbVar.state.restorable) {
+          gbVar.setState({ restorable: isRestorable });
         }
       }
+    }
 
-      if (adhocFilters) {
-        const { nextFilters, nextOriginFilters, nonApplicableOriginFilters, nonApplicableFilters } =
-          buildAdHocApplyFilters({
-            keys: state.keys,
-            isOriginByKey: state.isOriginByKey,
-            operatorsByKey: state.operatorsByKey,
-            singleValuesByKey: state.singleValuesByKey,
-            multiValuesByKey: state.multiValuesByKey,
-            existingOriginFilters: adhocFilters.state.originFilters ?? [],
-            existingFilters: adhocFilters.state.filters ?? [],
-          });
-
-        adhocFilters.setState({
-          filters: [...nextFilters, ...nonApplicableFilters],
-          originFilters: adhocFilters.validateOriginFilters([...nextOriginFilters, ...nonApplicableOriginFilters]),
+    if (adhoc) {
+      const { nextFilters, nextOriginFilters, nonApplicableOriginFilters, nonApplicableFilters } =
+        buildAdHocApplyFilters({
+          keys: currentState.keys,
+          isOriginByKey: currentState.isOriginByKey,
+          operatorsByKey: currentState.operatorsByKey,
+          singleValuesByKey: currentState.singleValuesByKey,
+          multiValuesByKey: currentState.multiValuesByKey,
+          existingOriginFilters: adhoc.state.originFilters ?? [],
+          existingFilters: adhoc.state.filters ?? [],
         });
-      }
-    },
-  };
+
+      adhoc.setState({
+        filters: [...nextFilters, ...nonApplicableFilters],
+        originFilters: adhoc.validateOriginFilters([...nextOriginFilters, ...nonApplicableOriginFilters]),
+      });
+    }
+  }, []);
+
+  const actions: FiltersOverviewActions = useMemo(
+    () => ({
+      toggleGroup,
+      setOperator,
+      setSingleValue,
+      setMultiValues,
+      toggleGroupBy,
+      restoreDefault,
+      getValueOptionsForKey,
+      applyChanges,
+    }),
+    [toggleGroup, setOperator, setSingleValue, setMultiValues, toggleGroupBy, restoreDefault, getValueOptionsForKey, applyChanges]
+  );
 
   return {
     state,

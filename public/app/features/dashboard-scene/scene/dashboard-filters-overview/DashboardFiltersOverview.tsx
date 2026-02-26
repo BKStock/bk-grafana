@@ -16,6 +16,7 @@ const GROUP_HEADER_HEIGHT = 32;
 const FILTER_ROW_HEIGHT = 32;
 const ROW_GAP = 8;
 const SKELETON_ROW_COUNT = 5;
+const EMPTY_MULTI_VALUES: string[] = [];
 
 interface DashboardFiltersOverviewProps {
   adhocFilters?: AdHocFiltersVariable;
@@ -121,7 +122,7 @@ export const DashboardFiltersOverview = ({
                   operatorValue={operatorValue}
                   isMultiOperator={MULTI_OPERATOR_VALUES.has(operatorValue)}
                   singleValue={state.singleValuesByKey[keyValue] ?? ''}
-                  multiValues={state.multiValuesByKey[keyValue] ?? []}
+                  multiValues={state.multiValuesByKey[keyValue] ?? EMPTY_MULTI_VALUES}
                   isGroupBy={state.isGrouped[keyValue] ?? false}
                   isOrigin={state.isOriginByKey[keyValue] ?? false}
                   isRestorable={
@@ -188,6 +189,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
+    overflow: 'hidden',
   }),
   skeletonContainer: css({
     display: 'flex',
@@ -206,6 +208,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     overflowY: 'auto',
   }),
   footer: css({
+    flexShrink: 0,
     marginTop: theme.spacing(2),
     paddingTop: theme.spacing(1.5),
     borderTop: `1px solid ${theme.colors.border.weak}`,
