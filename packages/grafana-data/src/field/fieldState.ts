@@ -150,9 +150,10 @@ export function calculateFieldDisplayName(field: Field, frame?: DataFrame, allFr
   let frameNamesDiffer = false;
 
   if (allFrames && allFrames.length > 1) {
+    let name = allFrames[0].name;
+
     for (let i = 1; i < allFrames.length; i++) {
-      const frame = allFrames[i];
-      if (frame.name !== allFrames[i - 1].name) {
+      if (allFrames[i].name !== name) {
         frameNamesDiffer = true;
         break;
       }

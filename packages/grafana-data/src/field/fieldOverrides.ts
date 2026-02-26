@@ -434,7 +434,8 @@ function processFieldConfigValue(
   context: FieldOverrideEnv
 ) {
   const currentConfig = get(destination, fieldConfigProperty.path);
-  if (currentConfig === null || currentConfig === undefined) {
+
+  if (currentConfig == null) {
     const item = context.fieldConfigRegistry.getIfExists(fieldConfigProperty.id);
     if (!item) {
       return;
@@ -442,7 +443,7 @@ function processFieldConfigValue(
 
     if (item && item.shouldApply(context.field!)) {
       const val = item.process(get(source, item.path), context, item.settings);
-      if (val !== undefined && val !== null) {
+      if (val != null) {
         set(destination, item.path, val);
       }
     }
