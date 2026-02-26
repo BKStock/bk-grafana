@@ -1,10 +1,8 @@
-import { css } from '@emotion/css';
 import { useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { GrafanaTheme2, NavModel, NavModelItem, PageLayoutType } from '@grafana/data';
+import { NavModel, NavModelItem, PageLayoutType } from '@grafana/data';
 import { SceneComponentProps, SceneObjectBase, SceneVariable, SceneVariables, sceneGraph } from '@grafana/scenes';
-import { useStyles2 } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 
 import { DashboardScene } from '../scene/DashboardScene';
@@ -14,8 +12,8 @@ import { getDashboardSceneFor } from '../utils/utils';
 import { createUsagesNetwork, transformUsagesToNetwork } from '../variables/utils';
 
 import { EditListViewSceneUrlSync } from './EditListViewSceneUrlSync';
-import { ProvisionedControlsSection, SourceIcon } from './ProvisionedControlsSection';
 import { DashboardEditView, DashboardEditViewState, useDashboardEditPageNav } from './utils';
+import { ProvisionedVariablesSection } from './variables/ProvisionedVariablesSection';
 import { VariableEditorForm } from './variables/VariableEditorForm';
 import { VariableEditorList } from './variables/VariableEditorList';
 import { VariablesUnknownTable } from './variables/VariablesUnknownTable';
@@ -23,7 +21,6 @@ import {
   EditableVariableType,
   RESERVED_GLOBAL_VARIABLE_NAME_REGEX,
   WORD_CHARACTERS_REGEX,
-  getDefinition,
   getVariableDefault,
   getVariableScene,
 } from './variables/utils';
@@ -260,7 +257,6 @@ function VariableEditorSettingsListView({ model }: SceneComponentProps<Variables
         variables={variables}
         usages={usages}
         usagesNetwork={usagesNetwork}
-        hasProvisionedVariables={defaultVariables.length > 0}
         onDelete={onDelete}
         onDuplicate={onDuplicated}
         onChangeOrder={onOrderChanged}
@@ -312,52 +308,3 @@ function VariableEditorSettingsView({
     </Page>
   );
 }
-
-const VARIABLE_COLUMNS = [
-  { i18nKey: 'dashboard-scene.variable-editor-list.variable', defaultText: 'Variable' },
-  { i18nKey: 'dashboard-scene.variable-editor-list.definition', defaultText: 'Definition' },
-];
-
-function ProvisionedVariablesSection({ variables }: { variables: SceneVariable[] }) {
-  const styles = useStyles2(getProvisionedVariableStyles);
-
-  return (
-    <ProvisionedControlsSection columns={VARIABLE_COLUMNS}>
-      {variables.map((variable, index) => {
-        const variableState = variable.state;
-
-        return (
-          <tr key={`${variableState.name}-${index}`}>
-            <td role="gridcell" className={styles.nameCell}>
-              {variableState.name}
-            </td>
-            <td role="gridcell" className={styles.definitionColumn}>
-              {getDefinition(variable)}
-            </td>
-            <td role="gridcell" className={styles.sourceCell}>
-              <SourceIcon origin={variableState.origin} />
-            </td>
-          </tr>
-        );
-      })}
-    </ProvisionedControlsSection>
-  );
-}
-
-const getProvisionedVariableStyles = (theme: GrafanaTheme2) => ({
-  nameCell: css({
-    fontWeight: theme.typography.fontWeightMedium,
-    width: '20%',
-  }),
-  definitionColumn: css({
-    width: '70%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: 0,
-  }),
-  sourceCell: css({
-    width: '1%',
-    textAlign: 'center' as const,
-  }),
-});

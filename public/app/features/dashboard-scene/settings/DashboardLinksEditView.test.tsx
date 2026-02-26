@@ -314,31 +314,6 @@ describe('DashboardLinksEditView', () => {
       expect(getByText('Provisioned by data source')).toBeInTheDocument();
       expect(getByText('user-link')).toBeInTheDocument();
     });
-
-    it('should not show User defined links heading when no provisioned links exist', () => {
-      dashboard.setState({
-        links: [
-          { ...NEW_LINK, title: 'link-1' },
-          { ...NEW_LINK, title: 'link-2' },
-        ],
-      });
-      const { queryByText } = render(<settings.Component model={settings} />);
-
-      expect(queryByText('User defined links')).not.toBeInTheDocument();
-    });
-
-    it('should show User defined links heading and Provisioned by data source section when both present', () => {
-      dashboard.setState({
-        links: [
-          { ...NEW_LINK, title: 'ds-link', origin: { type: 'datasource', group: 'test' } },
-          { ...NEW_LINK, title: 'user-link' },
-        ],
-      });
-      const { getByText } = render(<settings.Component model={settings} />);
-
-      expect(getByText('User defined links')).toBeInTheDocument();
-      expect(getByText('Provisioned by data source')).toBeInTheDocument();
-    });
   });
 });
 

@@ -21,7 +21,6 @@ export interface Props {
   variables: Array<SceneVariable<SceneVariableState>>;
   usages: VariableUsageTree[];
   usagesNetwork: UsagesToNetwork[];
-  hasProvisionedVariables?: boolean;
   onAdd: () => void;
   onChangeOrder: (fromIndex: number, toIndex: number) => void;
   onDuplicate: (identifier: string) => void;
@@ -33,7 +32,6 @@ export function VariableEditorList({
   variables,
   usages,
   usagesNetwork,
-  hasProvisionedVariables,
   onChangeOrder,
   onDelete,
   onDuplicate,
@@ -62,11 +60,6 @@ export function VariableEditorList({
     <EmptyVariablesList onAdd={onVariableAdd} />
   ) : (
     <Stack direction="column" gap={3}>
-      {hasProvisionedVariables && (
-        <h5 className={styles.sectionHeading}>
-          <Trans i18nKey="dashboard-scene.variable-editor-list.user-defined-heading">User defined variables</Trans>
-        </h5>
-      )}
       <table
         className={classNames('filter-table', 'filter-table--hover', styles.tableContainer)}
         data-testid={selectors.pages.Dashboard.Settings.Variables.List.table}
@@ -166,8 +159,5 @@ function EmptyVariablesList({ onAdd }: { onAdd: () => void }) {
 const getStyles = (theme: GrafanaTheme2) => ({
   tableContainer: css({
     overflow: 'auto',
-  }),
-  sectionHeading: css({
-    marginBottom: theme.spacing(2),
   }),
 });

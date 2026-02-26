@@ -7,7 +7,6 @@ import { Button, DeleteButton, EmptyState, Icon, IconButton, Stack, TagList, Tex
 
 interface DashboardLinkListProps {
   links: DashboardLink[];
-  hasProvisionedLinks?: boolean;
   onNew: () => void;
   onEdit: (idx: number) => void;
   onDuplicate: (link: DashboardLink) => void;
@@ -17,7 +16,6 @@ interface DashboardLinkListProps {
 
 export function DashboardLinkList({
   links,
-  hasProvisionedLinks,
   onNew,
   onOrderChange,
   onEdit,
@@ -63,11 +61,6 @@ export function DashboardLinkList({
 
   return (
     <>
-      {hasProvisionedLinks && (
-        <h5 className={styles.sectionHeading}>
-          <Trans i18nKey="dashboard-scene.dashboard-link-list.user-defined-heading">User defined links</Trans>
-        </h5>
-      )}
       <table role="grid" className="filter-table filter-table--hover">
         <thead>
           <tr>
@@ -141,9 +134,6 @@ export function DashboardLinkList({
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
-  sectionHeading: css({
-    marginBottom: theme.spacing(2),
-  }),
   titleWrapper: css({
     width: '20vw',
     textOverflow: 'ellipsis',

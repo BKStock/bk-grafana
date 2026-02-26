@@ -1,21 +1,18 @@
-import { css } from '@emotion/css';
-
-import { GrafanaTheme2, NavModel, NavModelItem, PageLayoutType, arrayUtils } from '@grafana/data';
+import { NavModel, NavModelItem, PageLayoutType, arrayUtils } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { SceneComponentProps, SceneObjectBase } from '@grafana/scenes';
 import { DashboardLink } from '@grafana/schema';
-import { Icon, Stack, TagList, useStyles2 } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 
 import { DashboardScene } from '../scene/DashboardScene';
 import { NavToolbarActions } from '../scene/NavToolbarActions';
 import { DashboardLinkForm } from '../settings/links/DashboardLinkForm';
 import { DashboardLinkList } from '../settings/links/DashboardLinkList';
+import { ProvisionedLinksSection } from '../settings/links/ProvisionedLinksSection';
 import { NEW_LINK, isLinkEditable } from '../settings/links/utils';
 import { getDashboardSceneFor } from '../utils/utils';
 
 import { EditListViewSceneUrlSync } from './EditListViewSceneUrlSync';
-import { ProvisionedControlsSection, SourceIcon } from './ProvisionedControlsSection';
 import { DashboardEditView, DashboardEditListViewState, useDashboardEditPageNav } from './utils';
 
 export interface DashboardLinksEditViewState extends DashboardEditListViewState {}
@@ -130,7 +127,6 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
       <NavToolbarActions dashboard={dashboard} />
       <DashboardLinkList
         links={editableLinks}
-        hasProvisionedLinks={defaultLinks.length > 0}
         onNew={model.onNewLink}
         onEdit={model.onEdit}
         onDelete={model.onDelete}
@@ -141,54 +137,6 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
     </Page>
   );
 }
-
-const LINK_COLUMNS = [
-  { i18nKey: 'dashboard-scene.dashboard-link-list.type', defaultText: 'Type' },
-  { i18nKey: 'dashboard-scene.dashboard-link-list.info', defaultText: 'Info' },
-];
-
-function ProvisionedLinksSection({ links }: { links: DashboardLink[] }) {
-  const styles = useStyles2(getProvisionedLinkStyles);
-
-  return (
-    <ProvisionedControlsSection columns={LINK_COLUMNS}>
-      {links.map((link, index) => (
-        <tr key={`${link.title}-${index}`}>
-          <td role="gridcell">
-            <Icon name="external-link-alt" /> &nbsp; {link.type}
-          </td>
-          <td role="gridcell">
-            <Stack>
-              {link.title && <span className={styles.titleWrapper}>{link.title}</span>}
-              {link.type === 'link' && <span className={styles.urlWrapper}>{link.url}</span>}
-              {link.type === 'dashboards' && <TagList tags={link.tags ?? []} />}
-            </Stack>
-          </td>
-          <td role="gridcell" className={styles.sourceCell}>
-            <SourceIcon origin={link.origin} />
-          </td>
-        </tr>
-      ))}
-    </ProvisionedControlsSection>
-  );
-}
-
-const getProvisionedLinkStyles = (theme: GrafanaTheme2) => ({
-  titleWrapper: css({
-    width: '20vw',
-    textOverflow: 'ellipsis',
-    overflow: 'hidden',
-  }),
-  urlWrapper: css({
-    width: '40vw',
-    textOverflow: 'ellipsis',
-    overflow: 'hidden',
-  }),
-  sourceCell: css({
-    width: '1%',
-    textAlign: 'center' as const,
-  }),
-});
 
 interface EditLinkViewProps {
   link?: DashboardLink;

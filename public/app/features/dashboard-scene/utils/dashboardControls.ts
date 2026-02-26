@@ -4,7 +4,7 @@ import { DataSourceApi } from '@grafana/data';
 import { getDataSourceSrv, reportInteraction } from '@grafana/runtime';
 import { SceneVariable } from '@grafana/scenes';
 import { DashboardLink, DataSourceRef } from '@grafana/schema';
-import { ControlSourceRef, VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
+import { VariableKind } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { reportPerformance } from 'app/core/services/echo/EchoSrv';
 
 export function loadDefaultControlsFromDatasources(refs: DataSourceRef[]) {
@@ -137,13 +137,3 @@ const sortByProp = <T>(items: T[], propGetter: (item: T) => Object | undefined) 
 
 export const sortDefaultVarsFirst = (items: SceneVariable[]) => sortByProp(items, (item) => item.state.origin);
 export const sortDefaultLinksFirst = (items: DashboardLink[]) => sortByProp(items, (item) => item.origin);
-
-export function getPluginNameForControlSource(origin: ControlSourceRef | undefined): string | undefined {
-  if (!origin?.group) {
-    return undefined;
-  }
-
-  const list = getDataSourceSrv().getList({});
-  const ds = list.find((d) => d.meta.id === origin.group);
-  return ds?.meta.name ?? origin.group;
-}

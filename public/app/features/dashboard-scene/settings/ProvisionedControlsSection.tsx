@@ -4,10 +4,9 @@ import { ReactNode, useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
+import { getDataSourceSrv } from '@grafana/runtime';
 import { ControlSourceRef } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { CollapsableSection, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
-
-import { getPluginNameForControlSource } from '../utils/dashboardControls';
 
 type Column = {
   i18nKey: string;
@@ -75,6 +74,16 @@ function getSourceTooltip(pluginName: string | undefined): string {
     });
   }
   return t('dashboard-scene.provisioned-controls-section.tooltip-unknown', 'Added by a data source plugin');
+}
+
+function getPluginNameForControlSource(origin: ControlSourceRef | undefined): string | undefined {
+  if (!origin?.group) {
+    return undefined;
+  }
+
+  const list = getDataSourceSrv().getList({});
+  const ds = list.find((d) => d.meta.id === origin.group);
+  return ds?.meta.name ?? origin.group;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
