@@ -1,13 +1,14 @@
 import { css } from '@emotion/css';
-import * as React from 'react';
 
-import { GrafanaTheme2, dateTimeFormat, systemDateFormats, textUtil, LinkModel, ActionModel } from '@grafana/data';
-import { t } from '@grafana/i18n';
-import { Stack, IconButton, Tag, usePanelContext, useStyles2 } from '@grafana/ui';
+import { ActionModel, GrafanaTheme2, LinkModel } from '@grafana/data';
+import { useStyles2 } from '@grafana/ui';
 import { VizTooltipFooter } from '@grafana/ui/internal';
-import alertDef from 'app/features/alerting/state/alertDef';
 
-interface Props {
+import { AnnotationTooltipBody } from './AnnotationTooltipBody';
+import { AnnotationTooltipHeader } from './AnnotationTooltipHeader';
+import { useAnnotationTooltip } from './useAnnotationTooltip';
+
+export interface AnnotationTooltipProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   annoVals: Record<string, any[]>;
   annoIdx: number;
@@ -19,8 +20,6 @@ interface Props {
   actions?: ActionModel[];
 }
 
-const retFalse = () => false;
-
 export const AnnotationTooltip2 = ({
   annoVals,
   annoIdx,
@@ -30,125 +29,37 @@ export const AnnotationTooltip2 = ({
   onEdit,
   links = [],
   actions = [],
-}: Props) => {
-  console.log('AnnotationTooltip2', annoVals);
-  const annoId = annoVals.id?.[annoIdx];
-
+}: AnnotationTooltipProps) => {
   const styles = useStyles2(getStyles);
-  const focusRef = React.useRef<HTMLButtonElement | null>(null);
-  const { canEditAnnotations = retFalse, canDeleteAnnotations = retFalse, onAnnotationDelete } = usePanelContext();
-  const dashboardUID = annoVals.dashboardUID?.[annoIdx];
-
-  // grafana can be configured to load alert rules from loki. Those annotations cannot be edited or deleted. The id being 0 is the best indicator the annotation came from loki
-  const canEdit = annoId !== 0 && canEditAnnotations(dashboardUID);
-  const canDelete = annoId !== 0 && canDeleteAnnotations(dashboardUID) && onAnnotationDelete != null;
-
-  React.useEffect(() => {
-    if (isPinned) {
-      focusRef.current?.focus();
-    }
-  }, [isPinned]);
-
-  const timeFormatter = (value: number) =>
-    dateTimeFormat(value, {
-      format: systemDateFormats.fullDate,
-      timeZone,
-    });
-
-  let time = timeFormatter(annoVals.time[annoIdx]);
-  let text = annoVals.text?.[annoIdx] ?? '';
-
-  if (annoVals.isRegion?.[annoIdx]) {
-    time += ' - ' + timeFormatter(annoVals.timeEnd[annoIdx]);
-  }
-
-  let avatar;
-  if (annoVals.login?.[annoIdx] && annoVals.avatarUrl?.[annoIdx]) {
-    avatar = <img className={styles.avatar} alt="Annotation avatar" src={annoVals.avatarUrl[annoIdx]} />;
-  }
-
-  let state: React.ReactNode | null = null;
-  let alertText = '';
-
-  if (annoVals.alertId?.[annoIdx] !== undefined && annoVals.newState?.[annoIdx]) {
-    const stateModel = alertDef.getStateDisplayModel(annoVals.newState[annoIdx]);
-    state = (
-      <div className={styles.alertState}>
-        <i className={stateModel.stateClass}>{stateModel.text}</i>
-      </div>
-    );
-
-    alertText = annoVals.data?.[annoIdx] ? alertDef.getAlertAnnotationText(annoVals.data[annoIdx]) : '';
-  } else if (annoVals.title?.[annoIdx]) {
-    text = annoVals.title[annoIdx] + (text ? `<br />${text}` : '');
-  }
+  let { onAnnotationDelete, canEdit, canDelete, time, text, alertText, alertState, avatarImgSrc } =
+    useAnnotationTooltip(annoVals, annoIdx, timeZone);
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.header}>
-        <Stack gap={2} basis="100%" justifyContent="space-between" alignItems="center">
-          <div className={styles.meta}>
-            <span>
-              {avatar}
-              {state}
-            </span>
-            {time}
-          </div>
-          {(canEdit || canDelete || isPinned) && (
-            <div className={styles.controls}>
-              {canEdit && (
-                <IconButton
-                  ref={focusRef}
-                  name={'pen'}
-                  size={'sm'}
-                  onClick={onEdit}
-                  tooltip={t('timeseries.annotation-tooltip2.tooltip-edit', 'Edit')}
-                />
-              )}
-              {canDelete && (
-                <IconButton
-                  ref={canEdit ? null : focusRef}
-                  name={'trash-alt'}
-                  size={'sm'}
-                  onClick={() => onAnnotationDelete(annoId)}
-                  tooltip={t('timeseries.annotation-tooltip2.tooltip-delete', 'Delete')}
-                />
-              )}
-              {isPinned && (
-                <IconButton
-                  ref={canEdit || canDelete ? null : focusRef}
-                  name={'times'}
-                  size={'sm'}
-                  onClick={(e) => {
-                    // Don't trigger onClick
-                    e.stopPropagation();
-                    onClose();
-                  }}
-                  tooltip={t('timeseries.annotation-tooltip2.tooltip-close', 'Close')}
-                />
-              )}
-            </div>
-          )}
-        </Stack>
-      </div>
+      <AnnotationTooltipHeader
+        avatarImg={avatarImgSrc}
+        alertState={alertState}
+        timeRange={time}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        isPinned={isPinned}
+        onEdit={onEdit}
+        onDelete={onAnnotationDelete}
+        onRemove={(e) => {
+          // Don't trigger onClick
+          e.stopPropagation();
+          onClose();
+        }}
+      />
 
-      <div className={styles.body}>
-        {text && <div className={styles.text} dangerouslySetInnerHTML={{ __html: textUtil.sanitize(text) }} />}
-        {alertText}
-        <div>
-          <Stack gap={0.5} wrap={true}>
-            {annoVals.tags?.[annoIdx]?.map((t: string, i: number) => (
-              <Tag name={t} key={`${t}-${i}`} />
-            ))}
-          </Stack>
-        </div>
-      </div>
+      <AnnotationTooltipBody text={text} alertText={alertText} tags={annoVals.tags} annoIdx={annoIdx} />
 
       {(links.length > 0 || actions.length > 0) && <VizTooltipFooter dataLinks={links} actions={actions} />}
     </div>
   );
 };
 
+// @todo clean up
 const getStyles = (theme: GrafanaTheme2) => ({
   wrapper: css({
     zIndex: theme.zIndex.tooltip,
@@ -176,18 +87,6 @@ const getStyles = (theme: GrafanaTheme2) => ({
     display: 'flex',
     '> :last-child': {
       marginLeft: 0,
-    },
-  }),
-  body: css({
-    padding: theme.spacing(1),
-    fontSize: theme.typography.bodySmall.fontSize,
-    color: theme.colors.text.secondary,
-    fontWeight: 400,
-    a: {
-      color: theme.colors.text.link,
-      '&:hover': {
-        textDecoration: 'underline',
-      },
     },
   }),
   text: css({

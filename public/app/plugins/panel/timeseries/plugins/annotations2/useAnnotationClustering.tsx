@@ -61,7 +61,9 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
   return { clusterIdx, clusters };
 };
 export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) => {
+  console.log('useAnnotationClustering');
   const { outAnnos } = useMemo(() => {
+    console.log('useAnnotationClustering memo');
     const clusteredAnnotations: DataFrame[] = [];
 
     // per-frame clustering
@@ -132,6 +134,15 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
                 vals.push('idicies' + idxs.join(', '));
               } else if (field.name === 'clusterIdx') {
                 // Update the cluster index?
+                vals.push(ci);
+              } else if (field.name === 'source') {
+                // Update the source?
+                vals.push(ci);
+              } else if (field.name === 'tags') {
+                // Update the tags?
+                vals.push(ci);
+              } else if (field.name === 'type') {
+                // Update the type?
                 vals.push(ci);
               } else {
                 console.log('unexpected annotation field name', { field });

@@ -56,15 +56,8 @@ export const AnnotationMarker2 = ({
 
   const [state, setState] = useState(exitWipEdit != null ? STATE_EDITING : STATE_DEFAULT);
   const [isHovering, setIsHovering] = useState(false);
-
   const isClustering = annoVals.isRegion[annoIdx] && annoVals.clusterIdx?.[annoIdx];
-  console.log('isCustlueer', {
-    isClustering,
-    annoVals,
-    annoIdx,
-    'annoVals.isRegion[annoIdx]': annoVals.isRegion[annoIdx],
-    'annoVals.clusterIdx?.[annoIdx]': annoVals.clusterIdx?.[annoIdx],
-  });
+
   const { refs, floatingStyles } = useFloating({
     open: true,
     placement,
@@ -90,41 +83,45 @@ export const AnnotationMarker2 = ({
     });
   }
 
-  console.log('contents', isClustering);
-  const contents = isClustering ? (
-    <AnnotationTooltip2Cluster
-      actions={actions}
-      links={links}
-      onClose={onClose}
-      isPinned={isPinned}
-      annoIdx={annoIdx}
-      annoVals={annoVals}
-      timeZone={timeZone}
-    />
-  ) : (isPinned && !(state === STATE_EDITING)) || (showOnHover && isHovering && !(state === STATE_EDITING)) ? (
-    <AnnotationTooltip2
-      annoIdx={annoIdx}
-      annoVals={annoVals}
-      timeZone={timeZone}
-      onClose={onClose}
-      isPinned={isPinned}
-      onEdit={() => setState(STATE_EDITING)}
-      links={links}
-      actions={actions}
-    />
-  ) : state === STATE_EDITING ? (
-    <AnnotationEditor2
-      isPinned={isPinned}
-      annoIdx={annoIdx}
-      annoVals={annoVals}
-      timeZone={timeZone}
-      dismiss={() => {
-        exitWipEdit?.();
-        setState(STATE_DEFAULT);
-        onClose();
-      }}
-    />
-  ) : null;
+  const showTooltip =
+    (isPinned && !(state === STATE_EDITING)) || (showOnHover && isHovering && !(state === STATE_EDITING));
+
+  const contents =
+    showTooltip && isClustering ? (
+      <AnnotationTooltip2Cluster
+        actions={actions}
+        links={links}
+        onClose={onClose}
+        isPinned={isPinned}
+        annoIdx={annoIdx}
+        annoVals={annoVals}
+        timeZone={timeZone}
+        onEdit={() => setState(STATE_EDITING)}
+      />
+    ) : showTooltip ? (
+      <AnnotationTooltip2
+        annoIdx={annoIdx}
+        annoVals={annoVals}
+        timeZone={timeZone}
+        onClose={onClose}
+        isPinned={isPinned}
+        onEdit={() => setState(STATE_EDITING)}
+        links={links}
+        actions={actions}
+      />
+    ) : state === STATE_EDITING ? (
+      <AnnotationEditor2
+        isPinned={isPinned}
+        annoIdx={annoIdx}
+        annoVals={annoVals}
+        timeZone={timeZone}
+        dismiss={() => {
+          exitWipEdit?.();
+          setState(STATE_DEFAULT);
+          onClose();
+        }}
+      />
+    ) : null;
 
   return (
     <button

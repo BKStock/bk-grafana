@@ -1,58 +1,32 @@
 import { css } from '@emotion/css';
 import * as React from 'react';
 
-import {
-  GrafanaTheme2,
-  dateTimeFormat,
-  systemDateFormats,
-  textUtil,
-  LinkModel,
-  ActionModel,
-  Field,
-} from '@grafana/data';
-import { t } from '@grafana/i18n';
-import { Stack, IconButton, Tag, useStyles2, ScrollContainer } from '@grafana/ui';
+import { GrafanaTheme2 } from '@grafana/data';
+import { ScrollContainer, useStyles2 } from '@grafana/ui';
 import { VizTooltipFooter } from '@grafana/ui/internal';
 import alertDef from 'app/features/alerting/state/alertDef';
 
-interface Props {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  annoVals: Record<string, any[]>;
-  annoIdx: number;
-  timeZone: string;
-  isPinned: boolean;
-  onClose: () => void;
-  links?: LinkModel[];
-  actions: Array<ActionModel<Field>>;
-}
+import { AnnotationTooltipProps } from './AnnotationTooltip2';
+import { AnnotationTooltipBody } from './AnnotationTooltipBody';
+import { AnnotationTooltipHeader } from './AnnotationTooltipHeader';
+import { useAnnotationTooltip } from './useAnnotationTooltip';
 
 export const AnnotationTooltip2Cluster = ({
   annoVals,
   annoIdx,
   timeZone,
+  onEdit,
   isPinned,
   onClose,
   links,
   actions,
-}: Props) => {
-  console.log('AnnotationTooltip2Cluster', annoVals);
-  // const annoId = annoVals.id?.[annoIdx];
-
+}: AnnotationTooltipProps) => {
   const styles = useStyles2(getStyles);
-  const focusRef = React.useRef<HTMLButtonElement | null>(null);
-  // const { canEditAnnotations = retFalse, canDeleteAnnotations = retFalse, onAnnotationDelete } = usePanelContext();
-
-  React.useEffect(() => {
-    if (isPinned) {
-      focusRef.current?.focus();
-    }
-  }, [isPinned]);
-
-  const timeFormatter = (value: number) =>
-    dateTimeFormat(value, {
-      format: systemDateFormats.fullDate,
-      timeZone,
-    });
+  let { onAnnotationDelete, canEdit, canDelete, time, alertState, avatarImgSrc } = useAnnotationTooltip(
+    annoVals,
+    annoIdx,
+    timeZone
+  );
 
   let items: React.ReactNode[] = [];
 
@@ -65,66 +39,35 @@ export const AnnotationTooltip2Cluster = ({
 
       if (annoVals.alertId?.[i] !== undefined && annoVals.newState?.[i]) {
         alertText = annoVals.data?.[i] ? alertDef.getAlertAnnotationText(annoVals.data[i]) : '';
+        console.log('alertText vs ', alertText);
+        // @todo text vs title
       } else if (annoVals.title?.[i]) {
         text = annoVals.title[i] + (text ? `<br />${text}` : '');
       }
 
       items.push(
-        <div className={styles.body}>
-          {text && <div className={styles.text} dangerouslySetInnerHTML={{ __html: textUtil.sanitize(text) }} />}
-          {alertText}
-          <div>
-            <Stack gap={0.5} wrap={true}>
-              {annoVals.tags?.[i]?.map((t: string, i: number) => (
-                <Tag name={t} key={`${t}-${i}`} />
-              ))}
-            </Stack>
-          </div>
-        </div>
+        <AnnotationTooltipBody key={i} text={text} alertText={alertText} tags={annoVals.tags} annoIdx={annoIdx} />
       );
     }
   }
 
-  let time = timeFormatter(annoVals.time[annoIdx]);
-
-  if (annoVals.isRegion?.[annoIdx]) {
-    time += ' - ' + timeFormatter(annoVals.timeEnd[annoIdx]);
-  }
-
-  let avatar = '';
-  let state = '';
-
   return (
     <div className={styles.wrapper}>
-      <div className={styles.header}>
-        <Stack gap={2} basis="100%" justifyContent="space-between" alignItems="center">
-          <div className={styles.meta}>
-            <span>
-              {avatar}
-              {state}
-            </span>
-            {time}
-          </div>
-
-          {isPinned && (
-            // @todo canEdit/canDelete is set when user cannot edit/delete
-            <div className={styles.controls}>
-              {isPinned && (
-                <IconButton
-                  name={'times'}
-                  size={'sm'}
-                  onClick={(e) => {
-                    // Don't trigger onClick
-                    e.stopPropagation();
-                    onClose();
-                  }}
-                  tooltip={t('timeseries.annotation-tooltip2.tooltip-close', 'Close')}
-                />
-              )}
-            </div>
-          )}
-        </Stack>
-      </div>
+      <AnnotationTooltipHeader
+        avatarImg={avatarImgSrc}
+        alertState={alertState}
+        timeRange={time}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        isPinned={isPinned}
+        onEdit={onEdit}
+        onDelete={onAnnotationDelete}
+        onRemove={(e) => {
+          // Don't trigger onClick
+          e.stopPropagation();
+          onClose();
+        }}
+      />
 
       <ScrollContainer maxHeight="200px">{items}</ScrollContainer>
 
@@ -163,6 +106,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     },
   }),
   body: css({
+    label: 'cluster-annotation-body',
     padding: theme.spacing(1),
     fontSize: theme.typography.bodySmall.fontSize,
     color: theme.colors.text.secondary,

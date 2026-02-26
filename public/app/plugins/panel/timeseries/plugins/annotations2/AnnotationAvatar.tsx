@@ -1,0 +1,23 @@
+import { css } from '@emotion/css';
+
+import { GrafanaTheme2 } from '@grafana/data';
+import { useStyles2 } from '@grafana/ui';
+
+interface Props {
+  src: string | undefined;
+}
+export function AnnotationAvatar({ src }: Props) {
+  const styles = useStyles2(getStyles);
+  return src && <img className={styles.avatar} alt="Annotation avatar" src={src} />;
+}
+
+const getStyles = (theme: GrafanaTheme2) => {
+  return {
+    avatar: css({
+      borderRadius: theme.shape.radius.circle,
+      width: 16,
+      height: 16,
+      marginRight: theme.spacing(1),
+    }),
+  };
+};
