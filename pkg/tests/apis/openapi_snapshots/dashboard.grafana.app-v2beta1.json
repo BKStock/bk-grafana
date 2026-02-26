@@ -1119,12 +1119,6 @@
             "type": "string",
             "default": ""
           },
-          "labels": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
           "spec": {
             "default": {},
             "allOf": [
@@ -1930,12 +1924,6 @@
             "type": "string",
             "default": ""
           },
-          "labels": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
           "spec": {
             "type": "object",
             "additionalProperties": {
@@ -2482,12 +2470,6 @@
           "kind": {
             "type": "string",
             "default": ""
-          },
-          "labels": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
           },
           "spec": {
             "default": {},
