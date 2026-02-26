@@ -15,4 +15,8 @@ export interface MatcherUIProps<T> {
   data: DataFrame[];
   options: T;
   onChange: (options: T) => void;
+  /**
+   * if true, fields in nested frames will be included in field matching.
+   */
+  includeNestedFramesFields?: boolean;
 }

@@ -1,3 +1,5 @@
+import { t } from '@grafana/i18n';
+
 import { getFieldMatcher } from '../transformations/matchers';
 import {
   DataFrame,
@@ -127,6 +129,9 @@ export function getFieldDisplayName(field: Field, frame?: DataFrame, allFrames?:
   return displayName;
 }
 
+const addComparisonSuffix = (displayName: string) =>
+  t('grafana-data.field.displayName.comparison', '{{displayName}} (comparison)', { displayName });
+
 /**
  * Get an appropriate display name. If the 'displayName' field config is set, use that.
  */
@@ -136,11 +141,11 @@ export function calculateFieldDisplayName(field: Field, frame?: DataFrame, allFr
   let displayName = hasConfigTitle ? field.config!.displayName! : field.name;
 
   if (hasConfigTitle) {
-    return isComparisonSeries ? `${displayName} (comparison)` : displayName;
+    return isComparisonSeries ? addComparisonSuffix(displayName) : displayName;
   }
 
   if (frame && field.config?.displayNameFromDS) {
-    return isComparisonSeries ? `${field.config.displayNameFromDS} (comparison)` : field.config.displayNameFromDS;
+    return isComparisonSeries ? addComparisonSuffix(field.config.displayNameFromDS) : field.config.displayNameFromDS;
   }
 
   // This is an ugly exception for time field
@@ -212,7 +217,7 @@ export function calculateFieldDisplayName(field: Field, frame?: DataFrame, allFr
   }
 
   if (isComparisonSeries) {
-    displayName = `${displayName} (comparison)`;
+    displayName = addComparisonSuffix(displayName);
   }
   return displayName;
 }

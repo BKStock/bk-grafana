@@ -12,7 +12,7 @@ type Props = StandardEditorProps<string, FieldNamePickerConfigSettings>;
 // Pick a field name out of the fields
 export const FieldNamePicker = ({ value, onChange, context, item, id }: Props) => {
   const settings: FieldNamePickerConfigSettings = item.settings ?? {};
-  const names = useFieldDisplayNames(context.data, settings?.filter);
+  const names = useFieldDisplayNames(context.data, settings.filter, settings.includeNestedFramesFields);
   const selectOptions = useSelectOptions(names, value, undefined, undefined, settings.baseNameMode);
 
   const onSelectChange = useCallback(

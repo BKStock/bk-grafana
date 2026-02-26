@@ -10,6 +10,7 @@ import {
   TransformerCategory,
 } from '@grafana/data';
 import { t } from '@grafana/i18n';
+import { config } from '@grafana/runtime';
 import { fieldMatchersUI, InlineField, InlineFieldRow, Select, useStyles2 } from '@grafana/ui';
 
 import { getTransformationContent } from '../docs/getTransformationContent';
@@ -84,6 +85,7 @@ export function ConfigFromQueryTransformerEditor({ input, onChange, options }: P
             data={input}
             options={currentMatcher.options}
             onChange={onMatcherConfigChange}
+            includeNestedFramesFields={config.featureToggles.nestedFramesFieldOverrides}
           />
         </InlineField>
       </InlineFieldRow>

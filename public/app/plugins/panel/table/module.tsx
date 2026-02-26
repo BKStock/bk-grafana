@@ -1,5 +1,6 @@
 import { identityOverrideProcessor, FieldConfigProperty, PanelPlugin, standardEditorsRegistry } from '@grafana/data';
 import { t } from '@grafana/i18n';
+import { config } from '@grafana/runtime';
 import {
   TableCellDisplayMode,
   TableCellOptions,
@@ -84,6 +85,9 @@ export const plugin = new PanelPlugin<Options, FieldConfig>(TablePanel)
             'Render a cell from a field (hidden or visible) in a tooltip'
           ),
           category: cellCategory,
+          settings: {
+            includeNestedFramesFields: config.featureToggles.nestedFramesFieldOverrides,
+          },
         })
         .addSelect({
           path: 'tooltip.placement',
@@ -120,6 +124,9 @@ export const plugin = new PanelPlugin<Options, FieldConfig>(TablePanel)
           name: t('table.name-styling-from-field', 'Styling from field'),
           description: t('table.description-styling-from-field', 'A field containing JSON objects with CSS properties'),
           category: cellCategory,
+          settings: {
+            includeNestedFramesFields: config.featureToggles.nestedFramesFieldOverrides,
+          },
         });
     },
   })

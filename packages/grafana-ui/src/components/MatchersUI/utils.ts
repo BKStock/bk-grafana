@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
-import { DataFrame, Field, FieldNamePickerBaseNameMode, getFieldDisplayName } from '@grafana/data';
+import { DataFrame, Field, getFieldDisplayName, FieldNamePickerBaseNameMode, FieldType } from '@grafana/data';
+import { t } from '@grafana/i18n';
 
 import { getFieldTypeIcon } from '../../types/icon';
 import { ComboboxOption } from '../Combobox/types';
@@ -34,9 +35,12 @@ export function frameHasName(name: string | undefined, names: FrameFieldsDisplay
  */
 export function getFrameFieldsDisplayNames(
   data: DataFrame[],
-  filter?: (field: Field) => boolean
+  filter?: (field: Field) => boolean,
+  existingNames?: FrameFieldsDisplayNames,
+  parentData: DataFrame[] = data,
+  includeNestedFramesFields?: boolean
 ): FrameFieldsDisplayNames {
-  const names: FrameFieldsDisplayNames = {
+  const names = existingNames ?? {
     display: new Set<string>(),
     raw: new Set<string>(),
     fields: new Map<string, Field>(),
@@ -47,7 +51,13 @@ export function getFrameFieldsDisplayNames(
       if (filter && !filter(field)) {
         continue;
       }
-      const disp = getFieldDisplayName(field, frame, data);
+      if (includeNestedFramesFields && field.type === FieldType.nestedFrames) {
+        field.values.forEach((nestedData) =>
+          getFrameFieldsDisplayNames(nestedData, filter, names, parentData, includeNestedFramesFields)
+        );
+        continue;
+      }
+      const disp = getFieldDisplayName(field, frame, parentData);
       names.display.add(disp);
       names.fields.set(disp, field);
       if (field.name && disp !== field.name) {
@@ -62,10 +72,14 @@ export function getFrameFieldsDisplayNames(
 /**
  * @internal
  */
-export function useFieldDisplayNames(data: DataFrame[], filter?: (field: Field) => boolean): FrameFieldsDisplayNames {
+export function useFieldDisplayNames(
+  data: DataFrame[],
+  filter?: (field: Field) => boolean,
+  includeNestedFramesFields?: boolean
+): FrameFieldsDisplayNames {
   return useMemo(() => {
-    return getFrameFieldsDisplayNames(data, filter);
-  }, [data, filter]);
+    return getFrameFieldsDisplayNames(data, filter, undefined, undefined, includeNestedFramesFields);
+  }, [data, filter, includeNestedFramesFields]);
 }
 /**
  * @internal
@@ -90,7 +104,7 @@ export function useSelectOptions(
         }
         options.push({
           value: name,
-          label: `${name} (base field name)`,
+          label: t('grafana-ui.matchers.labels.base-field-name', '{{name}} (base field name)', { name }),
         });
       }
     } else {
@@ -116,7 +130,7 @@ export function useSelectOptions(
             }
             options.push({
               value: name,
-              label: `${name} (base field name)`,
+              label: t('grafana-ui.matchers.labels.base-field-name', '{{name}} (base field name)', { name }),
             });
           }
         }
@@ -126,7 +140,7 @@ export function useSelectOptions(
     if (currentName && !found) {
       options.push({
         value: currentName,
-        label: `${currentName} (not found)`,
+        label: t('grafana-ui.matchers.labels.not-found', '{{name}} (not found)', { name: currentName }),
       });
     }
     return options;

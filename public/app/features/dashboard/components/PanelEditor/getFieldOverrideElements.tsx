@@ -15,6 +15,7 @@ import {
   DataFrame,
 } from '@grafana/data';
 import { t } from '@grafana/i18n';
+import { config } from '@grafana/runtime';
 import { fieldMatchersUI, useStyles2, ValuePicker } from '@grafana/ui';
 import { getDataLinksVariableSuggestions } from 'app/features/panel/panellinks/link_srv';
 
@@ -135,6 +136,7 @@ export function getFieldOverrideCategories(
               data={data ?? []}
               options={override.matcher.options}
               onChange={onMatcherConfigChange}
+              includeNestedFramesFields={config.featureToggles.nestedFramesFieldOverrides}
             />
           );
         },

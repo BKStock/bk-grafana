@@ -10,8 +10,8 @@ import { ComboboxOption } from '../Combobox/types';
 import { FieldMatcherUIRegistryItem, MatcherUIProps } from './types';
 
 export const FieldTypeMatcherEditor = memo<MatcherUIProps<string>>((props) => {
-  const { data, options, onChange: onChangeFromProps, id } = props;
-  const counts = useFieldCounts(data);
+  const { data, options, onChange: onChangeFromProps, id, includeNestedFramesFields } = props;
+  const counts = useFieldCounts(data, includeNestedFramesFields);
   const selectOptions = useSelectOptions(counts, options);
 
   const onChange = useCallback(
@@ -66,24 +66,36 @@ export const getAllFieldTypeIconOptions: () => Array<ComboboxOption<FieldType>> 
   },
 ];
 
-const useFieldCounts = (data: DataFrame[]): Map<FieldType, number> => {
-  return useMemo(() => {
-    const counts: Map<FieldType, number> = new Map();
-    for (const t of getAllFieldTypeIconOptions()) {
-      counts.set(t.value!, 0);
-    }
-    for (const frame of data) {
-      for (const field of frame.fields) {
-        const key = field.type || FieldType.other;
-        let v = counts.get(key);
-        if (!v) {
-          v = 0;
-        }
-        counts.set(key, v + 1);
+const populateFieldTypeCounts = (
+  data: DataFrame[],
+  counts: Map<FieldType, number>,
+  includeNestedFramesFields?: boolean
+): Map<FieldType, number> => {
+  for (const frame of data) {
+    for (const field of frame.fields) {
+      const key = field.type || FieldType.other;
+      if (includeNestedFramesFields && key === FieldType.nestedFrames) {
+        // walk through the nested frame's fields in the first row, since
+        // each row should have the same fields.
+        populateFieldTypeCounts(field.values[0] ?? [], counts);
+        continue;
       }
+      let v = counts.get(key);
+      if (!v) {
+        v = 0;
+      }
+      counts.set(key, v + 1);
     }
+  }
+  return counts;
+};
+
+const useFieldCounts = (data: DataFrame[], includeNestedFramesFields?: boolean): Map<FieldType, number> => {
+  return useMemo(() => {
+    const counts = new Map<FieldType, number>();
+    populateFieldTypeCounts(data, counts, includeNestedFramesFields);
     return counts;
-  }, [data]);
+  }, [data, includeNestedFramesFields]);
 };
 
 const useSelectOptions = (counts: Map<string, number>, opt?: string): ComboboxOption[] => {

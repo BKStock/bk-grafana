@@ -10,8 +10,8 @@ import { FieldMatcherUIRegistryItem, MatcherUIProps } from './types';
 import { frameHasName, useFieldDisplayNames, useSelectOptions } from './utils';
 
 export const FieldNameMatcherEditor = memo<MatcherUIProps<string>>((props) => {
-  const { data, options, onChange: onChangeFromProps, id } = props;
-  const names = useFieldDisplayNames(data);
+  const { data, options, onChange: onChangeFromProps, id, includeNestedFramesFields } = props;
+  const names = useFieldDisplayNames(data, undefined, includeNestedFramesFields);
   const selectOptions: ComboboxOption[] = useSelectOptions(names, options);
 
   const onChange = useCallback(

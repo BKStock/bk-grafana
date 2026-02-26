@@ -219,4 +219,9 @@ export interface FieldNamePickerConfigSettings {
 
   /** When set to false, the value can not be removed */
   isClearable?: boolean;
+
+  /**
+   * If true, fields in nested frames will be included in field matching.
+   */
+  includeNestedFramesFields?: boolean;
 }
