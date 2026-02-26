@@ -43,16 +43,93 @@ Installation of Grafana on other operating systems is possible, but is not recom
 
 ## Hardware recommendations
 
-Grafana requires the minimum system resources:
+Grafana requires the following minimum system resources:
 
 - Minimum recommended memory: 512 MB
 - Minimum recommended CPU: 1 core
 
-Some features might require more memory or CPUs, including:
+These minimums support evaluation and single-user development only. For any shared or production deployment, refer to the sizing guidance below.
 
-- [Server side rendering of images](/grafana/plugins/grafana-image-renderer#requirements)
-- [Alerting](../../alerting/)
-- [Data source proxy](../../developers/http_api/data_source/)
+### Sizing your deployment
+
+Four factors most directly drive Grafana's resource needs:
+
+- **Concurrent users:** active, concurrent browser sessions issuing queries or causing panels to refresh. This is the primary driver of CPU and memory load. Users who have Grafana open but are not actively viewing dashboards contribute little load, unless those dashboards have auto-refresh enabled.
+- **Alert rules:** background evaluation load on the alert scheduler. High rule counts with short evaluation intervals can saturate CPU independently of user activity. In Grafana OSS, the alert engine runs in the same process as the UI and data source proxy, so alert CPU saturation directly competes with dashboard query performance. This is why isolating alert evaluation to dedicated instances matters at Large scale.
+- **Data sources:** the number of proxied data source connections matters, but type matters more. Plugins that use the Grafana backend data source proxy — most SQL sources such as MySQL, PostgreSQL, and Microsoft SQL Server — hold an open connection per query on the server. Pull-based metric sources such as Prometheus or Graphite are queried more efficiently and place less load on the Grafana process. Some plugins, such as certain public API or Infinity sources, execute queries directly in the browser and may place no server-side load — depending on plugin configuration and authentication requirements. A deployment with five heavily-queried proxied SQL data sources can exceed the resource needs of one with twenty Prometheus sources.
+- **Dashboards and panels:** panel count and refresh interval together determine query throughput. A dashboard with 30 panels refreshing every 10 seconds generates roughly six times the query load of the same dashboard refreshing every minute. Dashboards with many panels and short refresh intervals should be treated as a tier higher than their raw dashboard count suggests. Note that Grafana Enterprise includes query caching, which can significantly reduce this multiplier when many users view the same dashboard simultaneously and may shift a deployment down a tier.
+
+Image rendering and large numbers of short-interval alert rules are the two most common reasons a deployment outgrows its initial sizing. Multi-organization setups and SSO or LDAP directory sync add overhead that can push a deployment into the next tier.
+
+### Deployment tiers
+
+Use the table below to identify which tier describes your workload, then refer to the corresponding hardware baseline.
+
+| Tier | Concurrent users | Alert rules | Data sources | Dashboards |
+| ------ | ---------------- | ----------- | ------------ | ---------- |
+| Small | < 25 | < 100 | < 5 | < 200 |
+| Medium | 25 – 200 | 100 – 1,000 | 5 – 25 | 200 – 2,000 |
+| Large | 200+ | 1,000+ | 25+ | 2,000+ |
+
+The dashboard count threshold assumes moderate complexity — roughly 10–20 panels per dashboard with refresh intervals of 30 seconds or longer. Dashboards with more panels or shorter refresh intervals produce proportionally more query load and should be weighted toward the higher tier. Similarly, the data source count assumes a mix of source types; deployments that rely heavily on proxied SQL sources should plan for the next tier up.
+
+These thresholds are starting points. Validate sizing with a load test that reflects your actual dashboard complexity, panel count, and refresh rates before committing to production hardware.
+
+#### Small
+
+Small deployments suit small teams, internal tooling, and low-traffic environments.
+
+| Resource | Minimum |
+| -------- | ------- |
+| CPU | 2 cores |
+| Memory | 2 – 4 GB |
+| Disk | 10 – 20 GB SSD (database host) |
+| Instances | 1 |
+
+**Database:** SQLite is acceptable for development and evaluation only. Use an external MySQL or PostgreSQL instance for production. Refer to [Supported databases](#supported-databases).
+
+**Image rendering:** optional; can run on the same host for light use. Refer to [Server-side image rendering](/grafana/plugins/grafana-image-renderer#requirements).
+
+#### Medium
+
+Medium deployments suit shared team environments and departmental observability platforms.
+
+| Resource | Recommendation |
+| -------- | -------------- |
+| CPU | 4 – 8 cores |
+| Memory | 8 – 16 GB |
+| Disk | 20 – 50 GB SSD (database host) |
+| Instances | 2 (load-balanced) |
+
+**Database:** SQLite is not suitable at this tier. Refer to [Supported databases](#supported-databases) for guidance on choosing an external database.
+
+**Image rendering:** run the image renderer as a separate process or container. Each renderer worker uses approximately 1 GB of memory; size your renderer host accordingly. Refer to [Server-side image rendering](/grafana/plugins/grafana-image-renderer#requirements).
+
+**High availability:** if you run two or more Grafana instances, configure a shared session store (Redis) or enable sticky sessions at the load balancer to prevent users from being signed out between requests. Refer to [Set up Grafana for high availability](../../setup-grafana/set-up-for-high-availability/).
+
+#### Large
+
+Large deployments suit organization-wide platforms and high-traffic production environments.
+
+| Resource | Recommendation |
+| -------- | -------------- |
+| CPU | 8 – 16+ cores per instance |
+| Memory | 16 – 32+ GB per instance |
+| Disk | 50+ GB SSD, high IOPS (database host) |
+| Instances | 3+ (load-balanced) |
+| Network | 10 Gbps or faster |
+
+**Database:** a highly available MySQL or PostgreSQL cluster is required. Refer to [Supported databases](#supported-databases).
+
+**Image rendering:** run a dedicated renderer fleet with multiple workers, isolated from Grafana instances. Each renderer worker uses approximately 1 GB of memory. Refer to [Server-side image rendering](/grafana/plugins/grafana-image-renderer#requirements).
+
+**Alert evaluation:** with more than 1,000 alert rules or short evaluation intervals (under one minute), alert evaluation can saturate CPU and degrade dashboard query performance on the same instance. Isolate alert evaluation to one or more dedicated Grafana instances in [remote evaluation mode](../../alerting/) to prevent this.
+
+**High availability:** sticky sessions or a shared Redis session store are required. Refer to [Set up Grafana for high availability](../../setup-grafana/set-up-for-high-availability/).
+
+**Data source latency:** minimize network hops between Grafana instances and data sources. Low-latency links to your database and data sources are important at this scale.
+
+**Deployment model:** managing three or more Grafana instances alongside a Redis cluster, renderer fleet, and highly available database becomes operationally complex on bare metal. Kubernetes reduces this operational burden significantly at this tier. Refer to [Deploy Grafana on Kubernetes](../kubernetes/) and the [Grafana Helm chart](../helm/) for guidance.
 
 ## Supported databases
 
