@@ -84,13 +84,14 @@ const getStyles = (theme: GrafanaTheme2) => {
       border: `1px solid ${theme.colors.border.medium}`,
 
       [theme.transitions.handleMotion('no-preference', 'reduce')]: {
-        transition: theme.transitions.create(['background'], {
+        transition: theme.transitions.create(['background', 'border-color'], {
           duration: theme.transitions.duration.short,
         }),
       },
 
       '&:hover': {
         background: theme.colors.background.secondary,
+        borderColor: theme.colors.primary.border,
       },
     }),
     imgBox: css({
