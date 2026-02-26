@@ -6,8 +6,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/grafana/grafana/pkg/apimachinery/utils"
+	apppluginv0alpha1 "github.com/grafana/grafana/pkg/apis/appplugin/v0alpha1"
+	"github.com/grafana/grafana/pkg/apiserver/rest"
 	"github.com/grafana/grafana/pkg/plugins"
+	"github.com/grafana/grafana/pkg/services/apiserver/builder"
+	"github.com/grafana/grafana/pkg/services/apiserver/options"
+	"github.com/grafana/grafana/pkg/setting"
 )
 
 func TestGetAppPlugins(t *testing.T) {
@@ -132,4 +139,99 @@ func bundle(id string, pluginType plugins.Type) *plugins.FoundBundle {
 			JSONData: plugins.JSONData{ID: id, Type: pluginType},
 		},
 	}
+}
+
+func TestApplyDefaultStorageConfig(t *testing.T) {
+	newBuilder := func(pluginID string) *AppPluginAPIBuilder {
+		return &AppPluginAPIBuilder{
+			pluginID: pluginID,
+			groupVersion: schema.GroupVersion{
+				Group:   pluginID + ".grafana.app",
+				Version: apppluginv0alpha1.VERSION,
+			},
+		}
+	}
+
+	newRI := func(pluginID string) utils.ResourceInfo {
+		return apppluginv0alpha1.SettingsResourceInfo.WithGroupAndShortName(
+			pluginID+".grafana.app", pluginID,
+		)
+	}
+
+	t.Run("no-op when StorageOpts is nil", func(t *testing.T) {
+		b := newBuilder("my-app")
+		opts := builder.APIGroupOptions{StorageOpts: nil}
+		ri := newRI("my-app")
+		b.applyDefaultStorageConfig(opts, ri)
+	})
+
+	t.Run("no-op when no wildcard and no specific config", func(t *testing.T) {
+		b := newBuilder("my-app")
+		storageOpts := &options.StorageOptions{
+			UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{},
+		}
+		opts := builder.APIGroupOptions{StorageOpts: storageOpts}
+		ri := newRI("my-app")
+
+		b.applyDefaultStorageConfig(opts, ri)
+
+		_, exists := storageOpts.UnifiedStorageConfig["settings.my-app.grafana.app"]
+		require.False(t, exists)
+	})
+
+	t.Run("wildcard config is applied when no specific config exists", func(t *testing.T) {
+		b := newBuilder("my-app")
+		storageOpts := &options.StorageOptions{
+			UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{
+				appPluginSettingsWildcard: {DualWriterMode: rest.Mode2},
+			},
+		}
+		opts := builder.APIGroupOptions{StorageOpts: storageOpts}
+		ri := newRI("my-app")
+
+		b.applyDefaultStorageConfig(opts, ri)
+
+		cfg, exists := storageOpts.UnifiedStorageConfig["settings.my-app.grafana.app"]
+		require.True(t, exists)
+		require.Equal(t, rest.Mode2, cfg.DualWriterMode)
+	})
+
+	t.Run("specific config takes precedence over wildcard", func(t *testing.T) {
+		b := newBuilder("my-app")
+		storageOpts := &options.StorageOptions{
+			UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{
+				appPluginSettingsWildcard:  {DualWriterMode: rest.Mode2},
+				"settings.my-app.grafana.app": {DualWriterMode: rest.Mode4},
+			},
+		}
+		opts := builder.APIGroupOptions{StorageOpts: storageOpts}
+		ri := newRI("my-app")
+
+		b.applyDefaultStorageConfig(opts, ri)
+
+		cfg := storageOpts.UnifiedStorageConfig["settings.my-app.grafana.app"]
+		require.Equal(t, rest.Mode4, cfg.DualWriterMode)
+	})
+
+	t.Run("wildcard applies independently per plugin", func(t *testing.T) {
+		storageOpts := &options.StorageOptions{
+			UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{
+				appPluginSettingsWildcard: {DualWriterMode: rest.Mode1},
+			},
+		}
+		opts := builder.APIGroupOptions{StorageOpts: storageOpts}
+
+		for _, pluginID := range []string{"app-a", "app-b", "app-c"} {
+			b := newBuilder(pluginID)
+			ri := newRI(pluginID)
+			b.applyDefaultStorageConfig(opts, ri)
+		}
+
+		for _, pluginID := range []string{"app-a", "app-b", "app-c"} {
+			key := "settings." + pluginID + ".grafana.app"
+			cfg, exists := storageOpts.UnifiedStorageConfig[key]
+			require.True(t, exists, "expected config for %s", pluginID)
+			require.Equal(t, rest.Mode1, cfg.DualWriterMode)
+		}
+	})
 }

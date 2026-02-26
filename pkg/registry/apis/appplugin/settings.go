@@ -9,8 +9,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/rest"
+
+	"github.com/grafana/grafana/pkg/apimachinery/utils"
 
 	common "github.com/grafana/grafana/pkg/apimachinery/apis/common/v0alpha1"
 	apppluginv0alpha1 "github.com/grafana/grafana/pkg/apis/appplugin/v0alpha1"
@@ -22,14 +23,13 @@ import (
 type settingsStorage struct {
 	pluginID       string
 	pluginSettings pluginsettings.Service
-	resource       schema.GroupResource
-	tableConverter rest.TableConvertor
+	resourceInfo   *utils.ResourceInfo
 }
 
 var _ grafanarest.Storage = (*settingsStorage)(nil)
 
 func (s *settingsStorage) New() runtime.Object {
-	return &apppluginv0alpha1.Settings{}
+	return s.resourceInfo.NewFunc()
 }
 
 func (s *settingsStorage) Destroy() {}
@@ -39,20 +39,20 @@ func (s *settingsStorage) NamespaceScoped() bool {
 }
 
 func (s *settingsStorage) GetSingularName() string {
-	return "settings"
+	return s.resourceInfo.GetSingularName()
 }
 
 func (s *settingsStorage) NewList() runtime.Object {
-	return &apppluginv0alpha1.SettingsList{}
+	return s.resourceInfo.NewListFunc()
 }
 
 func (s *settingsStorage) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
-	return s.tableConverter.ConvertToTable(ctx, object, tableOptions)
+	return s.resourceInfo.TableConverter().ConvertToTable(ctx, object, tableOptions)
 }
 
 func (s *settingsStorage) Get(ctx context.Context, name string, _ *metav1.GetOptions) (runtime.Object, error) {
 	if name != s.pluginID {
-		return nil, apierrors.NewNotFound(s.resource, name)
+		return nil, apierrors.NewNotFound(s.resourceInfo.GroupResource(), name)
 	}
 
 	nsInfo, err := request.NamespaceInfoFrom(ctx, true)

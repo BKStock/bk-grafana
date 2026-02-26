@@ -8,22 +8,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 
-	"github.com/grafana/grafana/pkg/apimachinery/utils"
 	apppluginv0alpha1 "github.com/grafana/grafana/pkg/apis/appplugin/v0alpha1"
 	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
 )
 
 func newTestStorage(plugins map[string]*pluginsettings.DTO) *settingsStorage {
-	gr := schema.GroupResource{Group: "test-app.app.grafana.app", Resource: "settings"}
+	ri := apppluginv0alpha1.SettingsResourceInfo.WithGroupAndShortName("test-app.grafana.app", "test-app")
 	return &settingsStorage{
 		pluginID:       "test-app",
 		pluginSettings: &pluginsettings.FakePluginSettings{Plugins: plugins},
-		resource:       gr,
-		tableConverter: utils.NewTableConverter(gr, utils.TableColumns{}),
+		resourceInfo:   &ri,
 	}
 }
 
