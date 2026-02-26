@@ -171,11 +171,7 @@ export class DashboardModelCompatibilityWrapper {
       return false;
     }
 
-    if (dashboardUID) {
-      return Boolean(this._scene.state.meta.annotationsPermissions?.dashboard.canEdit);
-    }
-
-    return false;
+    return Boolean(this._scene.state.meta.annotationsPermissions?.dashboard.canEdit);
   }
 
   public panelInitialized() {}
