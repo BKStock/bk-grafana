@@ -100,6 +100,12 @@ export function Actions({
             onDuplicate();
           },
         },
+        onDelete && {
+          id: 'delete',
+          icon: 'trash-alt',
+          label: labels.remove,
+          onClick: handleDelete,
+        },
         onToggleHide && {
           id: 'toggle-hide',
           icon: item.isHidden ? 'eye-slash' : 'eye',
@@ -108,12 +114,6 @@ export function Actions({
             e.stopPropagation();
             onToggleHide();
           },
-        },
-        onDelete && {
-          id: 'delete',
-          icon: 'trash-alt',
-          label: labels.remove,
-          onClick: handleDelete,
         },
       ].filter((btn): btn is ActionButtonConfig => Boolean(btn)),
     [
