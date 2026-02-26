@@ -2056,6 +2056,12 @@
       },
       "noOptionsMessage-no-datasources-found": "No datasources found"
     },
+    "multiple-policies-view": {
+      "collapse-all": "Collapse all",
+      "expand-all": "Expand all",
+      "policy-tree-filter-label": "Filter by policy tree",
+      "policy-tree-filter-placeholder": "Select policy trees"
+    },
     "mute-timing-actions-button": {
       "body-delete-mute-timing": "Are you sure you would like to delete \"{{muteTiming}}\"?"
     },
@@ -2422,6 +2428,7 @@
       "new-child": "New child policy",
       "new-policy": "Add new policy",
       "no-matchers": "No matchers",
+      "no-matching-policies": "No policies matching filters.",
       "reload-policies": "Reload policies",
       "reset-modal": {
         "permanently-reset": "This action will permanently reset the <1>{{routeName}}</1> notification policy to an empty state.",
@@ -2430,8 +2437,7 @@
         "title-reset-notification-policy": "Reset notification policy"
       },
       "root-policy": {
-        "description": "All alert instances associated with this Route will be handled by this default policy if no other matching policies are found.",
-        "title": "Default policy for '{{routeName}}'"
+        "description": "All alert instances associated with this route will be handled by this default policy if no other matching policies are found."
       },
       "save-policy": "Save policy",
       "update": {
@@ -3482,7 +3488,8 @@
     "use-create-dropdown-menu-actions": {
       "label-delete": "Delete",
       "label-edit": "Edit",
-      "label-export": "Export"
+      "label-export": "Export",
+      "label-reset": "Reset"
     },
     "use-delete-contact-point-modal": {
       "delete-confirm": "Yes, delete contact point",
