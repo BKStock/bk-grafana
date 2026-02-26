@@ -248,7 +248,7 @@ export function applyFieldOverrides(
         }
         field.values = newValues;
       } else if (field.type === FieldType.frame) {
-        const newValues = Array(field.values.length);
+        const newValues: DataFrame[] = Array(field.values.length);
         for (let idx = 0; idx < field.values.length; idx++) {
           const nestedFrame: DataFrame = field.values[idx] ?? createDataFrame({ fields: [] });
           for (let fieldIndex = 0; fieldIndex < nestedFrame.fields.length; fieldIndex++) {
