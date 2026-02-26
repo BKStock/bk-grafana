@@ -11,7 +11,7 @@ import { useQueryFilter } from './utils';
 /**
  * Viz config for the summary chart - used by the React component
  */
-export const summaryChartVizConfig = VizConfigBuilders.timeseries()
+const summaryChartVizConfig = VizConfigBuilders.timeseries()
   .setCustomFieldConfig('drawStyle', GraphDrawStyle.Bars)
   .setCustomFieldConfig('barWidthFactor', 1)
   .setCustomFieldConfig('barAlignment', BarAlignment.Center)
@@ -35,10 +35,10 @@ export const summaryChartVizConfig = VizConfigBuilders.timeseries()
   .build();
 
 export function SummaryChartReact() {
-  const filter = useQueryFilter();
+  const { filter, alertStateFilter } = useQueryFilter();
 
   const dataProvider = useQueryRunner({
-    queries: [summaryChartQuery(filter)],
+    queries: [summaryChartQuery(filter, alertStateFilter)],
   });
 
   return <VizPanel title="" viz={summaryChartVizConfig} dataProvider={dataProvider} hoverHeader={true} />;
