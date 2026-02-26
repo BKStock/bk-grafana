@@ -462,7 +462,11 @@ export async function makeExportableV2(dashboard: DashboardV2Spec, isSharingExte
 
   const isReferencingDsTemplateVariable = (datasourceUid: string) => {
     if (datasourceUid.startsWith('$')) {
-      const varName = datasourceUid.slice(2, -1);
+      const varName =
+        datasourceUid.startsWith('${') && datasourceUid.endsWith('}')
+          ? datasourceUid.slice(2, -1)
+          : datasourceUid.slice(1);
+
       return !!datasourceVariables.find((v) => v.spec.name === varName);
     }
 
