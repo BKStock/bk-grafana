@@ -145,7 +145,7 @@ func NewTenantWatcher(ctx context.Context, ds *dataStore, writeEvent EventAppend
 
 	resync := cfg.ResyncInterval
 	if resync <= 0 {
-		resync = 24 * time.Hour
+		resync = 1 * time.Hour
 	}
 
 	client, err := dynamic.NewForConfig(restCfg)
@@ -201,7 +201,7 @@ func (tw *TenantWatcher) handleTenant(tenant *unstructured.Unstructured) {
 	tw.pendingDeleteStore.RefreshCache(tw.ctx)
 
 	if labels[labelPendingDelete] == "true" {
-		deleteAfter, ok := tenant.GetAnnotations()[annotationPendingDeleteAfter]
+		deleteAfter, ok := annotations[annotationPendingDeleteAfter]
 		if !ok {
 			tw.log.Warn("tenant marked pending-delete but missing delete-after annotation", "tenant", name)
 			return

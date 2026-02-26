@@ -209,7 +209,7 @@ func (k *kvStorageBackend) IsHealthy(ctx context.Context, _ *resourcepb.HealthCh
 	return &resourcepb.HealthCheckResponse{Status: resourcepb.HealthCheckResponse_SERVING}, nil
 }
 
-// Stop shuts down background goroutines owned by the backend.
+// Stop shuts down services owned by the backend.
 func (k *kvStorageBackend) Stop() {
 	if k.tenantWatcher != nil {
 		k.tenantWatcher.Stop()
