@@ -253,7 +253,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn = ({
     const field = frame.fields[i];
     let originField = field;
     if (field.state?.origin) {
-      originField = allFrames[field.state.origin.frameIndex]?.fields[field.state.origin.fieldIndex];
+      originField = allFrames[field.state.origin.frameIndex]?.fields[field.state.origin.fieldIndex] ?? field;
     }
 
     const config: FieldConfig<GraphFieldConfig> = {
