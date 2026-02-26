@@ -1,6 +1,6 @@
 import { css } from '@emotion/css';
 import classNames from 'classnames';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
@@ -58,7 +58,7 @@ function ProvisionedControlsSectionLabel() {
 
 export function SourceIcon({ origin }: { origin: ControlSourceRef | undefined }) {
   const styles = useStyles2(getStyles);
-  const pluginName = getPluginNameForControlSource(origin);
+  const pluginName = usePluginName(origin);
 
   return (
     <Tooltip content={getSourceTooltip(pluginName)}>
@@ -76,14 +76,16 @@ function getSourceTooltip(pluginName: string | undefined): string {
   return t('dashboard-scene.provisioned-controls-section.tooltip-unknown', 'Added by a data source plugin');
 }
 
-function getPluginNameForControlSource(origin: ControlSourceRef | undefined): string | undefined {
-  if (!origin?.group) {
-    return undefined;
-  }
+function usePluginName(origin: ControlSourceRef | undefined): string | undefined {
+  return useMemo(() => {
+    if (!origin?.group) {
+      return undefined;
+    }
 
-  const list = getDataSourceSrv().getList({});
-  const ds = list.find((d) => d.meta.id === origin.group);
-  return ds?.meta.name ?? origin.group;
+    const list = getDataSourceSrv().getList({});
+    const ds = list.find((d) => d.meta.id === origin.group);
+    return ds?.meta.name ?? origin.group;
+  }, [origin?.group]);
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
