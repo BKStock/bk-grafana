@@ -31,7 +31,7 @@ export const AnnotationTooltip2 = ({
   actions = [],
 }: AnnotationTooltipProps) => {
   const styles = useStyles2(getStyles);
-  let { onAnnotationDelete, canEdit, canDelete, time, text, alertText, alertState, avatarImgSrc } =
+  let { onAnnotationDelete, canEdit, canDelete, time, text, alertText, alertState, avatarImgSrc, title } =
     useAnnotationTooltip(annoVals, annoIdx, timeZone);
 
   return (
@@ -52,7 +52,7 @@ export const AnnotationTooltip2 = ({
         }}
       />
 
-      <AnnotationTooltipBody text={text} alertText={alertText} tags={annoVals.tags} annoIdx={annoIdx} />
+      <AnnotationTooltipBody title={title} text={text} alertText={alertText} tags={annoVals.tags} annoIdx={annoIdx} />
 
       {(links.length > 0 || actions.length > 0) && <VizTooltipFooter dataLinks={links} actions={actions} />}
     </div>

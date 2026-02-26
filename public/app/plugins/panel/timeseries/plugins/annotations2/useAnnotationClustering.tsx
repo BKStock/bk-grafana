@@ -37,6 +37,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
           if (thisCluster.length === 0) {
             thisCluster.push(prevIdx);
             clusterIdx[prevIdx] = clusters.length;
+            // console.log('cluster::open', { prevIdx, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
           }
           thisCluster.push(j);
           clusterIdx[j] = clusters.length;
@@ -44,6 +45,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
           // close cluster
           if (thisCluster.length > 0) {
             clusters.push(thisCluster);
+            // console.log('cluster::close', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
             thisCluster = [];
           }
         }
@@ -56,6 +58,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
   // close cluster
   if (thisCluster.length > 0) {
     clusters.push(thisCluster);
+    // console.log('cluster::lateClose', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
   }
 
   return { clusterIdx, clusters };
@@ -83,7 +86,8 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
             fields: frame.fields
               .map((field) => ({
                 ...field,
-                values: field.values.slice(),
+                // Copy values
+                values: [...field.values],
               }))
               // add new number field containing the cluster locations
               .concat({
@@ -94,7 +98,9 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
               }),
           };
 
-          let hasTimeEndField = timeEndFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
+          const hasTimeEndField = timeEndFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
+
+          console.log('hasTimeEndField', { hasTimeEndField, timeEndFrame });
 
           if (!hasTimeEndField) {
             timeEndFrame.fields.push({
@@ -105,10 +111,13 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
             });
           }
 
+          console.log('hasTimeEndField', { hasTimeEndField, timeEndFrame });
+
           // append cluster regions to frame
           clusters.forEach((idxs, ci) => {
             timeEndFrame.fields.forEach((field) => {
               const vals = field.values;
+              console.log('clusters vals', vals);
 
               // @todo clean up
               if (field.name === 'time') {
@@ -129,10 +138,12 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
                 // Indicate the cluster index as the annotation title
                 vals.push(`Cluster ${ci}`);
               } else if (field.name === 'text') {
-                // Merge the indicies as the text?
+                // Merge the indices as the text?
                 // @todo debugging
-                vals.push('idicies' + idxs.join(', '));
+                vals.push('indices:  ' + idxs.join(', '));
+                // vals.push(ci);
               } else if (field.name === 'clusterIdx') {
+                console.log('clusterIdx', { ci, vals, field, timeEndFrame, clusters });
                 // Update the cluster index?
                 vals.push(ci);
               } else if (field.name === 'source') {
@@ -159,7 +170,7 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
         }
       }
     } else if (clusteringMode === ClusteringMode.Hover) {
-      // TODO
+      // TODO remove? check with @leon
       console.warn('Hover mode not implemented');
     }
 

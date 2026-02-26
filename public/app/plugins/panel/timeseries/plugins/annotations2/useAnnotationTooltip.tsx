@@ -35,11 +35,13 @@ export function useAnnotationTooltip(annoVals: Record<string, any[]>, annoIdx: n
   const avatarImgSrc: string =
     annoVals.login?.[annoIdx] && annoVals.avatarUrl[annoIdx] ? annoVals.avatarUrl[annoIdx] : undefined;
 
-  if (title && !alertState) {
-    text = annoVals.title[annoIdx] + (text ? `<br />${text}` : '');
-  }
+  // @todo handle in body instead
+  // if (title && !alertState) {
+  //   text = annoVals.title[annoIdx] + (text ? `<br />${text}` : '');
+  // }
 
   return {
+    title,
     onAnnotationDelete: onAnnotationDelete ? () => onAnnotationDelete(annoId) : undefined,
     canEdit,
     canDelete,

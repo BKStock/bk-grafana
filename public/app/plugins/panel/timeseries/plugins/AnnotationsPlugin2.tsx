@@ -83,6 +83,7 @@ const buildWipAnnoFrame = (newRange: TimeRange2) => {
   };
   return wipAnnoFrame;
 };
+
 export const AnnotationsPlugin2 = ({
   annotations,
   timeZone,
@@ -183,7 +184,7 @@ export const AnnotationsPlugin2 = ({
           if (shouldRenderRegion) {
             for (let i = 0; i < vals.time.length; i++) {
               // skip rendering annos that are clustered (have non-null cluster index)
-              if (clusterIdx?.[i] != null && !vals.isRegion[i]) {
+              if (isClusterRegion(vals, i)) {
                 continue;
               }
               let color = getColorByName(vals.color?.[i] ?? DEFAULT_ANNOTATION_COLOR_HEX8);
@@ -274,7 +275,7 @@ export const AnnotationsPlugin2 = ({
       const top = annotationsOptions?.multiLane ? frameIdx * ANNOTATION_LANE_SIZE : undefined;
 
       for (let i = 0; i < vals.time.length; i++) {
-        if (!vals.isRegion[i] && vals.clusterIdx?.[i] != null) {
+        if (isClusterRegion(vals, i)) {
           continue;
         }
         let color = getColorByName(vals.color?.[i] || DEFAULT_ANNOTATION_COLOR);
@@ -371,3 +372,7 @@ const getStyles = () => ({
     background: 'none',
   }),
 });
+
+const isClusterRegion = (vals: Record<string, Array<number | undefined>>, i: number) => {
+  return !vals.isRegion[i] && vals.clusterIdx?.[i] !== undefined && vals.clusterIdx[i] >= 0;
+};

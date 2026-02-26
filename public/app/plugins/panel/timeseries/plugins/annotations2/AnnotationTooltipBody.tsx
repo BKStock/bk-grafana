@@ -5,10 +5,12 @@ import { Stack, Tag, useStyles2 } from '@grafana/ui';
 
 export function AnnotationTooltipBody({
   text,
+  title,
   alertText,
   tags,
   annoIdx,
 }: {
+  title?: string;
   text: string;
   alertText: string;
   tags: string[][];
@@ -17,8 +19,11 @@ export function AnnotationTooltipBody({
   const styles = useStyles2(getStyles);
   console.log('tags', tags);
   console.log('text', text);
+  console.log('title', title);
+  // @todo double check alertText functionality, previously if(annoVals.alertId?.[annoIdx] !== undefined && annoVals.newState?.[annoIdx])) we didn't set the text
   return (
     <div className={styles.body}>
+      {title && <div dangerouslySetInnerHTML={{ __html: textUtil.sanitize(title) }}></div>}
       {text && <div className={styles.text} dangerouslySetInnerHTML={{ __html: textUtil.sanitize(text) }} />}
       {alertText}
       <div>
