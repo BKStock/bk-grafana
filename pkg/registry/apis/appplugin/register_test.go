@@ -200,7 +200,7 @@ func TestApplyDefaultStorageConfig(t *testing.T) {
 		b := newBuilder("my-app")
 		storageOpts := &options.StorageOptions{
 			UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{
-				appPluginSettingsWildcard:  {DualWriterMode: rest.Mode2},
+				appPluginSettingsWildcard:     {DualWriterMode: rest.Mode2},
 				"settings.my-app.grafana.app": {DualWriterMode: rest.Mode4},
 			},
 		}
