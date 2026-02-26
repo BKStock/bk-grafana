@@ -39,13 +39,13 @@ describe('MissingFolderMetadataBanner', () => {
   it('does not show fix button when repositoryName is not provided', () => {
     render(<MissingFolderMetadataBanner />);
 
-    expect(screen.queryByRole('button', { name: /fix folder ids/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Fix folder IDs')).not.toBeInTheDocument();
   });
 
   it('shows fix button when repositoryName is provided', () => {
     render(<MissingFolderMetadataBanner repositoryName="test-repo" />);
 
-    expect(screen.getByRole('button', { name: /fix folder ids/i })).toBeInTheDocument();
+    expect(screen.getByText('Fix folder IDs')).toBeInTheDocument();
   });
 
   it('calls createJob when fix button is clicked', async () => {
@@ -59,7 +59,7 @@ describe('MissingFolderMetadataBanner', () => {
 
     const { user } = render(<MissingFolderMetadataBanner repositoryName="test-repo" />);
 
-    await user.click(screen.getByRole('button', { name: /fix folder ids/i }));
+    await user.click(screen.getByText('Fix folder IDs'));
     expect(mockCreateJob).toHaveBeenCalledWith({
       name: 'test-repo',
       jobSpec: {
@@ -117,7 +117,7 @@ describe('FolderPermissions', () => {
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('This folder is missing metadata.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /fix folder ids/i })).toBeInTheDocument();
+    expect(screen.getByText('Fix folder IDs')).toBeInTheDocument();
 
     const permissions = screen.getByTestId('permissions');
     expect(permissions).toHaveAttribute('data-can-set', 'false');

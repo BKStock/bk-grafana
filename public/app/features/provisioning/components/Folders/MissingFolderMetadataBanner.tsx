@@ -1,6 +1,6 @@
 import { Trans, t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
-import { Alert, Button, LoadingPlaceholder, Stack } from '@grafana/ui';
+import { Alert, LoadingPlaceholder } from '@grafana/ui';
 import { useCreateRepositoryJobsMutation } from 'app/api/clients/provisioning/v0alpha1';
 import { Permissions } from 'app/core/components/AccessControl/Permissions';
 
@@ -29,30 +29,23 @@ export function MissingFolderMetadataBanner({ repositoryName }: MissingFolderMet
     });
   };
 
+  // TODO: replace buttonContent/onRemove with a proper action button prop
+  // once https://github.com/grafana/grafana/pull/118673 is merged.
+  const buttonLabel = isJobRunning
+    ? t('provisioning.missing-folder-metadata-banner.fix-button-loading', 'Fixing...')
+    : t('provisioning.missing-folder-metadata-banner.fix-button', 'Fix folder IDs');
+
   return (
     <Alert
       severity="warning"
       title={t('provisioning.missing-folder-metadata-banner.title', 'This folder is missing metadata.')}
+      buttonContent={repositoryName ? buttonLabel : undefined}
+      onRemove={repositoryName ? onClick : undefined}
     >
-      <Stack direction="column" gap={1}>
-        <span>
-          <Trans i18nKey="provisioning.missing-folder-metadata-banner.message">
-            Since this folder doesn&apos;t contain a metadata file, the folder ID is based on the folder path. If you
-            move or rename the folder, the folder ID will change, and permissions may no longer apply to the folder.
-          </Trans>
-        </span>
-        {repositoryName && (
-          <div>
-            <Button size="sm" icon="wrench" variant="secondary" disabled={isJobRunning} onClick={onClick}>
-              {isJobRunning ? (
-                <Trans i18nKey="provisioning.missing-folder-metadata-banner.fix-button-loading">Fixing...</Trans>
-              ) : (
-                <Trans i18nKey="provisioning.missing-folder-metadata-banner.fix-button">Fix folder IDs</Trans>
-              )}
-            </Button>
-          </div>
-        )}
-      </Stack>
+      <Trans i18nKey="provisioning.missing-folder-metadata-banner.message">
+        Since this folder doesn&apos;t contain a metadata file, the folder ID is based on the folder path. If you move
+        or rename the folder, the folder ID will change, and permissions may no longer apply to the folder.
+      </Trans>
     </Alert>
   );
 }
