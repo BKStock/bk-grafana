@@ -276,7 +276,6 @@ const getStyles = (
       paddingLeft: `calc(${theme.spacing(0.5)} + 4px)`,
       borderTopLeftRadius: theme.shape.radius.default,
       borderTopRightRadius: theme.shape.radius.default,
-      overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -291,6 +290,7 @@ const getStyles = (
         bottom: 0,
         width: 4,
         background: borderColor,
+        borderTopLeftRadius: theme.shape.radius.default,
       },
     }),
     leftSection: css({
