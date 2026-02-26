@@ -1929,13 +1929,6 @@ var (
 			Expression:  "false",
 		},
 		{
-			Name:        "tabularNumbers",
-			Description: "Use fixed-width numbers globally in the UI",
-			Stage:       FeatureStageGeneralAvailability,
-			Owner:       grafanaFrontendPlatformSquad,
-			Expression:  "false",
-		},
-		{
 			Name:         "newInfluxDSConfigPageDesign",
 			Description:  "Enables new design for the InfluxDB data source configuration page",
 			Stage:        FeatureStagePrivatePreview,
@@ -2395,6 +2388,14 @@ var (
 			Expression:   "false",
 		},
 		{
+			Name:         "kubernetesUsersApi",
+			Description:  "Enables user APIs in the app platform",
+			Stage:        FeatureStageExperimental,
+			Owner:        identityAccessTeam,
+			HideFromDocs: true,
+			Expression:   "false",
+		},
+		{
 			Name:         "kubernetesExternalGroupMappingsApi",
 			Description:  "Enables external group mapping APIs in the app platform",
 			Stage:        FeatureStageExperimental,
@@ -2480,6 +2481,22 @@ var (
 			Stage:        FeatureStageExperimental,
 			HideFromDocs: true,
 			Owner:        grafanaPluginsPlatformSquad,
+			Expression:   "false",
+		},
+		{
+			Name:         "rememberUserOrgForSso",
+			Description:  "Remember the last viewed organization for users using SSO",
+			Stage:        FeatureStageGeneralAvailability,
+			Owner:        identityAccessTeam,
+			HideFromDocs: true,
+			Expression:   "true", // enabled by default
+		},
+		{
+			Name:         "dsAbstractionApp",
+			Description:  "Registers the dsabstraction app for querying datasources via unified SQL",
+			Stage:        FeatureStageExperimental,
+			Owner:        grafanaDatasourcesCoreServicesSquad,
+			HideFromDocs: true,
 			Expression:   "false",
 		},
 	}
