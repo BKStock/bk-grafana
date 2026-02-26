@@ -387,12 +387,7 @@ const UnthemedSpanBarRow = React.memo<SpanBarRowProps>((props) => {
     onChildrenToggled,
   } = props;
 
-  const {
-    duration,
-    hasChildren: isParent,
-    operationName,
-    process,
-  } = span;
+  const { duration, hasChildren: isParent, operationName, process } = span;
   const serviceDisplayName = getServiceDisplayName(process);
   const label = formatDuration(duration);
 

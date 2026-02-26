@@ -511,7 +511,9 @@ export class UnthemedVirtualizedTraceView extends React.Component<VirtualizedTra
           removeHoverIndentGuideId={removeHoverIndentGuideId}
           createSpanLink={createSpanLink}
           datasourceType={datasourceType}
-          showServiceName={prevSpan === null || getServiceColorKey(prevSpan.process) !== getServiceColorKey(span.process)}
+          showServiceName={
+            prevSpan === null || getServiceColorKey(prevSpan.process) !== getServiceColorKey(span.process)
+          }
           visibleSpanIds={visibleSpanIds}
           criticalPath={criticalPathSections}
         />
