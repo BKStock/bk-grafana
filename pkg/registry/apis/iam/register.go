@@ -179,7 +179,7 @@ func NewAPIService(
 
 	return &IdentityAccessManagementAPIBuilder{
 		store:                      store,
-		userLegacyStore:            user.NewLegacyStore(store, accessClient, enableAuthnMutation, tracingService),
+		userLegacyStore:            user.NewLegacyStore(store, accessClient, tracingService),
 		teamBindingLegacyStore:     teambinding.NewLegacyBindingStore(store, enableAuthnMutation, tracingService),
 		display:                    user.NewLegacyDisplayREST(store),
 		tracing:                    tracingService,
