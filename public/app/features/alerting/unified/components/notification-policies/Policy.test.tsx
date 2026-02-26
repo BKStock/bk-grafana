@@ -74,10 +74,6 @@ describe('Policy', () => {
     expect(defaultPolicy).toBeInTheDocument();
     expect(within(defaultPolicy).getByText('Default policy')).toBeVisible();
 
-    // expand the root policy to show children (collapsed by default)
-    const expandButton = within(defaultPolicy).getByRole('button', { name: /expand/i });
-    await user.click(expandButton);
-
     // click "more actions" and check if we can edit and delete
     expect(within(defaultPolicy).getByTestId('more-actions')).toBeInTheDocument();
     await user.click(within(defaultPolicy).getByTestId('more-actions'));
@@ -116,12 +112,7 @@ describe('Policy', () => {
       'Wait 30s to group instances · Wait 5m before sending updates · Repeated every 4h'
     );
 
-    // expand the first child to show its nested children
-    const firstChildPolicy = screen.getByTestId('am-route-container');
-    const firstChildExpandButton = within(firstChildPolicy).getByRole('button', { name: /expand/i });
-    await user.click(firstChildExpandButton);
-
-    // should have custom policies (1 direct child + 2 grandchildren)
+    // should have custom policies (1 direct child + 2 grandchildren, all expanded by default)
     const customPolicies = screen.getAllByTestId('am-route-container');
     expect(customPolicies).toHaveLength(3);
 
@@ -311,7 +302,7 @@ describe('Policy', () => {
     expect(within(customPolicy).getByTestId('matching-instances')).toHaveTextContent('2instances');
   });
 
-  it('should show warnings and errors', async () => {
+  it('should show warnings and errors', () => {
     const routeTree: RouteWithID = {
       id: '0', // this one should show an error
       receiver: 'broken-receiver',
@@ -319,7 +310,6 @@ describe('Policy', () => {
     };
 
     const receiversState: ReceiversState = mockReceiversState();
-    const user = userEvent.setup();
 
     renderPolicy(
       <Policy
@@ -339,10 +329,6 @@ describe('Policy', () => {
     expect(within(defaultPolicy).queryByTestId('matches-all')).not.toBeInTheDocument();
     // Errors are now shown as an icon in the gutter
     expect(within(defaultPolicy).getByTestId('policy-errors')).toBeInTheDocument();
-
-    // expand the root policy to show children (collapsed by default)
-    const expandButton = within(defaultPolicy).getByRole('button', { name: /expand/i });
-    await user.click(expandButton);
 
     const customPolicy = screen.getByTestId('am-route-container');
     expect(within(customPolicy).getByTestId('matches-all')).toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { defaults } from 'lodash';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { computeInheritedTree } from '@grafana/alerting';
 import { Trans, t } from '@grafana/i18n';
@@ -10,7 +10,12 @@ import { AlertmanagerAction, useAlertmanagerAbility } from 'app/features/alertin
 import { FormAmRoute } from 'app/features/alerting/unified/types/amroutes';
 import { addUniqueIdentifierToRoute } from 'app/features/alerting/unified/utils/amroutes';
 import { getErrorCode, stringifyErrorLike } from 'app/features/alerting/unified/utils/misc';
-import { ObjectMatcher, ROUTES_META_SYMBOL, RouteWithID } from 'app/plugins/datasource/alertmanager/types';
+import {
+  AlertmanagerGroup,
+  ObjectMatcher,
+  ROUTES_META_SYMBOL,
+  RouteWithID,
+} from 'app/plugins/datasource/alertmanager/types';
 
 import { anyOfRequestState, isError } from '../../hooks/useAsync';
 import { useAlertmanager } from '../../state/AlertmanagerContext';
@@ -37,6 +42,13 @@ import {
   useUpdateExistingNotificationPolicy,
 } from './useNotificationPolicyRoute';
 
+/** Async function that computes route-to-alert-group mapping off the main thread. */
+export type GetRouteGroupsMapFn = (
+  rootRoute: RouteWithID,
+  alertGroups: AlertmanagerGroup[],
+  options?: { unquoteMatchers?: boolean }
+) => Promise<Map<string, AlertmanagerGroup[]>>;
+
 interface PoliciesTreeProps {
   routeName?: string;
   contactPointFilter?: string;
@@ -47,6 +59,12 @@ interface PoliciesTreeProps {
   expandedOverrides?: Set<string>;
   /** Called when a policy is toggled. When provided, the parent manages expand state. */
   onTogglePolicyExpanded?: (policyId: string) => void;
+  /** Alert groups data for instance matching preview. */
+  alertGroups?: AlertmanagerGroup[];
+  /** Refetch alert groups after a policy mutation. */
+  refetchAlertGroups?: () => void;
+  /** Worker-based matching function (from useRouteGroupsMatcher). */
+  getRouteGroupsMap: GetRouteGroupsMapFn;
 }
 
 export const PoliciesTree = ({
@@ -56,17 +74,15 @@ export const PoliciesTree = ({
   defaultExpanded,
   expandedOverrides,
   onTogglePolicyExpanded,
+  alertGroups,
+  refetchAlertGroups,
+  getRouteGroupsMap,
 }: PoliciesTreeProps) => {
   const appNotification = useAppNotification();
   const [contactPointsSupported, canSeeContactPoints] = useAlertmanagerAbility(AlertmanagerAction.ViewContactPoint);
+  const [, canSeeAlertGroups] = useAlertmanagerAbility(AlertmanagerAction.ViewAlertGroups);
 
-  // Instance matching disabled for performance
-  // const [_, canSeeAlertGroups] = useAlertmanagerAbility(AlertmanagerAction.ViewAlertGroups);
-  // const { useGetAlertmanagerAlertGroupsQuery } = alertmanagerApi;
-
-  const { selectedAlertmanager, hasConfigurationAPI } = useAlertmanager();
-  // Instance matching disabled for performance
-  // const { getRouteGroupsMap } = useRouteGroupsMatcher();
+  const { selectedAlertmanager, isGrafanaAlertmanager, hasConfigurationAPI } = useAlertmanager();
 
   const shouldFetchContactPoints = contactPointsSupported && canSeeContactPoints;
   const { currentData: contactPointsStatusData } = alertmanagerApi.useGetContactPointsStatusQuery(undefined, {
@@ -107,12 +123,6 @@ export const PoliciesTree = ({
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetRoute, setResetRoute] = useState<RouteWithID | null>(null);
 
-  // Instance matching disabled for performance — re-enable by uncommenting this and related blocks below
-  // const { currentData: alertGroups, refetch: refetchAlertGroups } = useGetAlertmanagerAlertGroupsQuery(
-  //   { amSourceName: selectedAlertmanager ?? '' },
-  //   { skip: !canSeeAlertGroups || !selectedAlertmanager }
-  // );
-
   const { contactPoints: receivers } = useContactPointsWithStatus({
     alertmanager: selectedAlertmanager ?? '',
     fetchPolicies: false,
@@ -128,16 +138,41 @@ export const PoliciesTree = ({
   }, [defaultPolicy]);
   const routeProvenance = defaultPolicy?.provenance;
 
-  // Instance matching disabled for performance — re-enable by uncommenting this and related blocks
-  // const [{ value: routeAlertGroupsMap, error: instancesPreviewError }, triggerGetRouteGroupsMap] = useAsyncFn(
-  //   getRouteGroupsMap,
-  //   [getRouteGroupsMap]
-  // );
-  // useEffect(() => {
-  //   if (rootRoute && alertGroups) {
-  //     triggerGetRouteGroupsMap(rootRoute, alertGroups, { unquoteMatchers: !isGrafanaAlertmanager });
-  //   }
-  // }, [rootRoute, alertGroups, triggerGetRouteGroupsMap, isGrafanaAlertmanager]);
+  // Compute route-to-alert-group mapping via the worker.
+  // Uses a ref-guard to avoid re-triggering when the async result causes a re-render.
+  const [routeAlertGroupsMap, setRouteAlertGroupsMap] = useState<Map<string, AlertmanagerGroup[]> | undefined>();
+  const [instancesPreviewError, setInstancesPreviewError] = useState<Error | undefined>();
+  const matchingInputsRef = useRef<{ rootRouteId: string | undefined; alertGroupsLen: number | undefined }>({
+    rootRouteId: undefined,
+    alertGroupsLen: undefined,
+  });
+
+  const computeMatching = useCallback(async () => {
+    if (!rootRoute || !alertGroups) {
+      return;
+    }
+    // Skip if inputs haven't changed (prevents re-triggering after state update)
+    const inputKey = { rootRouteId: rootRoute.id, alertGroupsLen: alertGroups.length };
+    if (
+      matchingInputsRef.current.rootRouteId === inputKey.rootRouteId &&
+      matchingInputsRef.current.alertGroupsLen === inputKey.alertGroupsLen
+    ) {
+      return;
+    }
+    matchingInputsRef.current = inputKey;
+
+    try {
+      const result = await getRouteGroupsMap(rootRoute, alertGroups, { unquoteMatchers: !isGrafanaAlertmanager });
+      setRouteAlertGroupsMap(result);
+      setInstancesPreviewError(undefined);
+    } catch (error) {
+      setInstancesPreviewError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }, [rootRoute, alertGroups, getRouteGroupsMap, isGrafanaAlertmanager]);
+
+  useEffect(() => {
+    computeMatching();
+  }, [computeMatching]);
 
   // these are computed from the contactPoint and labels matchers filter
   const routesMatchingFilters = useMemo(() => {
@@ -192,10 +227,9 @@ export const PoliciesTree = ({
     if (!error) {
       appNotification.success('Updated notification policies');
     }
-    // Instance matching disabled for performance
-    // if (selectedAlertmanager) {
-    //   refetchAlertGroups();
-    // }
+    if (selectedAlertmanager && refetchAlertGroups) {
+      refetchAlertGroups();
+    }
 
     // close all modals
     closeEditModal();
@@ -280,11 +314,10 @@ export const PoliciesTree = ({
                 onDeletePolicy={openDeleteModal}
                 onShowAlertInstances={showAlertGroupsModal}
                 onResetPolicy={handleResetPolicy}
-                // Instance matching disabled for performance
-                // matchingInstancesPreview={{
-                //   groupsMap: routeAlertGroupsMap,
-                //   enabled: Boolean(canSeeAlertGroups && !instancesPreviewError),
-                // }}
+                matchingInstancesPreview={{
+                  groupsMap: routeAlertGroupsMap,
+                  enabled: Boolean(canSeeAlertGroups && !instancesPreviewError),
+                }}
                 isAutoGenerated={false}
                 isDefaultPolicy
                 isActualDefaultPolicy={!routeName || routeName === ROOT_ROUTE_NAME}

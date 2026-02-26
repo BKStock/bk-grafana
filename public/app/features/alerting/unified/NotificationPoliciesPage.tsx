@@ -12,15 +12,20 @@ import {
   NotificationPoliciesFilter,
   useNotificationPoliciesFilters,
 } from 'app/features/alerting/unified/components/notification-policies/Filters';
-import { PoliciesTree } from 'app/features/alerting/unified/components/notification-policies/PoliciesTree';
+import {
+  GetRouteGroupsMapFn,
+  PoliciesTree,
+} from 'app/features/alerting/unified/components/notification-policies/PoliciesTree';
 import { CreateModal } from 'app/features/alerting/unified/components/notification-policies/components/Modals';
 import {
   useCreatePolicyAction,
   useListNotificationPolicyRoutes,
 } from 'app/features/alerting/unified/components/notification-policies/useNotificationPolicyRoute';
 import { AlertmanagerAction, useAlertmanagerAbility } from 'app/features/alerting/unified/hooks/useAbilities';
-import { ObjectMatcher } from 'app/plugins/datasource/alertmanager/types';
+import { useRouteGroupsMatcher } from 'app/features/alerting/unified/useRouteGroupsMatcher';
+import { AlertmanagerGroup, ObjectMatcher } from 'app/plugins/datasource/alertmanager/types';
 
+import { alertmanagerApi } from './api/alertmanagerApi';
 import { AlertmanagerPageWrapper } from './components/AlertingPageWrapper';
 import { GrafanaAlertmanagerWarning } from './components/GrafanaAlertmanagerWarning';
 import { InhibitionRulesAlert } from './components/InhibitionRulesAlert';
@@ -114,15 +119,35 @@ const NotificationPoliciesTabs = () => {
 };
 
 const PolicyTreeTab = () => {
-  const { isGrafanaAlertmanager } = useAlertmanager();
+  const { selectedAlertmanager = '', isGrafanaAlertmanager } = useAlertmanager();
+  const [, canSeeAlertGroups] = useAlertmanagerAbility(AlertmanagerAction.ViewAlertGroups);
+
+  // Single worker + alert groups query shared by all PoliciesTree instances
+  const { getRouteGroupsMap } = useRouteGroupsMatcher();
+  const { currentData: alertGroups, refetch: refetchAlertGroups } = alertmanagerApi.useGetAlertmanagerAlertGroupsQuery(
+    { amSourceName: selectedAlertmanager },
+    { skip: !canSeeAlertGroups || !selectedAlertmanager }
+  );
 
   const useMultiplePoliciesView = config.featureToggles.alertingMultiplePolicies;
 
   if (!isGrafanaAlertmanager || !useMultiplePoliciesView) {
-    return <PoliciesTree />;
+    return (
+      <PoliciesTree
+        alertGroups={alertGroups}
+        refetchAlertGroups={refetchAlertGroups}
+        getRouteGroupsMap={getRouteGroupsMap}
+      />
+    );
   }
 
-  return <MultiplePoliciesView />;
+  return (
+    <MultiplePoliciesView
+      alertGroups={alertGroups}
+      refetchAlertGroups={refetchAlertGroups}
+      getRouteGroupsMap={getRouteGroupsMap}
+    />
+  );
 };
 
 /**
@@ -130,7 +155,13 @@ const PolicyTreeTab = () => {
  * Default policy is hoisted to the top. All policies are collapsed by default.
  * Provides shared filters, policy tree selector, and collapse/expand all controls.
  */
-function MultiplePoliciesView() {
+interface MultiplePoliciesViewProps {
+  alertGroups?: AlertmanagerGroup[];
+  refetchAlertGroups: () => void;
+  getRouteGroupsMap: GetRouteGroupsMapFn;
+}
+
+function MultiplePoliciesView({ alertGroups, refetchAlertGroups, getRouteGroupsMap }: MultiplePoliciesViewProps) {
   const { currentData: allPolicies, isLoading, error: fetchPoliciesError } = useListNotificationPolicyRoutes();
 
   const {
@@ -249,6 +280,9 @@ function MultiplePoliciesView() {
               defaultExpanded={defaultExpanded}
               expandedOverrides={expandedOverrides}
               onTogglePolicyExpanded={handleTogglePolicyExpanded}
+              alertGroups={alertGroups}
+              refetchAlertGroups={refetchAlertGroups}
+              getRouteGroupsMap={getRouteGroupsMap}
             />
           ))}
         </Stack>
