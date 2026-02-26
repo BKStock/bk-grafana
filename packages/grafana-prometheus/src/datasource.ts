@@ -752,8 +752,17 @@ export class PrometheusDatasource
     }
 
     const finalQuery = filters.reduce((acc, filter) => {
-      const { key, operator } = filter;
-      let { value } = filter;
+      const { key } = filter;
+      let { value, operator } = filter;
+
+      if (operator === '=|') {
+        operator = '=~';
+      }
+
+      if (operator === '!=|') {
+        operator = '!~';
+      }
+
       if (operator === '=~' || operator === '!~') {
         value = prometheusRegularEscape(value);
       }
