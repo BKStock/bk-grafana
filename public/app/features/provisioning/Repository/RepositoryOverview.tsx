@@ -10,7 +10,7 @@ import { Repository, ResourceCount } from 'app/api/clients/provisioning/v0alpha1
 import { RecentJobs } from '../Job/RecentJobs';
 import { FreeTierLimitNote } from '../Shared/FreeTierLimitNote';
 import { MissingFolderMetadataBanner } from '../components/Folders/MissingFolderMetadataBanner';
-import { useFolderMetadataStatus } from '../hooks/useFolderMetadataStatus';
+import { useRepoMetadataStatus } from '../hooks/useRepoMetadataStatus';
 import { formatTimestamp } from '../utils/time';
 
 import { RepositoryHealthCard } from './RepositoryHealthCard';
@@ -30,7 +30,7 @@ export function RepositoryOverview({ repo }: { repo: Repository }) {
   const repoName = repo.metadata?.name ?? '';
   const showFolderMetadataCheck =
     config.featureToggles.provisioning && config.featureToggles.provisioningFolderMetadata;
-  const { status: folderMetadataStatus } = useFolderMetadataStatus({ repositoryName: repoName });
+  const { status: folderMetadataStatus } = useRepoMetadataStatus(repoName);
 
   const status = repo.status;
   const webhookURL = getWebhookURL(repo);

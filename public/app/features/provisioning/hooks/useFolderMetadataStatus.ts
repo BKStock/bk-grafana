@@ -1,11 +1,10 @@
 import { skipToken } from '@reduxjs/toolkit/query/react';
-import { useMemo } from 'react';
 
 import { isFetchError } from '@grafana/runtime';
-import { useGetRepositoryFilesQuery, useGetRepositoryFilesWithPathQuery } from 'app/api/clients/provisioning/v0alpha1';
+import { useGetRepositoryFilesWithPathQuery } from 'app/api/clients/provisioning/v0alpha1';
 import { AnnoKeySourcePath } from 'app/features/apiserver/types';
 
-import { checkFilesForMissingMetadata, getFolderMetadataPath } from '../utils/folderMetadata';
+import { getFolderMetadataPath } from '../utils/folderMetadata';
 
 import { useGetResourceRepositoryView } from './useGetResourceRepositoryView';
 
@@ -16,76 +15,38 @@ export interface FolderMetadataResult {
   repositoryName: string;
 }
 
-interface RepoLevelArgs {
-  repositoryName: string;
-}
-
 /**
- * Checks whether provisioned folders have a `_folder.json` metadata file.
- *
- * Two call patterns:
- * - `useFolderMetadataStatus(folderUID)` — single-folder check via repository view + file path query
- * - `useFolderMetadataStatus({ repositoryName })` — repo-level check using the full files listing
+ * Checks whether a single provisioned folder has a `_folder.json` metadata file.
+ * Only call this for folders already known to be provisioned.
  */
-export function useFolderMetadataStatus(args: string | RepoLevelArgs): FolderMetadataResult {
-  const isRepoLevel = typeof args === 'object';
-  const folderUID = isRepoLevel ? '' : args;
-  const repoLevelName = isRepoLevel ? args.repositoryName : '';
-
-  // --- Folder-level path (active when args is a string) ---
+export function useFolderMetadataStatus(folderUID: string): FolderMetadataResult {
   const {
     repository,
     folder,
     isLoading: isRepoViewLoading,
   } = useGetResourceRepositoryView({
-    folderName: folderUID || undefined,
-    skipQuery: isRepoLevel,
+    folderName: folderUID,
   });
 
   const sourcePath = folder?.metadata?.annotations?.[AnnoKeySourcePath]?.replace(/\/+$/, '');
-  const folderRepoName = repository?.name ?? '';
+  const repoName = repository?.name ?? '';
   const folderJsonPath = getFolderMetadataPath(sourcePath);
 
-  const { error: filePathError, isLoading: isFilePathLoading } = useGetRepositoryFilesWithPathQuery(
-    !isRepoLevel && folderRepoName ? { name: folderRepoName, path: folderJsonPath } : skipToken
+  const { error, isLoading: isFileLoading } = useGetRepositoryFilesWithPathQuery(
+    repoName ? { name: repoName, path: folderJsonPath } : skipToken
   );
 
-  // --- Repo-level path (active when args is an object) ---
-  const {
-    data: filesData,
-    isLoading: isFilesLoading,
-    error: filesError,
-  } = useGetRepositoryFilesQuery(repoLevelName ? { name: repoLevelName } : skipToken);
-
-  const hasMissing = useMemo(() => {
-    if (!isRepoLevel || isFilesLoading || !filesData?.items) {
-      return false;
-    }
-    return checkFilesForMissingMetadata(filesData.items);
-  }, [isRepoLevel, filesData?.items, isFilesLoading]);
-
-  // --- Return based on which path is active ---
-  if (isRepoLevel) {
-    if (isFilesLoading) {
-      return { status: 'loading', repositoryName: repoLevelName };
-    }
-    if (filesError) {
-      return { status: 'error', repositoryName: repoLevelName };
-    }
-    return { status: hasMissing ? 'missing' : 'ok', repositoryName: repoLevelName };
+  if (isRepoViewLoading || isFileLoading) {
+    return { status: 'loading', repositoryName: repoName };
   }
 
-  if (isRepoViewLoading || isFilePathLoading) {
-    return { status: 'loading', repositoryName: folderRepoName };
+  if (isFetchError(error) && error.status === 404) {
+    return { status: 'missing', repositoryName: repoName };
   }
 
-  if (isFetchError(filePathError) && filePathError.status === 404) {
-    return { status: 'missing', repositoryName: folderRepoName };
+  if (error) {
+    return { status: 'error', repositoryName: repoName };
   }
 
-  if (filePathError) {
-    return { status: 'error', repositoryName: folderRepoName };
-  }
-
-  return { status: 'ok', repositoryName: folderRepoName };
+  return { status: 'ok', repositoryName: repoName };
 }
