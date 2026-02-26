@@ -8,6 +8,7 @@ import { DashboardScene } from '../scene/DashboardScene';
 import { NavToolbarActions } from '../scene/NavToolbarActions';
 import { DashboardLinkForm } from '../settings/links/DashboardLinkForm';
 import { DashboardLinkList } from '../settings/links/DashboardLinkList';
+import { SystemLinksSection } from '../settings/links/SystemLinksSection';
 import { NEW_LINK } from '../settings/links/utils';
 import { getDashboardSceneFor } from '../utils/utils';
 
@@ -104,6 +105,7 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
   const dashboard = getDashboardSceneFor(model);
   const { links } = dashboard.useState();
   const { navModel, pageNav } = useDashboardEditPageNav(dashboard, model.getUrlKey());
+  const defaultLinks = links.filter((link) => link.origin != null);
   const editableLinks = links.filter((link) => link.origin === undefined);
   const linkToEdit = editIndex !== undefined ? editableLinks[editIndex] : undefined;
 
@@ -131,6 +133,7 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
         onDuplicate={model.onDuplicate}
         onOrderChange={model.onOrderChange}
       />
+      {defaultLinks.length > 0 && <SystemLinksSection links={defaultLinks} />}
     </Page>
   );
 }

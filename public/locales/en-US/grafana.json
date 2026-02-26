@@ -6536,7 +6536,8 @@
       "tooltip-copy-link": "Copy link",
       "tooltip-move-link-down": "Move link down",
       "tooltip-move-link-up": "Move link up",
-      "type": "Type"
+      "type": "Type",
+      "user-defined-heading": "User defined links"
     },
     "dashboard-preview-banner": {
       "title-error-loading-dashboard": "Error loading dashboard"
@@ -7064,6 +7065,16 @@
       "value-pair-type": "Value pair type",
       "value-pair-type-description": "Choose the type of values for the switch states"
     },
+    "system-links-section": {
+      "label": "Provisioned by data source",
+      "tooltip": "Added by the {{pluginName}} plugin",
+      "tooltip-unknown": "Added by a data source plugin"
+    },
+    "system-variables-section": {
+      "label": "Provisioned by data source",
+      "tooltip": "Added by the {{pluginName}} plugin",
+      "tooltip-unknown": "Added by a data source plugin"
+    },
     "text-box-variable": {
       "name-default-value": "Default value"
     },
@@ -7169,6 +7180,7 @@
     "variable-editor-list": {
       "definition": "Definition",
       "new-variable": "New variable",
+      "user-defined-heading": "User defined variables",
       "variable": "Variable"
     },
     "variable-editor-list-row": {
