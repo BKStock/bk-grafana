@@ -1,6 +1,7 @@
 import { config } from '@grafana/runtime';
 import { sceneGraph, VizPanel } from '@grafana/scenes';
 
+import { getUpdatedHoverHeader } from '../../panel-edit/getPanelFrameOptions';
 import type { DashboardScene } from '../../scene/DashboardScene';
 import { DefaultGridLayoutManager } from '../../scene/layout-default/DefaultGridLayoutManager';
 import { DashboardMutationClient } from '../DashboardMutationClient';
@@ -92,6 +93,10 @@ function buildPanelScene(panels: VizPanel[] = [], elementMap: Record<string, num
     setState: jest.fn((partial: Record<string, unknown>) => {
       Object.assign(state, partial);
     }),
+    updatePanelTitle: jest.fn((panel: VizPanel, title: string) => {
+      panel.setState({ title, hoverHeader: getUpdatedHoverHeader(title, panel.state.$timeRange) });
+    }),
+    changePanelPlugin: jest.fn(),
   };
 
   currentTestScene = scene;
@@ -137,7 +142,12 @@ function getElementName(data: unknown): string {
   return d.layoutItem.spec.element.name;
 }
 
-async function addPanel(client: DashboardMutationClient, title: string, pluginId?: string, options?: Record<string, unknown>) {
+async function addPanel(
+  client: DashboardMutationClient,
+  title: string,
+  pluginId?: string,
+  options?: Record<string, unknown>
+) {
   const result = await client.execute({
     type: 'ADD_PANEL',
     payload: { panel: makePanelPayload(title, pluginId, options) },
@@ -152,6 +162,7 @@ describe('Panel mutation commands', () => {
   beforeEach(() => {
     jest.spyOn(sceneGraph, 'getTimeRange').mockReturnValue({
       onRefresh: jest.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   });
 
@@ -325,6 +336,48 @@ describe('Panel mutation commands', () => {
       expect(body.getVizPanels()[0].state.title).toBe('New Title');
     });
 
+    it('sets hoverHeader to true when title is cleared', async () => {
+      const scene = buildPanelScene();
+      const client = new DashboardMutationClient(scene);
+
+      const elementName = await addPanel(client, 'Has Title');
+
+      const body = scene.state.body as unknown as DefaultGridLayoutManager;
+      expect(body.getVizPanels()[0].state.hoverHeader).toBe(false);
+
+      const result = await client.execute({
+        type: 'UPDATE_PANEL',
+        payload: {
+          element: { name: elementName },
+          panel: { kind: 'Panel', spec: { title: '' } },
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(body.getVizPanels()[0].state.hoverHeader).toBe(true);
+    });
+
+    it('sets hoverHeader to false when title is set from empty', async () => {
+      const scene = buildPanelScene();
+      const client = new DashboardMutationClient(scene);
+
+      const elementName = await addPanel(client, '');
+
+      const body = scene.state.body as unknown as DefaultGridLayoutManager;
+      expect(body.getVizPanels()[0].state.hoverHeader).toBe(true);
+
+      const result = await client.execute({
+        type: 'UPDATE_PANEL',
+        payload: {
+          element: { name: elementName },
+          panel: { kind: 'Panel', spec: { title: 'Now Has Title' } },
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(body.getVizPanels()[0].state.hoverHeader).toBe(false);
+    });
+
     it('deep-merges options without losing existing keys', async () => {
       const scene = buildPanelScene();
       const client = new DashboardMutationClient(scene);
@@ -354,6 +407,7 @@ describe('Panel mutation commands', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const opts = vizPanel.state.options as Record<string, any>;
       expect(opts.legend.show).toBe(true);
       expect(opts.tooltip.mode).toBe('multi');
@@ -438,10 +492,6 @@ describe('Panel mutation commands', () => {
 
       const elementName = await addPanel(client, 'Plugin Change Panel', 'timeseries');
 
-      const body = scene.state.body as unknown as DefaultGridLayoutManager;
-      const vizPanel = body.getVizPanels()[0];
-      jest.spyOn(vizPanel, 'changePluginType').mockResolvedValue(undefined);
-
       const result = await client.execute({
         type: 'UPDATE_PANEL',
         payload: {
@@ -455,11 +505,13 @@ describe('Panel mutation commands', () => {
         },
       });
 
+      expect(result.error).toBeUndefined();
       expect(result.success).toBe(true);
-      expect(vizPanel.changePluginType).toHaveBeenCalledWith(
+      expect(scene.changePanelPlugin).toHaveBeenCalledWith(
+        expect.any(Object),
         'stat',
         { graphMode: 'none' },
-        expect.objectContaining({ defaults: expect.any(Object) })
+        undefined
       );
     });
 

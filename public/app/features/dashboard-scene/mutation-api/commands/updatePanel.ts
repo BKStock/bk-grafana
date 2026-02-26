@@ -3,21 +3,19 @@
  *
  * Partial update of an existing panel. All fields are optional;
  * only provided fields are applied. Options and fieldConfig are
- * deep-merged. Plugin type changes use the shared changePanelPlugin
- * utility for proper fieldConfig cleanup.
+ * deep-merged. Plugin type changes delegate to DashboardScene.changePanelPlugin()
+ * which handles fieldConfig cleanup and $data pipeline management.
  */
 
 import { mergeWith, cloneDeep, isArray } from 'lodash';
 import { z } from 'zod';
 
 import { FieldConfigSource } from '@grafana/data';
-import { sceneGraph } from '@grafana/scenes';
 
-import { getElements } from '../../serialization/layoutSerializers/utils';
-import { getVizPanelKeyForPanelId } from '../../utils/utils';
+import { getElements, panelQueryKindToSceneQuery } from '../../serialization/layoutSerializers/utils';
+import { getQueryRunnerFor, getVizPanelKeyForPanelId } from '../../utils/utils';
 
 import { serializeResultLayoutItem } from './movePanel';
-import { changePanelPlugin } from './panelPluginChange';
 import { payloads, type PanelQueryKind, type TransformationKind } from './schemas';
 import { enterEditModeIfNeeded, requiresEdit, type MutationCommand } from './types';
 
@@ -25,7 +23,10 @@ export const updatePanelPayloadSchema = payloads.updatePanel;
 
 export type UpdatePanelPayload = z.infer<typeof updatePanelPayloadSchema>;
 
-function mergeReplacingArrays(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+function mergeReplacingArrays(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): Record<string, unknown> {
   return mergeWith(cloneDeep(target), source, (_objValue: unknown, srcValue: unknown) => {
     if (isArray(srcValue)) {
       return srcValue;
@@ -35,14 +36,9 @@ function mergeReplacingArrays(target: Record<string, unknown>, source: Record<st
 }
 
 interface DataTransformerLike {
-  state: { transformations?: unknown[]; $data?: QueryRunnerLike };
+  state: { transformations?: unknown[]; $data?: unknown };
   setState: (state: { transformations?: unknown[] }) => void;
   reprocessTransformations: () => void;
-}
-
-interface QueryRunnerLike {
-  state: { queries?: unknown[]; datasource?: unknown };
-  setState: (state: { queries?: unknown[]; datasource?: unknown }) => void;
 }
 
 interface RawLinksHolder {
@@ -65,17 +61,6 @@ function isDataTransformer(data: unknown): data is DataTransformerLike {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const state = (data as DataTransformerLike).state;
   return typeof state === 'object' && Array.isArray(state?.transformations);
-}
-
-function getQueryRunner(data: unknown): QueryRunnerLike | undefined {
-  if (isDataTransformer(data)) {
-    return data.state.$data;
-  }
-  if (data && typeof data === 'object' && 'setState' in data) {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return data as QueryRunnerLike;
-  }
-  return undefined;
 }
 
 export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
@@ -107,10 +92,8 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
         throw new Error(`Panel for element "${elementName}" not found in the layout`);
       }
 
-      let needsRefresh = false;
-
       if (spec.title !== undefined) {
-        vizPanel.onTitleChange(spec.title);
+        scene.updatePanelTitle(vizPanel, spec.title);
       }
 
       if (spec.description !== undefined) {
@@ -142,11 +125,7 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
         if (isPluginChange) {
           const newOptions = vizConfig.spec?.options as Record<string, unknown> | undefined;
           const newFieldConfig = vizConfig.spec?.fieldConfig as FieldConfigSource | undefined;
-          await changePanelPlugin(vizPanel, {
-            newPluginId: vizConfig.group!,
-            newOptions,
-            newFieldConfig,
-          });
+          await scene.changePanelPlugin(vizPanel, vizConfig.group!, newOptions, newFieldConfig);
         } else {
           if (vizConfig.spec?.options) {
             const merged = mergeReplacingArrays(
@@ -170,17 +149,16 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
       const dataSpec = spec.data?.spec;
       if (dataSpec) {
         const dataPipeline = vizPanel.state.$data;
-        const queryRunner = getQueryRunner(dataPipeline);
+        const queryRunner = getQueryRunnerFor(vizPanel);
 
         if (dataSpec.queries && queryRunner) {
-          const queries = dataSpec.queries.map((pq: PanelQueryKind) => ({
-            refId: pq.spec.refId,
-            hide: pq.spec.hidden,
-            datasource: pq.spec.query.datasource ? { uid: pq.spec.query.datasource.name } : undefined,
-            ...pq.spec.query.spec,
-          }));
+          const queries = dataSpec.queries.map((pq: PanelQueryKind) => panelQueryKindToSceneQuery(pq));
           queryRunner.setState({ queries });
-          needsRefresh = true;
+          try {
+            queryRunner.runQueries();
+          } catch {
+            // runQueries may fail if the panel is not yet activated (e.g. no time range in scope)
+          }
         }
 
         if (dataSpec.transformations !== undefined && isDataTransformer(dataPipeline)) {
@@ -191,13 +169,7 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
           }));
           dataPipeline.setState({ transformations });
           dataPipeline.reprocessTransformations();
-          needsRefresh = true;
         }
-      }
-
-      vizPanel.forceRender();
-      if (needsRefresh) {
-        sceneGraph.getTimeRange(scene).onRefresh();
       }
 
       const fullElements = getElements(scene.state.body, scene);
