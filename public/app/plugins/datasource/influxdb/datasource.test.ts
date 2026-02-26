@@ -1,8 +1,7 @@
 import { lastValueFrom, of } from 'rxjs';
 
 import { AdHocVariableFilter } from '@grafana/data';
-import { BackendSrvRequest, TemplateSrv } from '@grafana/runtime';
-import config from 'app/core/config';
+import { BackendSrvRequest, config, TemplateSrv } from '@grafana/runtime';
 
 import { queryBuilder } from '../../../features/variables/shared/testing/builders';
 
