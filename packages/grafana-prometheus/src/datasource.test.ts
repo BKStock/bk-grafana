@@ -325,7 +325,7 @@ describe('PrometheusDatasource', () => {
           {
             key: 'cluster',
             operator: '=|',
-            value: 'prod-us-east-1|staging-eu-west-1|dev-eu-west-2',
+            value: 'prod-us-east-1',
             values: ['prod-us-east-1', 'staging-eu-west-1', 'dev-eu-west-2'],
           },
         ];
@@ -346,7 +346,7 @@ describe('PrometheusDatasource', () => {
           {
             key: 'namespace',
             operator: '!=|',
-            value: 'kube-system|kube-public',
+            value: 'kube-system',
             values: ['kube-system', 'kube-public'],
           },
         ];

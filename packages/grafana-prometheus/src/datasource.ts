@@ -751,17 +751,9 @@ export class PrometheusDatasource
       return expr;
     }
 
-    const finalQuery = filters.reduce((acc, filter) => {
+    const finalQuery = filters.map(remapOneOf).reduce((acc, filter) => {
       const { key } = filter;
       let { value, operator } = filter;
-
-      if (operator === '=|') {
-        operator = '=~';
-      }
-
-      if (operator === '!=|') {
-        operator = '!~';
-      }
 
       if (operator === '=~' || operator === '!~') {
         value = prometheusRegularEscape(value);
@@ -930,3 +922,19 @@ export const extractResourceMatcher = (
   // Create a matcher using metric names and label filters
   return `{${[...metricMatch, ...labelsMatch].join(',')}}`;
 };
+
+export function remapOneOf(filter: AdHocVariableFilter) {
+  let { operator, value, values } = filter;
+  if (operator === '=|') {
+    operator = '=~';
+    value = values?.map(prometheusRegularEscape).join('|') ?? '';
+  } else if (operator === '!=|') {
+    operator = '!~';
+    value = values?.map(prometheusRegularEscape).join('|') ?? '';
+  }
+  return {
+    ...filter,
+    operator,
+    value,
+  };
+}
