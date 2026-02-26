@@ -2430,9 +2430,13 @@
       "no-matchers": "No matchers",
       "reload-policies": "Reload policies",
       "reset-modal": {
+        "delete": "Delete",
+        "deleting": "Deleting...",
+        "permanently-delete": "This action will permanently delete the <1>{{routeName}}</1> notification policy.",
         "permanently-reset": "This action will permanently reset the <1>{{routeName}}</1> notification policy to an empty state.",
         "reset": "Reset",
         "resetting": "Resetting...",
+        "title-delete-notification-policy": "Delete notification policy",
         "title-reset-notification-policy": "Reset notification policy"
       },
       "root-policy": {
