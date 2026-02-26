@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, render } from 'test/test-utils';
+import { screen, render, waitFor } from 'test/test-utils';
 
 import { setBackendSrv } from '@grafana/runtime';
 import server, { setupMockServer } from '@grafana/test-utils/server';
@@ -32,7 +32,7 @@ describe('TeamFolders', () => {
 
         return HttpResponse.json({
           items: [
-            { name: 'general', title: 'Dashboards' },
+            { name: 'team-folder-1-parent', title: 'Parent Folder' },
             { name: 'team-folder-1', title: 'Team Folder' },
           ],
         });
@@ -41,8 +41,13 @@ describe('TeamFolders', () => {
 
     render(<TeamFolders teamUid={MOCK_TEAMS[0].metadata.name} />);
 
-    const folderLinkLabel = await screen.findByText('Team Folder');
-    expect(folderLinkLabel.closest('a')).toHaveAttribute('href', '/dashboards/f/team-folder-1');
-    expect(await screen.findByText('/Dashboards/Team Folder')).toBeInTheDocument();
+    const dashboardsPathLink = await screen.findByRole('link', { name: 'Dashboards' });
+    expect(dashboardsPathLink).toHaveAttribute('href', '/dashboards/f/general');
+
+    await waitFor(() => expect(screen.getAllByText('Team Folder', { selector: 'a' })).toHaveLength(2));
+    const teamFolderLinks = screen.getAllByText('Team Folder', { selector: 'a' });
+    expect(teamFolderLinks).toHaveLength(2);
+    expect(teamFolderLinks[0]).toHaveAttribute('href', '/dashboards/f/team-folder-1');
+    expect(teamFolderLinks[1]).toHaveAttribute('href', '/dashboards/f/team-folder-1');
   });
 });

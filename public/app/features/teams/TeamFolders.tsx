@@ -1,13 +1,14 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import memoizeOne from 'memoize-one';
+import { Fragment } from 'react';
 import Skeleton from 'react-loading-skeleton';
 
 import { DashboardHit } from '@grafana/api-clients/rtkq/dashboard/v0alpha1';
 import { t } from '@grafana/i18n';
 import { Alert, Column, InteractiveTable, Text, TextLink } from '@grafana/ui';
 import { useSearchDashboardsAndFoldersQuery } from 'app/api/clients/dashboard/v0alpha1';
-import { FolderInfo, useGetFolderParentsQuery } from 'app/api/clients/folder/v1beta1';
-import { GENERAL_FOLDER_TITLE } from 'app/features/search/constants';
+import { useGetFolderParentsQuery } from 'app/api/clients/folder/v1beta1';
+import { GENERAL_FOLDER_TITLE, GENERAL_FOLDER_UID } from 'app/features/search/constants';
 
 import { extractErrorMessage } from '../../api/utils';
 
@@ -31,7 +32,7 @@ const getColumns = memoizeOne((): Array<Column<DashboardHit>> => {
     {
       id: 'folder',
       header: t('teams.team-pages.team-folders.table.path', 'Full path'),
-      cell: ({ row: { original } }) => <FolderPathCell folderUid={original.name} folderTitle={original.title} />,
+      cell: ({ row: { original } }) => <FolderPathCell folderUid={original.name} />,
     },
   ];
 });
@@ -81,29 +82,34 @@ export function TeamFolders({ teamUid }: { teamUid: string }) {
   );
 }
 
-function FolderPathCell({ folderUid, folderTitle }: { folderUid: string; folderTitle?: string }) {
-  const { data, isLoading, isError } = useGetFolderParentsQuery(folderUid ? { name: folderUid } : skipToken);
+function FolderPathCell({ folderUid }: { folderUid: string }) {
+  const isSkeletonData = folderUid.startsWith('loading-folder');
+  const { data, isLoading, isError } = useGetFolderParentsQuery(
+    folderUid && !isSkeletonData ? { name: folderUid } : skipToken
+  );
 
-  if (isLoading) {
+  if (isLoading || isSkeletonData) {
     return <Skeleton width={220} />;
   }
 
-  if (isError) {
+  if (isError || !data?.items.length) {
     // No better error handling here. This is not blocking anything if not shown.
     return <>-</>;
   }
 
-  const path = buildFolderPath(data?.items ?? []);
-  return <>{path}</>;
-}
+  // We add the general folder "Dashboards" as root to align with other UI
+  const pathParts = [{ name: GENERAL_FOLDER_UID, title: GENERAL_FOLDER_TITLE }, ...data.items];
 
-function buildFolderPath(items: FolderInfo[]): string {
-  const parentTitles = items.map((item) => item.title).filter(Boolean);
-
-  const pathParts = [...parentTitles];
-  if (pathParts[0] !== GENERAL_FOLDER_TITLE) {
-    pathParts.unshift(GENERAL_FOLDER_TITLE);
-  }
-
-  return `/${pathParts.join('/')}`;
+  return (
+    <>
+      {pathParts.map((part) => (
+        <Fragment key={part.name}>
+          /
+          <TextLink color="primary" inline={false} href={`/dashboards/f/${part.name}`}>
+            {part.title}
+          </TextLink>
+        </Fragment>
+      ))}
+    </>
+  );
 }
