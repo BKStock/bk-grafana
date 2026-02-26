@@ -359,12 +359,17 @@ type Cfg struct {
 	SATokenExpirationDayLimit int
 
 	// Annotations
-	AnnotationCleanupJobBatchSize      int64
-	AnnotationMaximumTagsLength        int64
-	AlertingAnnotationCleanupSetting   AnnotationCleanupSettings
-	DashboardAnnotationCleanupSettings AnnotationCleanupSettings
-	APIAnnotationCleanupSettings       AnnotationCleanupSettings
-	KubernetesAnnotationsAppEnabled    bool
+	AnnotationCleanupJobBatchSize          int64
+	AnnotationMaximumTagsLength            int64
+	AlertingAnnotationCleanupSetting       AnnotationCleanupSettings
+	DashboardAnnotationCleanupSettings     AnnotationCleanupSettings
+	APIAnnotationCleanupSettings           AnnotationCleanupSettings
+	KubernetesAnnotationsAppEnabled        bool
+	KubernetesAnnotationsStoreBackend      string // "sql" (default) or "grpc"
+	KubernetesAnnotationsGRPCAddress       string // gRPC server address (e.g., "localhost:9090")
+	KubernetesAnnotationsGRPCUseTLS        bool   // Enable TLS for gRPC connection (default: false)
+	KubernetesAnnotationsGRPCTLSCAFile     string // Path to CA certificate file (optional)
+	KubernetesAnnotationsGRPCTLSSkipVerify bool   // Skip TLS verification (insecure, for testing)
 
 	// GrafanaJavascriptAgent config
 	GrafanaJavascriptAgent GrafanaJavascriptAgent
@@ -855,6 +860,11 @@ func (cfg *Cfg) readAnnotationSettings() error {
 	cfg.AnnotationCleanupJobBatchSize = section.Key("cleanupjob_batchsize").MustInt64(100)
 	cfg.AnnotationMaximumTagsLength = section.Key("tags_length").MustInt64(500)
 	cfg.KubernetesAnnotationsAppEnabled = section.Key("kubernetes_annotations_app_enabled").MustBool(false)
+	cfg.KubernetesAnnotationsStoreBackend = section.Key("kubernetes_annotations_store_backend").MustString("sql")
+	cfg.KubernetesAnnotationsGRPCAddress = section.Key("kubernetes_annotations_grpc_address").MustString("localhost:9090")
+	cfg.KubernetesAnnotationsGRPCUseTLS = section.Key("kubernetes_annotations_grpc_use_tls").MustBool(false)
+	cfg.KubernetesAnnotationsGRPCTLSCAFile = section.Key("kubernetes_annotations_grpc_tls_ca_file").MustString("")
+	cfg.KubernetesAnnotationsGRPCTLSSkipVerify = section.Key("kubernetes_annotations_grpc_tls_skip_verify").MustBool(false)
 
 	switch {
 	case cfg.AnnotationMaximumTagsLength > 4096:
