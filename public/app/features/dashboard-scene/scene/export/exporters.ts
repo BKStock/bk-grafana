@@ -477,7 +477,7 @@ export async function makeExportableV2(dashboard: DashboardV2Spec, isSharingExte
       dataQueryLabels[datasourceGroup] = group;
     }
 
-    if (!group.get(datasourceUid)) {
+    if (!group.has(datasourceUid)) {
       group.set(datasourceUid, group.size + 1);
     }
 
