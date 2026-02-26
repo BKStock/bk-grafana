@@ -27,22 +27,21 @@ const withDefaults = (
 
 /**
  * Creates the default preset using the current panel's configuration
- * Captures the current panel state including all defaults and overrides
  */
-const defaultPreset = (
-  context: PresetsSupplierContext<Options, GraphFieldConfig>
-): VisualizationSuggestion<Options, GraphFieldConfig> => {
-  return {
-    name: t('timeseries.presets.default', 'Default'),
-    fieldConfig: defaultsDeep(
-      {},
-      {
-        defaults: context.fieldConfig?.defaults ?? {},
-        overrides: context.fieldConfig?.overrides ?? [],
-      }
-    ),
-  };
-};
+// const defaultPreset = (
+//   context: PresetsSupplierContext<Options, GraphFieldConfig>
+// ): VisualizationSuggestion<Options, GraphFieldConfig> => {
+//   return {
+//     name: t('timeseries.presets.default', 'Default'),
+//     fieldConfig: defaultsDeep(
+//       {},
+//       {
+//         defaults: context.fieldConfig?.defaults ?? {},
+//         overrides: context.fieldConfig?.overrides ?? [],
+//       }
+//     ),
+//   };
+// };
 
 /**
  * Smooth preset with visible points - TS3
@@ -167,7 +166,7 @@ export const timeseriesPresetsSupplier = (
   context: PresetsSupplierContext<Options, GraphFieldConfig>
 ): Array<VisualizationSuggestion<Options, GraphFieldConfig>> | void => {
   const presets: Array<VisualizationSuggestion<Options, GraphFieldConfig>> = [
-    defaultPreset(context),
+    // defaultPreset(context),
     smoothPreset(),
     areaPreset(),
     stepPreset(),
