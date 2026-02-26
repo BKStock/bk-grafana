@@ -46,7 +46,7 @@ Use the following checklist to diagnose common issues with the Traces to profile
 
 ### Button appears but no profile data is shown
 
-1. The span might be shorter than the profiler's sampling interval. Span profiling is most effective on spans longer than 20ms.
+1. The span might be shorter than the sampling interval of the profiler. Span profiling is most effective on spans longer than 20ms.
 1. CPU profiling only captures time spent actively executing on the CPU. If the span is mostly waiting on I/O, network calls, or database queries, the CPU profile for that span may be sparse or empty.
 1. Verify that the profile type selected in the Tempo data source configuration matches the profile type your application sends.
 
