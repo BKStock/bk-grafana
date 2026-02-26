@@ -502,6 +502,90 @@ describe('PanelDataPaneNext', () => {
     });
   });
 
+  describe('resolveUniformDatasource', () => {
+    it('should collapse from Mixed when all queries use the same datasource', () => {
+      mockQueryRunnerState.datasource = { uid: '-- Mixed --', type: 'mixed' };
+      mockQueryRunnerState.queries = [
+        { refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } },
+        { refId: 'B', datasource: { type: 'prometheus', uid: 'prom-1' } },
+      ];
+
+      dataPane.updateQueries([...mockQueryRunnerState.queries] as DataQuery[]);
+
+      // First call sets queries, second call collapses from Mixed
+      expect(mockQueryRunner.setState).toHaveBeenCalledTimes(2);
+      expect(mockQueryRunner.setState).toHaveBeenLastCalledWith({
+        datasource: { type: 'prometheus', uid: 'prom-1' },
+      });
+    });
+
+    it('should not collapse from Mixed when queries use different datasources', () => {
+      mockQueryRunnerState.datasource = { uid: '-- Mixed --', type: 'mixed' };
+      mockQueryRunnerState.queries = [
+        { refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } },
+        { refId: 'B', datasource: { type: 'graphite', uid: 'graphite-1' } },
+      ];
+
+      dataPane.updateQueries([...mockQueryRunnerState.queries] as DataQuery[]);
+
+      // Only the queries update, no collapse
+      expect(mockQueryRunner.setState).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ignore expression queries when checking for uniform datasource', () => {
+      mockQueryRunnerState.datasource = { uid: '-- Mixed --', type: 'mixed' };
+      mockQueryRunnerState.queries = [
+        { refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } },
+        { refId: 'B', datasource: { type: '__expr__', uid: '__expr__' } },
+        { refId: 'C', datasource: { type: 'prometheus', uid: 'prom-1' } },
+      ];
+
+      dataPane.updateQueries([...mockQueryRunnerState.queries] as DataQuery[]);
+
+      expect(mockQueryRunner.setState).toHaveBeenCalledTimes(2);
+      expect(mockQueryRunner.setState).toHaveBeenLastCalledWith({
+        datasource: { type: 'prometheus', uid: 'prom-1' },
+      });
+    });
+
+    it('should not collapse when not in Mixed mode', () => {
+      mockQueryRunnerState.datasource = { uid: 'prom-1', type: 'prometheus' };
+      mockQueryRunnerState.queries = [{ refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } }];
+
+      dataPane.updateQueries([...mockQueryRunnerState.queries] as DataQuery[]);
+
+      expect(mockQueryRunner.setState).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not collapse when there are no regular queries (only expressions)', () => {
+      mockQueryRunnerState.datasource = { uid: '-- Mixed --', type: 'mixed' };
+      mockQueryRunnerState.queries = [{ refId: 'A', datasource: { type: '__expr__', uid: '__expr__' } }];
+
+      dataPane.updateQueries([...mockQueryRunnerState.queries] as DataQuery[]);
+
+      expect(mockQueryRunner.setState).toHaveBeenCalledTimes(1);
+    });
+
+    it('should collapse after deleteQuery when remaining queries are uniform', () => {
+      mockQueryRunnerState.datasource = { uid: '-- Mixed --', type: 'mixed' };
+      mockQueryRunnerState.queries = [
+        { refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } },
+        { refId: 'B', datasource: { type: 'graphite', uid: 'graphite-1' } },
+      ] as DataQuery[];
+
+      // Simulate deleting query B — after mutateQuery, queries would be just [A]
+      // The mock setState doesn't actually update mockQueryRunnerState, so we
+      // update it manually to simulate the post-mutation state
+      mockQueryRunnerState.queries = [{ refId: 'A', datasource: { type: 'prometheus', uid: 'prom-1' } }] as DataQuery[];
+
+      dataPane.deleteQuery('B');
+
+      expect(mockQueryRunner.setState).toHaveBeenCalledWith({
+        datasource: { type: 'prometheus', uid: 'prom-1' },
+      });
+    });
+  });
+
   describe('localStorage datasource loading', () => {
     it('should load datasource from localStorage when no datasource is available', async () => {
       // Clear all mocks to ensure clean state
