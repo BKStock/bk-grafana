@@ -30,6 +30,7 @@ export const AnnotationTooltip2 = ({
   links = [],
   actions = [],
 }: Props) => {
+  console.log('AnnotationTooltip2', annoVals);
   const annoId = annoVals.id?.[annoIdx];
 
   const styles = useStyles2(getStyles);

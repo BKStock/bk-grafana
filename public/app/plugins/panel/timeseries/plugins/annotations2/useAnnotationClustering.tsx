@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+
 import { DataFrame, FieldType } from '@grafana/data';
 
 interface Props {
@@ -11,75 +12,78 @@ enum ClusteringMode {
   Render = 'render',
 }
 
-export const useAnnotationClustering = ({ annotations: _annos, clusteringMode }: Props) => {
-  const { annos } = useMemo(() => {
-    const annos2: DataFrame[] = [];
+const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
+  const isRegionVals: boolean[] =
+    frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
+  const clusterIdx: Array<number | null> = Array(timeVals.length).fill(null);
+  const clusters: number[][] = [];
 
-    // 15min in millis
-    // todo: compute this from pixel space, to make dynamic, like 10px -> millis
-    let mergeThreshold = (3600 / 4) * 1e3;
+  let thisCluster: number[] = [];
+  let prevIdx = null;
 
-    // per-frame clustering
-    if (clusteringMode === ClusteringMode.Render) {
-      for (let i = 0; i < _annos.length; i++) {
-        let frame = _annos[i];
+  // 15min in millis
+  // todo: compute this from pixel space, to make dynamic, like 10px -> millis
+  const mergeThreshold = (3600 / 4) * 1e3;
 
-        let timeVals = frame.fields.find((f) => f.name === 'time')!.values;
-        let colorVals = frame.fields.find((f) => f.name === 'color')!.values;
+  for (let j = 0; j < timeVals.length; j++) {
+    let time = timeVals[j];
 
-        if (timeVals.length > 1) {
-          let isRegionVals =
-            frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
-
-          let len = timeVals.length;
-
-          let clusterIdx = Array(timeVals.length).fill(null);
-          let clusters: number[][] = [];
-
-          let thisCluster: number[] = [];
-          let prevIdx = null;
-
-          for (let j = 0; j < len; j++) {
-            let time = timeVals[j];
-
-            if (!isRegionVals[j]) {
-              if (prevIdx != null) {
-                if (time - timeVals[prevIdx] <= mergeThreshold) {
-                  // open cluster
-                  if (thisCluster.length === 0) {
-                    thisCluster.push(prevIdx);
-                    clusterIdx[prevIdx] = clusters.length;
-                  }
-                  thisCluster.push(j);
-                  clusterIdx[j] = clusters.length;
-                } else {
-                  // close cluster
-                  if (thisCluster.length > 0) {
-                    clusters.push(thisCluster);
-                    thisCluster = [];
-                  }
-                }
-              }
-
-              prevIdx = j;
-            }
+    // Don't cluster regions?
+    if (!isRegionVals[j]) {
+      if (prevIdx != null) {
+        // if we're within the threshold
+        if (time - timeVals[prevIdx] <= mergeThreshold) {
+          // open cluster
+          if (thisCluster.length === 0) {
+            thisCluster.push(prevIdx);
+            clusterIdx[prevIdx] = clusters.length;
           }
-
+          thisCluster.push(j);
+          clusterIdx[j] = clusters.length;
+        } else {
           // close cluster
           if (thisCluster.length > 0) {
             clusters.push(thisCluster);
+            thisCluster = [];
           }
+        }
+      }
 
-          // console.log(clusters);
+      prevIdx = j;
+    }
+  }
 
-          let frame2: DataFrame = {
+  // close cluster
+  if (thisCluster.length > 0) {
+    clusters.push(thisCluster);
+  }
+
+  return { clusterIdx, clusters };
+};
+export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) => {
+  const { outAnnos } = useMemo(() => {
+    const clusteredAnnotations: DataFrame[] = [];
+
+    // per-frame clustering
+    if (clusteringMode === ClusteringMode.Render) {
+      for (let frameIdx = 0; frameIdx < annotations.length; frameIdx++) {
+        const frame = annotations[frameIdx];
+
+        // @todo annotation getters
+        const timeVals: number[] = frame.fields.find((f) => f.name === 'time')?.values ?? [];
+        const colorVals: string[] = frame.fields.find((f) => f.name === 'color')?.values ?? [];
+
+        if (timeVals.length > 1) {
+          let { clusterIdx, clusters } = buildAnnotationClusters(frame, timeVals);
+
+          const timeEndFrame: DataFrame = {
             ...frame,
             fields: frame.fields
               .map((field) => ({
                 ...field,
                 values: field.values.slice(),
               }))
-              // append cluster indices
+              // add new number field containing the cluster locations
               .concat({
                 type: FieldType.number,
                 name: 'clusterIdx',
@@ -88,57 +92,68 @@ export const useAnnotationClustering = ({ annotations: _annos, clusteringMode }:
               }),
           };
 
-          let hasTimeEndField = frame2.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
+          let hasTimeEndField = timeEndFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
 
           if (!hasTimeEndField) {
-            frame2.fields.push({
+            timeEndFrame.fields.push({
               type: FieldType.time,
               name: 'timeEnd',
-              values: Array(frame2.fields[0].values.length).fill(null),
+              values: Array(timeEndFrame.fields[0].values.length).fill(null),
               config: {},
             });
           }
 
           // append cluster regions to frame
           clusters.forEach((idxs, ci) => {
-            frame2.fields.forEach((field) => {
-              let vals = field.values;
+            timeEndFrame.fields.forEach((field) => {
+              const vals = field.values;
 
+              // @todo clean up
               if (field.name === 'time') {
+                // Push the first clustered annotation as the annotation region start time
                 vals.push(timeVals[idxs[0]]);
               } else if (field.name === 'timeEnd') {
+                // push the last clustered annotation as the annotation region end time
                 let lastIdx = idxs.length - 1;
                 vals.push(timeVals[idxs[lastIdx]]);
               } else if (field.name === 'isRegion') {
+                // It is a region
+                // @todo can a cluster have just one anno?
                 vals.push(true);
               } else if (field.name === 'color') {
+                // Use the color of the first annotation in the region
                 vals.push(colorVals[idxs[0]]);
               } else if (field.name === 'title') {
+                // Indicate the cluster index as the annotation title
                 vals.push(`Cluster ${ci}`);
               } else if (field.name === 'text') {
-                vals.push(idxs.join());
+                // Merge the indicies as the text?
+                // @todo debugging
+                vals.push('idicies' + idxs.join(', '));
               } else if (field.name === 'clusterIdx') {
+                // Update the cluster index?
                 vals.push(ci);
               } else {
+                console.log('unexpected annotation field name', { field });
                 vals.push(null);
               }
             });
           });
 
-          frame2.length = frame2.fields[0].values.length;
-
-          // console.log(frame2);
-          annos2.push(frame2);
+          // Set data frame length
+          timeEndFrame.length = timeEndFrame.fields[0].values.length;
+          clusteredAnnotations.push(timeEndFrame);
         } else {
-          annos2.push(frame);
+          clusteredAnnotations.push(frame);
         }
       }
     } else if (clusteringMode === ClusteringMode.Hover) {
       // TODO
+      console.warn('Hover mode not implemented');
     }
 
-    return { annos: annos2.length > 0 ? annos2 : _annos };
-  }, [_annos, clusteringMode]);
+    return { outAnnos: clusteredAnnotations.length > 0 ? clusteredAnnotations : annotations };
+  }, [annotations, clusteringMode]);
 
-  return annos;
+  return outAnnos;
 };

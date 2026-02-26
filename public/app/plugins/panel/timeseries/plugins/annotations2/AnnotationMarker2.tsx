@@ -55,7 +55,15 @@ export const AnnotationMarker2 = ({
 
   const [state, setState] = useState(exitWipEdit != null ? STATE_EDITING : STATE_DEFAULT);
   const [isHovering, setIsHovering] = useState(false);
+
   const isClustering = annoVals.isRegion[annoIdx] && annoVals.clusterIdx?.[annoIdx];
+  console.log('isCustlueer', {
+    isClustering,
+    annoVals,
+    annoIdx,
+    'annoVals.isRegion[annoIdx]': annoVals.isRegion[annoIdx],
+    'annoVals.clusterIdx?.[annoIdx]': annoVals.clusterIdx?.[annoIdx],
+  });
   const { refs, floatingStyles } = useFloating({
     open: true,
     placement,
@@ -81,6 +89,7 @@ export const AnnotationMarker2 = ({
     });
   }
 
+  console.log('contents', isClustering);
   const contents = isClustering ? (
     <AnnotationTooltip2Cluster
       actions={actions}

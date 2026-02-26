@@ -5,13 +5,7 @@ import { createPortal } from 'react-dom';
 import tinycolor from 'tinycolor2';
 import uPlot from 'uplot';
 
-import {
-  arrayToDataFrame,
-  colorManipulator,
-  DataFrame,
-  DataTopic,
-  InterpolateFunction,
-} from '@grafana/data';
+import { arrayToDataFrame, colorManipulator, DataFrame, DataTopic, InterpolateFunction } from '@grafana/data';
 import { maybeSortFrame } from '@grafana/data/internal';
 import { TimeZone, VizAnnotations } from '@grafana/schema';
 import {
@@ -22,12 +16,11 @@ import {
   useStyles2,
   useTheme2,
 } from '@grafana/ui';
+import { TimeRange2 } from '@grafana/ui/internal';
 
 import { AnnotationMarker2 } from './annotations2/AnnotationMarker2';
-import { ANNOTATION_LANE_SIZE, getXAnnotationFrames, getXYAnnotationFrames } from './utils';
 import { useAnnotationClustering } from './annotations2/useAnnotationClustering';
-import { useAnnotations } from './annotations2/useAnnotations';
-import { TimeRange2 } from '@grafana/ui/internal';
+import { ANNOTATION_LANE_SIZE, getXAnnotationFrames, getXYAnnotationFrames } from './utils';
 
 interface AnnotationsPluginProps {
   config: UPlotConfigBuilder;
@@ -75,6 +68,30 @@ function getVals(frame: DataFrame) {
   return vals;
 }
 
+/**
+ * edit mode wip frame
+ * @param newRange
+ */
+const buildWipAnnoFrame = (newRange: TimeRange2) => {
+  let isRegion = newRange.to > newRange.from;
+
+  const wipAnnoFrame = arrayToDataFrame([
+    {
+      time: newRange.from,
+      timeEnd: isRegion ? newRange.to : null,
+      isRegion: isRegion,
+      color: DEFAULT_ANNOTATION_COLOR_HEX8,
+    },
+  ]);
+
+  wipAnnoFrame.meta = {
+    dataTopic: DataTopic.Annotations,
+    custom: {
+      isWip: true,
+    },
+  };
+  return wipAnnoFrame;
+};
 export const AnnotationsPlugin2 = ({
   annotations,
   timeZone,
@@ -95,37 +112,22 @@ export const AnnotationsPlugin2 = ({
   const [_, forceUpdate] = useReducer((x) => x + 1, 0);
 
   const clusteringMode: ClusteringMode | null = annotationsOptions?.clustering ? ClusteringMode.Render : null;
-  console.log('clusteringmode', clusteringMode);
   const { canExecuteActions } = usePanelContext();
   const userCanExecuteActions = canExecuteActions?.() ?? false;
 
   const { xAnnos, xyAnnos } = useMemo(() => {
-    let xAnnos = getXAnnotationFrames(annotations);
-    let xyAnnos = getXYAnnotationFrames(annotations);
+    const xAnnos = getXAnnotationFrames(annotations).map((frame) =>
+      maybeSortFrame(
+        frame,
+        frame.fields.findIndex((field) => field.name === 'time')
+      )
+    );
+
+    const xyAnnos = getXYAnnotationFrames(annotations);
 
     if (newRange) {
-      let isRegion = newRange.to > newRange.from;
-
-      const wipAnnoFrame = arrayToDataFrame([
-        {
-          time: newRange.from,
-          timeEnd: isRegion ? newRange.to : null,
-          isRegion: isRegion,
-          color: DEFAULT_ANNOTATION_COLOR_HEX8,
-        },
-      ]);
-
-      wipAnnoFrame.meta = {
-        dataTopic: DataTopic.Annotations,
-        custom: {
-          isWip: true,
-        },
-      };
-      const sortedAnnoFrame = maybeSortFrame(
-        wipAnnoFrame,
-        wipAnnoFrame.fields.findIndex((field) => field.name === 'time')
-      );
-      xAnnos.push(sortedAnnoFrame);
+      const wipAnnoFrame = buildWipAnnoFrame(newRange);
+      xAnnos.push(wipAnnoFrame);
     }
 
     return {
@@ -134,16 +136,10 @@ export const AnnotationsPlugin2 = ({
     };
   }, [annotations, newRange]);
 
-  const _annos = useAnnotations({ annotations, newRange });
-
-  console.log('xAnnos (before cluster)', xAnnos);
-
-  const clusteredAnnos = useAnnotationClustering({ annotations: _annos, clusteringMode });
+  const clusteredAnnos = useAnnotationClustering({ annotations: xAnnos, clusteringMode });
   const exitWipEdit = useCallback(() => {
     setNewRange(null);
   }, [setNewRange]);
-
-  console.log('clusteredAnnos', clusteredAnnos);
 
   const xAnnoRef = useRef(clusteredAnnos);
   xAnnoRef.current = clusteredAnnos;
@@ -158,53 +154,63 @@ export const AnnotationsPlugin2 = ({
 
   useLayoutEffect(() => {
     config.addHook('ready', (u) => {
-      let xAxisEl = u.root.querySelector<HTMLDivElement>('.u-axis')!;
-      xAxisRef.current = xAxisEl;
+      xAxisRef.current = u.root.querySelector<HTMLDivElement>('.u-axis')!;
       setPlot(u);
     });
 
     config.addHook('draw', (u) => {
-      let xAnnos = xAnnoRef.current;
-      let xyAnnos = xyAnnoRef.current;
-
+      const xAnnos = xAnnoRef.current;
+      const xyAnnos = xyAnnoRef.current;
       const ctx = u.ctx;
 
       ctx.save();
-
       ctx.beginPath();
       ctx.rect(u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height);
       ctx.clip();
 
+      // @todo debug:: do we want lines again if clustering is used? Multi-lane + clustering makes the use-case for making this configurable in the annotation settings.
+      const shouldRenderRegion = !annotationsOptions?.multiLane || annotationsOptions.clustering || true;
+      const shouldRenderLine = true;
+
+      console.log('xAnnos', xAnnos);
+
       // Multi-lane annotations do not support vertical lines or shaded regions
       xAnnos.forEach((frame) => {
-        let vals = getVals(frame);
+        const vals = getVals(frame);
         const clusterIdx = vals.clusterIdx;
-        if (!annotationsOptions?.multiLane) {
+        console.log('clusterIdx', clusterIdx);
+
+        // render line
+        if (shouldRenderLine) {
           let y0 = u.bbox.top;
           let y1 = y0 + u.bbox.height;
 
           ctx.lineWidth = 2;
           ctx.setLineDash([5, 5]);
 
-          for (let i = 0; i < vals.time.length; i++) {
-            // skip rendering annos that are clustered (have non-null cluster index)
-            if (clusterIdx?.[i] != null && !vals.isRegion[i]) {
-              continue;
-            }
-            let color = getColorByName(vals.color?.[i] ?? DEFAULT_ANNOTATION_COLOR_HEX8);
+          // Render region
+          if (shouldRenderRegion) {
+            for (let i = 0; i < vals.time.length; i++) {
+              // skip rendering annos that are clustered (have non-null cluster index)
+              if (clusterIdx?.[i] != null && !vals.isRegion[i]) {
+                continue;
+              }
+              let color = getColorByName(vals.color?.[i] ?? DEFAULT_ANNOTATION_COLOR_HEX8);
 
-            let x0 = u.valToPos(vals.time[i], 'x', true);
-            renderLine(ctx, y0, y1, x0, color);
+              let x0 = u.valToPos(vals.time[i], 'x', true);
+              renderLine(ctx, y0, y1, x0, color);
 
-            // If dataframe does not have end times, let's omit rendering the region for now to prevent runtime error in valToPos
-            // @todo do we want to fix isRegion to render a point (or use "to" as timeEnd) when we're missing timeEnd?
-            if (vals.isRegion?.[i] && vals.timeEnd?.[i]) {
-              let x1 = u.valToPos(vals.timeEnd[i], 'x', true);
-              renderLine(ctx, y0, y1, x1, color);
+              // If dataframe does not have end times, let's omit rendering the region for now to prevent runtime error in valToPos
+              // @todo do we want to fix isRegion to render a point (or use "to" as timeEnd) when we're missing timeEnd?
 
-              if (canvasRegionRendering) {
-                ctx.fillStyle = colorManipulator.alpha(color, 0.1);
-                ctx.fillRect(x0, y0, x1 - x0, u.bbox.height);
+              if (vals.isRegion?.[i] && vals.timeEnd?.[i]) {
+                let x1 = u.valToPos(vals.timeEnd[i], 'x', true);
+                renderLine(ctx, y0, y1, x1, color);
+
+                if (canvasRegionRendering) {
+                  ctx.fillStyle = colorManipulator.alpha(color, 0.1);
+                  ctx.fillRect(x0, y0, x1 - x0, u.bbox.height);
+                }
               }
             }
           }
@@ -246,8 +252,9 @@ export const AnnotationsPlugin2 = ({
 
       ctx.restore();
     });
-  }, [config, canvasRegionRendering, getColorByName, annotationsOptions?.multiLane]);
+  }, [config, canvasRegionRendering, getColorByName, annotationsOptions?.multiLane, annotationsOptions?.clustering]);
 
+  // @todo useEffect on the react ref or the "wrong" variable?
   // ensure xAnnos are re-drawn whenever they change
   useEffect(() => {
     if (plot) {
@@ -268,10 +275,9 @@ export const AnnotationsPlugin2 = ({
   }, []);
 
   if (plot) {
-    let markers = xAnnos.flatMap((frame, frameIdx) => {
-      let vals = getVals(frame);
-
-      let markers: React.ReactNode[] = [];
+    const markers = xAnnoRef.current.flatMap((frame, frameIdx) => {
+      const vals = getVals(frame);
+      const markers: React.ReactNode[] = [];
 
       // Top offset for multi-lane annotations
       const top = annotationsOptions?.multiLane ? frameIdx * ANNOTATION_LANE_SIZE : undefined;

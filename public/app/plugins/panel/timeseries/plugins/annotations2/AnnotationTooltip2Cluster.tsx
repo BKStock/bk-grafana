@@ -35,6 +35,7 @@ export const AnnotationTooltip2Cluster = ({
   links,
   actions,
 }: Props) => {
+  console.log('AnnotationTooltip2Cluster', annoVals);
   // const annoId = annoVals.id?.[annoIdx];
 
   const styles = useStyles2(getStyles);
