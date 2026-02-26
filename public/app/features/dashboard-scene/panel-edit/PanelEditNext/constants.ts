@@ -187,6 +187,14 @@ export const QUERY_OPTION_FIELD_CONFIG: Record<QueryOptionField, QueryOptionFiel
     getLabel: () => t('query-editor-next.details-sidebar.cache-ttl', 'Cache TTL'),
     inputType: 'number',
   },
+  [QueryOptionField.hideTimeInfo]: {
+    getTooltip: () =>
+      t(
+        'query-editor-next.details-sidebar.hide-time-info-tooltip',
+        'Hide the time override information displayed on the panel.'
+      ),
+    getLabel: () => t('query-editor-next.details-sidebar.hide-time-info', 'Hide time info'),
+  },
 };
 
 export const EXPRESSION_IMAGE_MAP: Record<ExpressionQueryType, { dark: string; light: string }> = {

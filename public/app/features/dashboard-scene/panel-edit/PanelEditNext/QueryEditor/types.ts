@@ -48,4 +48,5 @@ export enum QueryOptionField {
   timeShift = 'timeShift',
   cacheTimeout = 'cacheTimeout',
   queryCachingTTL = 'queryCachingTTL',
+  hideTimeInfo = 'hideTimeInfo',
 }

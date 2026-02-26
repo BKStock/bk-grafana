@@ -22,16 +22,17 @@ export function QueryEditorFooter() {
   const { queryOptions } = useQueryEditorUIContext();
   const { options, openSidebar } = queryOptions;
   const { data } = useQueryRunnerContext();
-  const { datasource } = useDatasourceContext();
+  const { datasource, dsSettings } = useDatasourceContext();
 
-  // Compute footer items from actual query options
-  // Items with isActive=true have non-default (user-set) values and are highlighted
+  const showCacheTimeout = dsSettings?.meta.queryOptions?.cacheTimeout;
+  const showCacheTTL = dsSettings?.cachingConfig?.enabled;
+
   const items: FooterLabelValue[] = useMemo(() => {
     const realMaxDataPoints = data?.request?.maxDataPoints;
     const realInterval = data?.request?.interval;
     const minIntervalOnDs = datasource?.interval ?? t('query-editor-next.footer.placeholder.no-limit', 'No limit');
 
-    return [
+    const result: FooterLabelValue[] = [
       {
         id: QueryOptionField.maxDataPoints,
         label: t('query-editor-next.footer.label.max-data-points', 'Max data points'),
@@ -48,7 +49,7 @@ export function QueryEditorFooter() {
         id: QueryOptionField.interval,
         label: t('query-editor-next.footer.label.interval', 'Interval'),
         value: realInterval ?? '-',
-        isActive: false, // Interval is always computed, never user-set
+        isActive: false,
       },
       {
         id: QueryOptionField.relativeTime,
@@ -63,7 +64,32 @@ export function QueryEditorFooter() {
         isActive: options.timeRange?.shift != null,
       },
     ];
-  }, [options, data, datasource]);
+
+    if (showCacheTimeout) {
+      result.push({
+        id: QueryOptionField.cacheTimeout,
+        label: t('query-editor-next.footer.label.cache-timeout', 'Cache timeout'),
+        value: options.cacheTimeout ?? '60',
+        isActive: options.cacheTimeout != null,
+      });
+    }
+
+    if (showCacheTTL) {
+      result.push({
+        id: QueryOptionField.queryCachingTTL,
+        label: t('query-editor-next.footer.label.cache-ttl', 'Cache TTL'),
+        value:
+          options.queryCachingTTL != null
+            ? String(options.queryCachingTTL)
+            : dsSettings?.cachingConfig?.TTLMs != null
+              ? String(dsSettings.cachingConfig.TTLMs)
+              : '-',
+        isActive: options.queryCachingTTL != null,
+      });
+    }
+
+    return result;
+  }, [options, data, datasource, showCacheTimeout, showCacheTTL, dsSettings?.cachingConfig?.TTLMs]);
 
   const handleItemClick = (event: React.MouseEvent, fieldId?: QueryOptionField) => {
     // Stop propagation to prevent ClickOutsideWrapper from immediately closing

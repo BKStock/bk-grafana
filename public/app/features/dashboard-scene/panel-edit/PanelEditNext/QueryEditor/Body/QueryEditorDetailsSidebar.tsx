@@ -3,7 +3,7 @@ import { FocusEvent, useCallback, useRef } from 'react';
 
 import { GrafanaTheme2, rangeUtil } from '@grafana/data';
 import { t, Trans } from '@grafana/i18n';
-import { Button, ClickOutsideWrapper, Stack, useStyles2 } from '@grafana/ui';
+import { Button, ClickOutsideWrapper, InlineSwitch, Stack, useStyles2 } from '@grafana/ui';
 
 import { CONTENT_SIDE_BAR } from '../../constants';
 import {
@@ -97,7 +97,18 @@ export function QueryEditorDetailsSidebar() {
     [options, onQueryOptionsChange]
   );
 
-  // Shared props for all input-based OptionFields
+  const handleToggleHideTimeInfo = useCallback(() => {
+    onQueryOptionsChange({
+      ...options,
+      timeRange: {
+        ...(options.timeRange ?? {}),
+        hide: !options.timeRange?.hide,
+      },
+    });
+  }, [options, onQueryOptionsChange]);
+
+  const showHideTimeInfo = Boolean(options.timeRange?.from || options.timeRange?.shift);
+
   const inputProps = { onBlur: handleBlur, focusedField };
 
   return (
@@ -147,6 +158,16 @@ export function QueryEditorDetailsSidebar() {
               {...inputProps}
               defaultValue={options.timeRange?.shift ?? ''}
             />
+
+            {showHideTimeInfo && (
+              <OptionField field={QueryOptionField.hideTimeInfo}>
+                <InlineSwitch
+                  value={options.timeRange?.hide ?? false}
+                  onChange={handleToggleHideTimeInfo}
+                  aria-label={t('query-editor-next.details-sidebar.hide-time-info', 'Hide time info')}
+                />
+              </OptionField>
+            )}
 
             {showCacheTimeout && (
               <OptionField

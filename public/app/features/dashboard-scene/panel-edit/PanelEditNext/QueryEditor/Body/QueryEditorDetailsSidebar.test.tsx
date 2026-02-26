@@ -1,9 +1,9 @@
 import { fireEvent, screen } from '@testing-library/react';
 
-import { PanelData } from '@grafana/data';
+import { DataSourceInstanceSettings, PanelData } from '@grafana/data';
 import { QueryGroupOptions } from 'app/types/query';
 
-import { renderWithQueryEditorProvider, mockOptions, mockActions } from '../testUtils';
+import { renderWithQueryEditorProvider, mockOptions, mockActions, ds1SettingsMock } from '../testUtils';
 
 import { QueryEditorDetailsSidebar } from './QueryEditorDetailsSidebar';
 
@@ -27,10 +27,12 @@ describe('QueryEditorDetailsSidebar', () => {
 
   const renderSidebar = (
     options: QueryGroupOptions = mockOptions,
-    qrState: { queries: never[]; data: PanelData | undefined; isLoading: boolean } = defaultQrState
+    qrState: { queries: never[]; data: PanelData | undefined; isLoading: boolean } = defaultQrState,
+    dsSettings?: DataSourceInstanceSettings
   ) => {
     return renderWithQueryEditorProvider(<QueryEditorDetailsSidebar />, {
       qrState,
+      dsState: dsSettings ? { dsSettings } : undefined,
       uiStateOverrides: {
         queryOptions: {
           options,
@@ -196,6 +198,92 @@ describe('QueryEditorDetailsSidebar', () => {
 
       // onQueryOptionsChange should not be called for invalid time
       expect(mockActions.onQueryOptionsChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hideTimeInfo toggle', () => {
+    it('should not render hide time info toggle when no time overrides are set', () => {
+      renderSidebar();
+
+      expect(screen.queryByLabelText('Hide time info')).not.toBeInTheDocument();
+    });
+
+    it('should render hide time info toggle when relative time is set', () => {
+      const optionsWithRelativeTime: QueryGroupOptions = {
+        ...mockOptions,
+        timeRange: { from: '1h', shift: undefined, hide: false },
+      };
+      renderSidebar(optionsWithRelativeTime);
+
+      expect(screen.getByLabelText('Hide time info')).toBeInTheDocument();
+    });
+
+    it('should render hide time info toggle when time shift is set', () => {
+      const optionsWithTimeShift: QueryGroupOptions = {
+        ...mockOptions,
+        timeRange: { from: undefined, shift: '2h', hide: false },
+      };
+      renderSidebar(optionsWithTimeShift);
+
+      expect(screen.getByLabelText('Hide time info')).toBeInTheDocument();
+    });
+
+    it('should call onQueryOptionsChange with toggled hide value', () => {
+      const optionsWithTimeOverride: QueryGroupOptions = {
+        ...mockOptions,
+        timeRange: { from: '1h', shift: undefined, hide: false },
+      };
+      renderSidebar(optionsWithTimeOverride);
+
+      const toggle = screen.getByLabelText('Hide time info');
+      fireEvent.click(toggle);
+
+      expect(mockActions.onQueryOptionsChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeRange: expect.objectContaining({
+            hide: true,
+          }),
+        })
+      );
+    });
+  });
+
+  describe('cache options', () => {
+    it('should render cache timeout when datasource supports it', () => {
+      const dsSettingsWithCache = {
+        ...ds1SettingsMock,
+        meta: {
+          ...ds1SettingsMock.meta,
+          queryOptions: { cacheTimeout: true },
+        },
+      };
+
+      renderSidebar(mockOptions, defaultQrState, dsSettingsWithCache);
+
+      expect(screen.getByLabelText('Cache timeout')).toBeInTheDocument();
+    });
+
+    it('should not render cache timeout when datasource does not support it', () => {
+      renderSidebar();
+
+      expect(screen.queryByLabelText('Cache timeout')).not.toBeInTheDocument();
+    });
+
+    it('should render cache TTL when datasource caching is enabled', () => {
+      const dsSettingsWithCacheTTL = {
+        ...ds1SettingsMock,
+        cachingConfig: { enabled: true, TTLMs: 60000 },
+      };
+
+      renderSidebar(mockOptions, defaultQrState, dsSettingsWithCacheTTL);
+
+      expect(screen.getByLabelText('Cache TTL')).toBeInTheDocument();
+    });
+
+    it('should not render cache TTL when datasource caching is disabled', () => {
+      renderSidebar();
+
+      expect(screen.queryByLabelText('Cache TTL')).not.toBeInTheDocument();
     });
   });
 

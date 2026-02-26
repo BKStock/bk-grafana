@@ -13301,6 +13301,8 @@
       "cache-ttl": "Cache TTL",
       "cache-ttl-tooltip": "Cache time-to-live: How long results from the queries in this panel will be cached, in milliseconds.",
       "collapse": "Collapse query options sidebar",
+      "hide-time-info": "Hide time info",
+      "hide-time-info-tooltip": "Hide the time override information displayed on the panel.",
       "interval": "Interval",
       "interval-tooltip": "The evaluated interval that is sent to data source and is used in $__interval and $__interval_ms.",
       "max-data-points": "Max data points",
@@ -13318,6 +13320,8 @@
     "footer": {
       "edit-option": "Edit {{label}}",
       "label": {
+        "cache-timeout": "Cache timeout",
+        "cache-ttl": "Cache TTL",
         "interval": "Interval",
         "max-data-points": "Max data points",
         "min-interval": "Min interval",
