@@ -47,19 +47,10 @@ enum ClusteringMode {
   Render = 'render',
 }
 
-// const renderUpTriangle = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) => {
-//   ctx.beginPath();
-//   ctx.moveTo(x - w/2, y + h/2);
-//   ctx.lineTo(x + w/2, y + h/2);
-//   ctx.lineTo(x, y);
-//   ctx.closePath();
-//   ctx.fillStyle = color;
-//   ctx.fill();
-// }
-
 const DEFAULT_ANNOTATION_COLOR_HEX8 = tinycolor(DEFAULT_ANNOTATION_COLOR).toHex8String();
 
 function getVals(frame: DataFrame) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let vals: Record<string, any[]> = {};
   frame.fields.forEach((f) => {
     vals[f.name] = f.values;

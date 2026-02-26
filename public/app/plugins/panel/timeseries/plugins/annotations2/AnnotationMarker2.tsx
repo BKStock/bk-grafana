@@ -17,6 +17,7 @@ import { AnnotationTooltip2Cluster } from './AnnotationTooltip2Cluster';
 
 interface AnnoBoxProps {
   frame: DataFrame;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   annoVals: Record<string, any[]>;
   annoIdx: number;
   style: React.CSSProperties | null;

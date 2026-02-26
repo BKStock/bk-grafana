@@ -8,6 +8,7 @@ import { VizTooltipFooter } from '@grafana/ui/internal';
 import alertDef from 'app/features/alerting/state/alertDef';
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   annoVals: Record<string, any[]>;
   annoIdx: number;
   timeZone: string;
