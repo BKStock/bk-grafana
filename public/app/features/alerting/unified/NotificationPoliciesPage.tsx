@@ -12,10 +12,7 @@ import {
   NotificationPoliciesFilter,
   useNotificationPoliciesFilters,
 } from 'app/features/alerting/unified/components/notification-policies/Filters';
-import {
-  GetRouteGroupsMapFn,
-  PoliciesTree,
-} from 'app/features/alerting/unified/components/notification-policies/PoliciesTree';
+import { PoliciesTree } from 'app/features/alerting/unified/components/notification-policies/PoliciesTree';
 import { CreateModal } from 'app/features/alerting/unified/components/notification-policies/components/Modals';
 import {
   useCreatePolicyAction,
@@ -23,7 +20,7 @@ import {
 } from 'app/features/alerting/unified/components/notification-policies/useNotificationPolicyRoute';
 import { AlertmanagerAction, useAlertmanagerAbility } from 'app/features/alerting/unified/hooks/useAbilities';
 import { useRouteGroupsMatcher } from 'app/features/alerting/unified/useRouteGroupsMatcher';
-import { AlertmanagerGroup, ObjectMatcher } from 'app/plugins/datasource/alertmanager/types';
+import { ObjectMatcher } from 'app/plugins/datasource/alertmanager/types';
 
 import { alertmanagerApi } from './api/alertmanagerApi';
 import { AlertmanagerPageWrapper } from './components/AlertingPageWrapper';
@@ -118,7 +115,15 @@ const NotificationPoliciesTabs = () => {
   );
 };
 
-const PolicyTreeTab = () => {
+/**
+ * Unified policy tree view that handles both single and multiple policy trees.
+ * Owns the single Web Worker instance and alert groups query shared by all PoliciesTree children.
+ *
+ * When the `alertingMultiplePolicies` feature toggle is enabled (Grafana AM only),
+ * lists all policy trees with create/filter/expand controls.
+ * Otherwise, renders a single default policy tree.
+ */
+function PolicyTreeTab() {
   const { selectedAlertmanager = '', isGrafanaAlertmanager } = useAlertmanager();
   const [, canSeeAlertGroups] = useAlertmanagerAbility(AlertmanagerAction.ViewAlertGroups);
 
@@ -129,40 +134,13 @@ const PolicyTreeTab = () => {
     { skip: !canSeeAlertGroups || !selectedAlertmanager }
   );
 
-  const useMultiplePoliciesView = config.featureToggles.alertingMultiplePolicies;
+  const useMultiplePolicies = isGrafanaAlertmanager && config.featureToggles.alertingMultiplePolicies;
 
-  if (!isGrafanaAlertmanager || !useMultiplePoliciesView) {
-    return (
-      <PoliciesTree
-        alertGroups={alertGroups}
-        refetchAlertGroups={refetchAlertGroups}
-        getRouteGroupsMap={getRouteGroupsMap}
-      />
-    );
-  }
-
-  return (
-    <MultiplePoliciesView
-      alertGroups={alertGroups}
-      refetchAlertGroups={refetchAlertGroups}
-      getRouteGroupsMap={getRouteGroupsMap}
-    />
-  );
-};
-
-/**
- * Shows all policy trees inline as full trees (no list view).
- * Default policy is hoisted to the top. All policies are collapsed by default.
- * Provides shared filters, policy tree selector, and collapse/expand all controls.
- */
-interface MultiplePoliciesViewProps {
-  alertGroups?: AlertmanagerGroup[];
-  refetchAlertGroups: () => void;
-  getRouteGroupsMap: GetRouteGroupsMapFn;
-}
-
-function MultiplePoliciesView({ alertGroups, refetchAlertGroups, getRouteGroupsMap }: MultiplePoliciesViewProps) {
-  const { currentData: allPolicies, isLoading, error: fetchPoliciesError } = useListNotificationPolicyRoutes();
+  const {
+    currentData: allPolicies,
+    isLoading,
+    error: fetchPoliciesError,
+  } = useListNotificationPolicyRoutes({ skip: !useMultiplePolicies });
 
   const {
     isCreateModalOpen,
@@ -218,6 +196,17 @@ function MultiplePoliciesView({ alertGroups, refetchAlertGroups, getRouteGroupsM
       return selectedPolicyTreeNames.includes(name);
     });
   }, [sortedPolicies, selectedPolicyTreeNames]);
+
+  // Single-tree mode: just render one PoliciesTree with no list/create chrome
+  if (!useMultiplePolicies) {
+    return (
+      <PoliciesTree
+        alertGroups={alertGroups}
+        refetchAlertGroups={refetchAlertGroups}
+        getRouteGroupsMap={getRouteGroupsMap}
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingPlaceholder text={t('alerting.policies-list.text-loading', 'Loading....')} />;
