@@ -36,18 +36,23 @@ var (
 
 var userResource = iamv0alpha1.UserResourceInfo
 
-func NewLegacyStore(store legacy.LegacyIdentityStore, ac claims.AccessClient, tracer trace.Tracer) *LegacyStore {
-	return &LegacyStore{store, ac, tracer}
+func NewLegacyStore(store legacy.LegacyIdentityStore, ac claims.AccessClient, enableAuthnMutation bool, tracer trace.Tracer) *LegacyStore {
+	return &LegacyStore{store, ac, enableAuthnMutation, tracer}
 }
 
 type LegacyStore struct {
-	store  legacy.LegacyIdentityStore
-	ac     claims.AccessClient
-	tracer trace.Tracer
+	store               legacy.LegacyIdentityStore
+	ac                  claims.AccessClient
+	enableAuthnMutation bool
+	tracer              trace.Tracer
 }
 
 // Update implements rest.Updater.
 func (s *LegacyStore) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	if !s.enableAuthnMutation {
+		return nil, false, apierrors.NewMethodNotSupported(userResource.GroupResource(), "update")
+	}
+
 	ctx, span := s.tracer.Start(ctx, "user.Update")
 	defer span.End()
 
@@ -104,6 +109,10 @@ func (s *LegacyStore) DeleteCollection(ctx context.Context, deleteValidation res
 
 // Delete implements rest.GracefulDeleter.
 func (s *LegacyStore) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	if !s.enableAuthnMutation {
+		return nil, false, apierrors.NewMethodNotSupported(userResource.GroupResource(), "delete")
+	}
+
 	ctx, span := s.tracer.Start(ctx, "user.Delete")
 	defer span.End()
 
@@ -250,6 +259,10 @@ func (s *LegacyStore) Get(ctx context.Context, name string, options *metav1.GetO
 
 // Create implements rest.Creater.
 func (s *LegacyStore) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	if !s.enableAuthnMutation {
+		return nil, apierrors.NewMethodNotSupported(userResource.GroupResource(), "create")
+	}
+
 	ctx, span := s.tracer.Start(ctx, "user.Create")
 	defer span.End()
 
