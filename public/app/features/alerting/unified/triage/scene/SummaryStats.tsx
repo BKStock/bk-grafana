@@ -1,14 +1,20 @@
 import { css } from '@emotion/css';
+import { useState } from 'react';
 
 import { DataFrameView, GrafanaTheme2 } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
 import { SceneObjectBase, SceneObjectState } from '@grafana/scenes';
-import { useQueryRunner } from '@grafana/scenes-react';
-import { Box, ErrorBoundaryAlert, Grid, Icon, type IconName, useStyles2 } from '@grafana/ui';
+import { useQueryRunner, useSceneContext } from '@grafana/scenes-react';
+import { Box, Button, ErrorBoundaryAlert, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
 import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
+import { AllLabelsDrawer } from './AllLabelsDrawer';
+import { LabelBadgeCounts } from './BadgeCounts';
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
-import { useQueryFilter } from './utils';
+import { type LabelStats, useLabelsBreakdown } from './useLabelsBreakdown';
+import { addOrReplaceFilter, useQueryFilter } from './utils';
+
+const PREVIEW_LABEL_COUNT = 5;
 
 type AlertState = PromAlertingRuleState.Firing | PromAlertingRuleState.Pending;
 
@@ -25,39 +31,15 @@ export interface RuleFrame {
   Value: number;
 }
 
-export function parseAlertstateFilter(filter: string): AlertState[] {
-  const hasFiring = filter.match(/alertstate\s*=~?\s*"firing"/);
-  const hasPending = filter.match(/alertstate\s*=~?\s*"pending"/);
-
-  const states: AlertState[] = [];
-
-  // If both or neither match, include both states
-  if ((hasFiring && hasPending) || (!hasFiring && !hasPending)) {
-    return [PromAlertingRuleState.Firing, PromAlertingRuleState.Pending];
-  }
-
-  if (hasFiring) {
-    states.push(PromAlertingRuleState.Firing);
-  }
-  if (hasPending) {
-    states.push(PromAlertingRuleState.Pending);
-  }
-
-  return states;
-}
-
-export function countRules(ruleDfv: DataFrameView<RuleFrame>, alertstateFilter: AlertState[]) {
+export function countRules(ruleDfv: DataFrameView<RuleFrame>) {
   const counts = {
     [PromAlertingRuleState.Firing]: new Set<string>(),
     [PromAlertingRuleState.Pending]: new Set<string>(),
   };
 
-  // Only count rules for states we're interested in
   ruleDfv.fields.grafana_rule_uid.values.forEach((ruleUID, i) => {
     const alertstate = ruleDfv.fields.alertstate.values[i];
-    if (alertstateFilter.includes(alertstate)) {
-      counts[alertstate].add(ruleUID);
-    }
+    counts[alertstate]?.add(ruleUID);
   });
 
   return {
@@ -74,68 +56,127 @@ function countInstances(instanceDfv: DataFrameView<Frame>) {
   return { firing: getValue(PromAlertingRuleState.Firing), pending: getValue(PromAlertingRuleState.Pending) };
 }
 
-interface StatBoxProps {
-  i18nKey: string;
-  value: number;
+interface CompactStatRowProps {
   color: 'error' | 'warning';
-  icon?: IconName;
-  children: React.ReactNode;
+  icon: 'exclamation-circle' | 'circle';
+  instanceCount: number;
+  ruleCount: number;
+  stateLabel: AlertState;
 }
 
-function StatBox({ i18nKey, value, color, icon, children }: StatBoxProps) {
-  const styles = useStyles2(getStatBoxStyles);
+function CompactStatRow({ color, icon, instanceCount, ruleCount, stateLabel }: CompactStatRowProps) {
+  const styles = useStyles2(getCompactStatStyles);
   const colorClass = color === 'error' ? styles.errorColor : styles.warningColor;
 
   return (
-    <Box
-      display="flex"
-      direction="column"
-      justifyContent="center"
-      alignItems="center"
-      padding={2}
-      backgroundColor="secondary"
-      borderRadius="default"
-      gap={1}
-      height="100%"
-    >
-      <div className={styles.label}>
-        {icon && <Icon name={icon} size="sm" className={colorClass} />}
-        {children}
-      </div>
-      <div className={`${styles.value} ${colorClass}`}>{value}</div>
+    <div className={styles.statRow}>
+      <Icon name={icon} size="sm" className={colorClass} />
+      <Text element="span" weight="medium" color={color}>
+        {stateLabel === 'firing' ? (
+          <Trans i18nKey="alerting.triage.compact-firing">firing</Trans>
+        ) : (
+          <Trans i18nKey="alerting.triage.compact-pending">pending</Trans>
+        )}
+      </Text>
+      <span className={`${styles.statValue} ${colorClass}`}>{instanceCount}</span>
+      <Text element="span" color="secondary" variant="bodySmall">
+        <Trans i18nKey="alerting.triage.compact-instances">instances</Trans>
+      </Text>
+      <span className={`${styles.statValue} ${colorClass}`}>{ruleCount}</span>
+      <Text element="span" color="secondary" variant="bodySmall">
+        <Trans i18nKey="alerting.triage.compact-rules">rules</Trans>
+      </Text>
+    </div>
+  );
+}
+
+const TOOLTIP_MAX_VALUES = 10;
+
+function LabelTooltipContent({ label }: { label: LabelStats }) {
+  const styles = useStyles2(getTooltipStyles);
+
+  const visibleValues = label.values.slice(0, TOOLTIP_MAX_VALUES);
+  const hiddenCount = label.values.length - visibleValues.length;
+
+  return (
+    <Box padding={0.5}>
+      <Box marginBottom={0.5}>
+        <Stack direction="row" gap={1} alignItems="center">
+          <Text weight="bold">{label.key}</Text>
+          <LabelBadgeCounts firing={label.firing} pending={label.pending} />
+        </Stack>
+      </Box>
+      <div className={styles.tooltipDivider} />
+      {visibleValues.map(({ value, firing, pending }) => (
+        <Stack key={value} direction="row" justifyContent="space-between" gap={2}>
+          <span>{value}</span>
+          <LabelBadgeCounts firing={firing} pending={pending} />
+        </Stack>
+      ))}
+      {hiddenCount > 0 && (
+        <Text color="secondary" variant="bodySmall">
+          <Trans i18nKey="alerting.triage.tooltip-more-values" values={{ count: hiddenCount }}>
+            {'and {{ count }} more'}
+          </Trans>
+        </Text>
+      )}
     </Box>
   );
 }
 
-const getStatBoxStyles = (theme: GrafanaTheme2) => ({
-  label: css({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing(0.5),
-    fontSize: theme.typography.bodySmall.fontSize,
-    color: theme.colors.text.primary,
-    wordWrap: 'break-word',
-    whiteSpace: 'normal',
-    textAlign: 'center',
-  }),
-  value: css({
-    fontSize: theme.typography.h1.fontSize,
-    fontWeight: theme.typography.fontWeightMedium,
-    lineHeight: 1.2,
-    textAlign: 'center',
-  }),
-  errorColor: css({
-    color: theme.colors.error.text,
-  }),
-  warningColor: css({
-    color: theme.colors.warning.text,
-  }),
-});
+function LabelStatsSection() {
+  const styles = useStyles2(getLabelStatsStyles);
+  const { labels, isLoading } = useLabelsBreakdown();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const sceneContext = useSceneContext();
+
+  const topLabels = labels.slice(0, PREVIEW_LABEL_COUNT);
+
+  if (isLoading || topLabels.length === 0) {
+    return null;
+  }
+
+  const hiddenCount = labels.length - topLabels.length;
+
+  return (
+    <Stack direction="column" gap={1}>
+      <Stack justifyContent="space-between" alignItems="center">
+        <Text weight="medium">
+          <Trans i18nKey="alerting.triage.high-activity-labels">High Activity Labels</Trans>
+        </Text>
+        <Button variant="secondary" fill="outline" size="sm" onClick={() => setIsDrawerOpen(true)}>
+          <Trans i18nKey="alerting.triage.all-labels">All labels</Trans>
+        </Button>
+      </Stack>
+      <Stack gap={1} wrap="wrap" alignItems="center">
+        {topLabels.map((label) => (
+          <Tooltip key={label.key} content={<LabelTooltipContent label={label} />} interactive>
+            <button
+              className={styles.labelBadge}
+              type="button"
+              onClick={() => addOrReplaceFilter(sceneContext, label.key, '=~', '.+')}
+            >
+              <span>{label.key}</span>
+              <LabelBadgeCounts firing={label.firing} pending={label.pending} />
+            </button>
+          </Tooltip>
+        ))}
+        {hiddenCount > 0 && (
+          <Text color="secondary" variant="bodySmall">
+            <Trans i18nKey="alerting.triage.hidden-label-count" values={{ count: hiddenCount }}>
+              {'and {{ count }} more'}
+            </Trans>
+          </Text>
+        )}
+      </Stack>
+      {isDrawerOpen && <AllLabelsDrawer allLabels={labels} onClose={() => setIsDrawerOpen(false)} />}
+    </Stack>
+  );
+}
 
 function SummaryStatsContent() {
+  const styles = useStyles2(getCompactStatStyles);
   const filter = useQueryFilter();
-  const alertstateFilter = parseAlertstateFilter(filter);
 
   // Strip alertstate from filter since the dedup queries add their own alertstate matchers
   const cleanFilter = filter
@@ -173,51 +214,38 @@ function SummaryStatsContent() {
   }
 
   const instances = countInstances(instanceDfv);
-  const rules = countRules(ruleDfv, alertstateFilter);
+  const rules = countRules(ruleDfv);
+  const hasFiring = instances.firing > 0 || rules.firing > 0;
+  const hasPending = instances.pending > 0 || rules.pending > 0;
 
   return (
-    <Grid gap={2}>
-      {alertstateFilter.includes(PromAlertingRuleState.Firing) && (
-        <Grid columns={2} gap={2}>
-          <StatBox
-            i18nKey="alerting.triage.firing-instances-count"
-            value={instances.firing}
-            color="error"
-            icon="exclamation-circle"
-          >
-            <Trans i18nKey="alerting.triage.firing-instances-count">Firing alert instances</Trans>
-          </StatBox>
-          <StatBox
-            i18nKey="alerting.triage.firing-rules-count"
-            value={rules.firing}
-            color="error"
-            icon="exclamation-circle"
-          >
-            <Trans i18nKey="alerting.triage.rules-with-firing-instances">Alert rules with firing instances</Trans>
-          </StatBox>
-        </Grid>
-      )}
-      {alertstateFilter.includes(PromAlertingRuleState.Pending) && (
-        <Grid columns={2} gap={2}>
-          <StatBox
-            i18nKey="alerting.triage.pending-instances-count"
-            value={instances.pending}
-            color="warning"
-            icon="circle"
-          >
-            <Trans i18nKey="alerting.triage.pending-instances-count">Pending alert instances</Trans>
-          </StatBox>
-          <StatBox
-            i18nKey="alerting.triage.rules-with-pending-instances"
-            value={rules.pending}
-            color="warning"
-            icon="circle"
-          >
-            <Trans i18nKey="alerting.triage.rules-with-pending-instances">Alert rules with pending instances</Trans>
-          </StatBox>
-        </Grid>
-      )}
-    </Grid>
+    <Stack direction="column" gap={2}>
+      <Box backgroundColor="secondary" borderRadius="default" padding={1.5}>
+        <div className={styles.statsGrid}>
+          {hasFiring && (
+            <CompactStatRow
+              color="error"
+              icon="exclamation-circle"
+              instanceCount={instances.firing}
+              ruleCount={rules.firing}
+              stateLabel={PromAlertingRuleState.Firing}
+            />
+          )}
+          {hasPending && (
+            <CompactStatRow
+              color="warning"
+              icon="circle"
+              instanceCount={instances.pending}
+              ruleCount={rules.pending}
+              stateLabel={PromAlertingRuleState.Pending}
+            />
+          )}
+        </div>
+      </Box>
+      <ErrorBoundaryAlert style="alertbox">
+        <LabelStatsSection />
+      </ErrorBoundaryAlert>
+    </Stack>
   );
 }
 
@@ -233,3 +261,56 @@ export function SummaryStatsReact() {
 export class SummaryStatsScene extends SceneObjectBase<SceneObjectState> {
   static Component = SummaryStatsReact;
 }
+
+const getCompactStatStyles = (theme: GrafanaTheme2) => ({
+  statsGrid: css({
+    display: 'grid',
+    gridTemplateColumns: 'max-content max-content max-content max-content max-content max-content',
+    alignItems: 'center',
+    columnGap: theme.spacing(1.5),
+    rowGap: theme.spacing(0.5),
+    fontSize: theme.typography.body.fontSize,
+  }),
+  statRow: css({
+    display: 'contents',
+  }),
+  statValue: css({
+    fontWeight: theme.typography.fontWeightBold,
+    fontSize: theme.typography.h4.fontSize,
+    textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums',
+  }),
+  errorColor: css({
+    color: theme.colors.error.text,
+  }),
+  warningColor: css({
+    color: theme.colors.warning.text,
+  }),
+});
+
+const getTooltipStyles = (theme: GrafanaTheme2) => ({
+  tooltipDivider: css({
+    borderBottom: `1px solid ${theme.colors.border.medium}`,
+    marginBottom: theme.spacing(0.5),
+  }),
+});
+
+const getLabelStatsStyles = (theme: GrafanaTheme2) => ({
+  labelBadge: css({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: theme.spacing(0.75),
+    padding: `${theme.spacing(0.25)} ${theme.spacing(1)}`,
+    backgroundColor: theme.colors.background.secondary,
+    border: `1px solid ${theme.colors.border.weak}`,
+    borderRadius: theme.shape.radius.pill,
+    fontSize: theme.typography.bodySmall.fontSize,
+    color: theme.colors.text.primary,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+
+    '&:hover': {
+      backgroundColor: theme.colors.action.hover,
+    },
+  }),
+});
