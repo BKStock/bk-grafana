@@ -8,7 +8,6 @@ import (
 	"github.com/grafana/grafana/pkg/infra/db"
 	sqlstoremigrator "github.com/grafana/grafana/pkg/services/sqlstore/migrator"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/storage/unified/resource"
 	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -17,12 +16,14 @@ func registerMigrations(ctx context.Context,
 	cfg *setting.Cfg,
 	mg *sqlstoremigrator.Migrator,
 	migrator UnifiedMigrator,
-	client resource.ResourceClient,
+	tableLocker MigrationTableLocker,
+	client resourcepb.ResourceIndexClient,
 	sqlStore db.DB,
+	registry *MigrationRegistry,
 ) error {
-	for _, def := range Registry.All() {
+	for _, def := range registry.All() {
 		if shouldAutoMigrate(ctx, def, cfg, sqlStore) {
-			registerMigration(mg, migrator, client, def, WithAutoMigrate(cfg))
+			registerMigration(mg, migrator, tableLocker, cfg, client, def, WithAutoMigrate(cfg))
 			continue
 		}
 
@@ -34,19 +35,22 @@ func registerMigrations(ctx context.Context,
 			logger.Info("Migration is disabled in config, skipping", "migration", def.ID)
 			continue
 		}
-		registerMigration(mg, migrator, client, def)
+		registerMigration(mg, migrator, tableLocker, cfg, client, def)
 	}
 	return nil
 }
 
 func registerMigration(mg *sqlstoremigrator.Migrator,
 	migrator UnifiedMigrator,
-	client resource.ResourceClient,
+	tableLocker MigrationTableLocker,
+	cfg *setting.Cfg,
+	client resourcepb.ResourceIndexClient,
 	def MigrationDefinition,
 	opts ...ResourceMigrationOption,
 ) {
 	validators := def.CreateValidators(client, mg.Dialect.DriverName())
-	migration := NewResourceMigration(migrator, def.GetGroupResources(), def.ID, validators, opts...)
+	migration := NewResourceMigration(migrator, tableLocker, def, validators, opts...)
+	migration.runner.cfg = cfg
 	mg.AddMigration(def.MigrationID, migration)
 }
 
@@ -170,8 +174,8 @@ func migrationExists(ctx context.Context, sqlStore db.DB, migrationID string) (b
 	return count > 0, nil
 }
 
-func buildResourceKey(gr schema.GroupResource, namespace string) *resourcepb.ResourceKey {
-	if !Registry.HasResource(gr) {
+func buildResourceKey(gr schema.GroupResource, namespace string, registry *MigrationRegistry) *resourcepb.ResourceKey {
+	if !registry.HasResource(gr) {
 		return nil
 	}
 	return &resourcepb.ResourceKey{
@@ -181,12 +185,11 @@ func buildResourceKey(gr schema.GroupResource, namespace string) *resourcepb.Res
 	}
 }
 
-func validateRegisteredResources() error {
+func validateRegisteredResources(registry *MigrationRegistry) error {
 	var missing []string
 	for expected := range setting.MigratedUnifiedResources {
-		// Parse the expected format "resource.group" into a GroupResource
 		gr := parseConfigResource(expected)
-		if !Registry.HasResource(gr) {
+		if !registry.HasResource(gr) {
 			missing = append(missing, expected)
 		}
 	}

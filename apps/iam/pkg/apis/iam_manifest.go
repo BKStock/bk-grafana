@@ -74,6 +74,10 @@ var appManifestData = app.ManifestData{
 					Plural:     "Users",
 					Scope:      "Namespaced",
 					Conversion: false,
+					SelectableFields: []string{
+						"spec.email",
+						"spec.login",
+					},
 					Routes: map[string]spec3.PathProps{
 						"/teams": {
 							Get: &spec3.Operation{
@@ -266,6 +270,7 @@ var appManifestData = app.ManifestData{
 					SelectableFields: []string{
 						"spec.teamRef.name",
 						"spec.subject.name",
+						"spec.external",
 					},
 				},
 
@@ -288,6 +293,10 @@ var appManifestData = app.ManifestData{
 					Plural:     "ExternalGroupMappings",
 					Scope:      "Namespaced",
 					Conversion: false,
+					SelectableFields: []string{
+						"spec.teamRef.name",
+						"spec.externalGroupId",
+					},
 				},
 			},
 			Routes: app.ManifestVersionRoutes{
@@ -672,14 +681,14 @@ func ManifestGoTypeAssociator(kind, version string) (goType resource.Kind, exist
 }
 
 var customRouteToGoResponseType = map[string]any{
-	"v0alpha1|User|teams|GET": v0alpha1.GetTeams{},
+	"v0alpha1|User|teams|GET": v0alpha1.GetTeamsResponse{},
 
-	"v0alpha1|Team|groups|GET": v0alpha1.GetGroups{},
+	"v0alpha1|Team|groups|GET": v0alpha1.GetGroupsResponse{},
 
-	"v0alpha1|Team|members|GET": v0alpha1.GetMembers{},
+	"v0alpha1|Team|members|GET": v0alpha1.GetMembersResponse{},
 
-	"v0alpha1||<namespace>/searchTeams|GET": v0alpha1.GetSearchTeams{},
-	"v0alpha1||<namespace>/searchUsers|GET": v0alpha1.GetSearchUsers{},
+	"v0alpha1||<namespace>/searchTeams|GET": v0alpha1.GetSearchTeamsResponse{},
+	"v0alpha1||<namespace>/searchUsers|GET": v0alpha1.GetSearchUsersResponse{},
 }
 
 // ManifestCustomRouteResponsesAssociator returns the associated response go type for a given kind, version, custom route path, and method, if one exists.

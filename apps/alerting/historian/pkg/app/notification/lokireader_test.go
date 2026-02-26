@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/alerting/models"
-	"github.com/grafana/alerting/notify/historian"
-	"github.com/grafana/alerting/notify/historian/lokiclient"
-	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/alerting/notify/historian"
+	"github.com/grafana/alerting/notify/historian/lokiclient"
+	"github.com/grafana/grafana-app-sdk/logging"
 
 	"github.com/grafana/grafana/apps/alerting/historian/pkg/apis/alertinghistorian/v0alpha1"
 )
@@ -134,7 +134,15 @@ func TestBuildQuery(t *testing.T) {
 			query: Query{
 				RuleUID: stringPtr("test-rule-uid"),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid"`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | json`,
+				historian.LabelFrom, historian.LabelFromValue),
+		},
+		{
+			name: "query with receiver filter only",
+			query: Query{
+				Receiver: stringPtr("email-receiver"),
+			},
+			expected: fmt.Sprintf(`{%s=%q} | receiver = "email-receiver" | json`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -143,7 +151,7 @@ func TestBuildQuery(t *testing.T) {
 				RuleUID:  stringPtr("test-rule-uid"),
 				Receiver: stringPtr("email-receiver"),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid" | receiver = "email-receiver"`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | receiver = "email-receiver" | json`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -152,7 +160,7 @@ func TestBuildQuery(t *testing.T) {
 				RuleUID: stringPtr("test-rule-uid"),
 				Status:  createStatusPtr(v0alpha1.CreateNotificationqueryRequestNotificationStatusFiring),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid" | status = "firing"`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | json | status = "firing"`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -161,7 +169,7 @@ func TestBuildQuery(t *testing.T) {
 				RuleUID: stringPtr("test-rule-uid"),
 				Outcome: outcomePtr(v0alpha1.CreateNotificationqueryRequestNotificationOutcomeSuccess),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid" | error = ""`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | json | error = ""`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -170,7 +178,7 @@ func TestBuildQuery(t *testing.T) {
 				RuleUID: stringPtr("test-rule-uid"),
 				Outcome: outcomePtr(v0alpha1.CreateNotificationqueryRequestNotificationOutcomeError),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid" | error != ""`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | json | error != ""`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -181,7 +189,7 @@ func TestBuildQuery(t *testing.T) {
 				Status:   createStatusPtr(v0alpha1.CreateNotificationqueryRequestNotificationStatusResolved),
 				Outcome:  outcomePtr(v0alpha1.CreateNotificationqueryRequestNotificationOutcomeSuccess),
 			},
-			expected: fmt.Sprintf(`{%s=%q} | json | alert_labels___alert_rule_uid__ = "test-rule-uid" | receiver = "email-receiver" | status = "resolved" | error = ""`,
+			expected: fmt.Sprintf(`{%s=%q} | rule_uids =~ "(^|.*,)test-rule-uid($|,.*)" | receiver = "email-receiver" | json | status = "resolved" | error = ""`,
 				historian.LabelFrom, historian.LabelFromValue),
 		},
 		{
@@ -264,7 +272,7 @@ func TestParseLokiEntry(t *testing.T) {
 			sample: lokiclient.Sample{
 				T: timestamp,
 				V: createLokiEntryJSON(t, historian.NotificationHistoryLokiEntry{
-					SchemaVersion: 1,
+					SchemaVersion: 2,
 					Receiver:      "test-receiver",
 					Status:        "firing",
 					Error:         "",
@@ -272,18 +280,6 @@ func TestParseLokiEntry(t *testing.T) {
 					GroupLabels: map[string]string{
 						"alertname": "test-alert",
 					},
-					Alert: historian.NotificationHistoryLokiEntryAlert{
-						Status: "firing",
-						Labels: map[string]string{
-							"severity": "critical",
-						},
-						Annotations: map[string]string{
-							"summary": "Test alert",
-						},
-						StartsAt: now,
-						EndsAt:   now.Add(1 * time.Hour),
-					},
-					AlertIndex:   0,
 					AlertCount:   1,
 					Retry:        false,
 					Duration:     100,
@@ -300,19 +296,7 @@ func TestParseLokiEntry(t *testing.T) {
 				GroupLabels: map[string]string{
 					"alertname": "test-alert",
 				},
-				Alerts: []EntryAlert{
-					{
-						Status: "firing",
-						Labels: map[string]string{
-							"severity": "critical",
-						},
-						Annotations: map[string]string{
-							"summary": "Test alert",
-						},
-						StartsAt: now,
-						EndsAt:   now.Add(1 * time.Hour),
-					},
-				},
+				Alerts:       []EntryAlert{},
 				Retry:        false,
 				Error:        nil,
 				Duration:     100,
@@ -324,14 +308,12 @@ func TestParseLokiEntry(t *testing.T) {
 			sample: lokiclient.Sample{
 				T: timestamp,
 				V: createLokiEntryJSON(t, historian.NotificationHistoryLokiEntry{
-					SchemaVersion: 1,
+					SchemaVersion: 2,
 					Receiver:      "test-receiver",
 					Status:        "firing",
 					Error:         "notification failed",
 					GroupKey:      "key:thing",
 					GroupLabels:   map[string]string{},
-					Alert:         historian.NotificationHistoryLokiEntryAlert{},
-					AlertIndex:    0,
 					AlertCount:    1,
 					PipelineTime:  now,
 				}),
@@ -344,7 +326,7 @@ func TestParseLokiEntry(t *testing.T) {
 				Outcome:      OutcomeError,
 				GroupKey:     "key:thing",
 				GroupLabels:  map[string]string{},
-				Alerts:       []EntryAlert{{}},
+				Alerts:       []EntryAlert{},
 				Error:        stringPtr("notification failed"),
 				PipelineTime: now,
 			},
@@ -362,7 +344,7 @@ func TestParseLokiEntry(t *testing.T) {
 				Status:       Status("firing"),
 				Outcome:      OutcomeSuccess,
 				GroupLabels:  map[string]string{},
-				Alerts:       []EntryAlert{{}},
+				Alerts:       []EntryAlert{},
 				PipelineTime: now,
 			},
 		},
@@ -421,6 +403,7 @@ func TestParseLokiEntry(t *testing.T) {
 				assert.Equal(t, tt.want.Alerts[i].Annotations, got.Alerts[i].Annotations)
 				assert.Equal(t, tt.want.Alerts[i].StartsAt, got.Alerts[i].StartsAt)
 				assert.Equal(t, tt.want.Alerts[i].EndsAt, got.Alerts[i].EndsAt)
+				assert.Equal(t, tt.want.Alerts[i].Enrichments, got.Alerts[i].Enrichments)
 			}
 		})
 	}
@@ -441,27 +424,25 @@ func TestLokiReader_RunQuery(t *testing.T) {
 						{
 							T: entry1Time,
 							V: createLokiEntryJSON(t, historian.NotificationHistoryLokiEntry{
-								SchemaVersion: 1,
+								SchemaVersion: 2,
 								Receiver:      "receiver-1",
 								Status:        "firing",
+								GroupKey:      "group1",
 								GroupLabels:   map[string]string{},
-								Alert:         historian.NotificationHistoryLokiEntryAlert{},
-								AlertIndex:    0,
 								AlertCount:    1,
-								PipelineTime:  now,
+								PipelineTime:  entry1Time,
 							}),
 						},
 						{
 							T: entry3Time,
 							V: createLokiEntryJSON(t, historian.NotificationHistoryLokiEntry{
-								SchemaVersion: 1,
+								SchemaVersion: 2,
 								Receiver:      "receiver-3",
 								Status:        "firing",
+								GroupKey:      "group3",
 								GroupLabels:   map[string]string{},
-								Alert:         historian.NotificationHistoryLokiEntryAlert{},
-								AlertIndex:    0,
 								AlertCount:    1,
-								PipelineTime:  now,
+								PipelineTime:  entry3Time,
 							}),
 						},
 					},
@@ -471,14 +452,13 @@ func TestLokiReader_RunQuery(t *testing.T) {
 						{
 							T: entry2Time,
 							V: createLokiEntryJSON(t, historian.NotificationHistoryLokiEntry{
-								SchemaVersion: 1,
+								SchemaVersion: 2,
 								Receiver:      "receiver-2",
 								Status:        "firing",
+								GroupKey:      "group2",
 								GroupLabels:   map[string]string{},
-								Alert:         historian.NotificationHistoryLokiEntryAlert{},
-								AlertIndex:    0,
 								AlertCount:    1,
-								PipelineTime:  now,
+								PipelineTime:  entry2Time,
 							}),
 						},
 					},
@@ -541,7 +521,7 @@ func createMockLokiResponse(timestamp time.Time) lokiclient.QueryRes {
 						{
 							T: timestamp,
 							V: createLokiEntryJSON(nil, historian.NotificationHistoryLokiEntry{
-								SchemaVersion: 1,
+								SchemaVersion: 2,
 								Receiver:      "test-receiver",
 								Status:        "firing",
 								Error:         "",
@@ -549,18 +529,6 @@ func createMockLokiResponse(timestamp time.Time) lokiclient.QueryRes {
 								GroupLabels: map[string]string{
 									"alertname": "test-alert",
 								},
-								Alert: historian.NotificationHistoryLokiEntryAlert{
-									Status: "firing",
-									Labels: map[string]string{
-										"severity": "critical",
-									},
-									Annotations: map[string]string{
-										"summary": "Test alert",
-									},
-									StartsAt: timestamp,
-									EndsAt:   timestamp.Add(1 * time.Hour),
-								},
-								AlertIndex:   0,
 								AlertCount:   1,
 								Retry:        false,
 								Duration:     100,
@@ -585,24 +553,15 @@ func createLokiEntryJSON(t *testing.T, entry historian.NotificationHistoryLokiEn
 func createLokiEntryJSONWithNilLabels(t *testing.T, timestamp time.Time) string {
 	// Create JSON with explicit null for group_labels
 	jsonStr := fmt.Sprintf(`{
-		"schemaVersion": 1,
+		"schemaVersion": 2,
 		"receiver": "test-receiver",
 		"status": "firing",
 		"error": "",
 		"groupLabels": null,
-		"alert": {},
-		"alertIndex": 0,
 		"alertCount": 1,
 		"retry": false,
 		"duration": 0,
 		"pipelineTime": "%s"
 	}`, timestamp.Format(time.RFC3339Nano))
 	return jsonStr
-}
-
-func TestRuleUIDLabelConstant(t *testing.T) {
-	// Verify that models.RuleUIDLabel has the expected value.
-	// If this changes in the alerting module, our LogQL field path constant will be incorrect
-	// and filtering for a single alert rule by its UID will break.
-	assert.Equal(t, "__alert_rule_uid__", models.RuleUIDLabel)
 }

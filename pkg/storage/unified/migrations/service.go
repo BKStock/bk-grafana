@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/metrics"
 	sqlstoremigrator "github.com/grafana/grafana/pkg/services/sqlstore/migrator"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/storage/legacysql"
 	"github.com/grafana/grafana/pkg/storage/unified/migrations/contract"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
 	"github.com/prometheus/client_golang/prometheus"
@@ -20,11 +21,13 @@ var tracer = otel.Tracer("github.com/grafana/grafana/pkg/storage/unified/migrati
 var logger = log.New("storage.unified.migrations")
 
 type UnifiedStorageMigrationServiceImpl struct {
-	migrator UnifiedMigrator
-	cfg      *setting.Cfg
-	sqlStore db.DB
-	kv       kvstore.KVStore
-	client   resource.ResourceClient
+	migrator    UnifiedMigrator
+	tableLocker MigrationTableLocker
+	cfg         *setting.Cfg
+	sqlStore    db.DB
+	kv          kvstore.KVStore
+	client      resource.ResourceClient
+	registry    *MigrationRegistry
 }
 
 var _ contract.UnifiedStorageMigrationService = (*UnifiedStorageMigrationServiceImpl)(nil)
@@ -32,17 +35,21 @@ var _ contract.UnifiedStorageMigrationService = (*UnifiedStorageMigrationService
 // ProvideUnifiedStorageMigrationService is a Wire provider that creates the migration service.
 func ProvideUnifiedStorageMigrationService(
 	migrator UnifiedMigrator,
+	sql legacysql.LegacyDatabaseProvider,
 	cfg *setting.Cfg,
 	sqlStore db.DB,
 	kv kvstore.KVStore,
 	client resource.ResourceClient,
+	registry *MigrationRegistry,
 ) contract.UnifiedStorageMigrationService {
 	return &UnifiedStorageMigrationServiceImpl{
-		migrator: migrator,
-		cfg:      cfg,
-		sqlStore: sqlStore,
-		kv:       kv,
-		client:   client,
+		migrator:    migrator,
+		tableLocker: newTableLocker(sqlStore, sql),
+		cfg:         cfg,
+		sqlStore:    sqlStore,
+		kv:          kv,
+		client:      client,
+		registry:    registry,
 	}
 }
 
@@ -56,15 +63,27 @@ func (p *UnifiedStorageMigrationServiceImpl) Run(ctx context.Context) error {
 
 	logger.Info("Running migrations for unified storage")
 	metrics.MUnifiedStorageMigrationStatus.Set(3)
-	return RegisterMigrations(ctx, p.migrator, p.cfg, p.sqlStore, p.client)
+	return RegisterMigrations(ctx, p.migrator, p.tableLocker, p.cfg, p.sqlStore, p.client, p.registry)
+}
+
+// EnsureMigrationLogTable creates the unifiedstorage_migration_log table if it doesn't exist.
+func EnsureMigrationLogTable(ctx context.Context, sqlStore db.DB, cfg *setting.Cfg) error {
+	mg := sqlstoremigrator.NewScopedMigrator(sqlStore.GetEngine(), cfg, "unifiedstorage")
+	mg.AddCreateMigration()
+	sec := cfg.Raw.Section("database")
+	return mg.RunMigrations(ctx,
+		sec.Key("migration_locking").MustBool(true),
+		sec.Key("locking_attempt_timeout_sec").MustInt())
 }
 
 func RegisterMigrations(
 	ctx context.Context,
 	migrator UnifiedMigrator,
+	tableLocker MigrationTableLocker,
 	cfg *setting.Cfg,
 	sqlStore db.DB,
 	client resource.ResourceClient,
+	registry *MigrationRegistry,
 ) error {
 	ctx, span := tracer.Start(ctx, "storage.unified.RegisterMigrations")
 	defer span.End()
@@ -75,11 +94,11 @@ func RegisterMigrations(
 		logger.Warn("Failed to register migrator metrics", "error", err)
 	}
 
-	if err := validateRegisteredResources(); err != nil {
+	if err := validateRegisteredResources(registry); err != nil {
 		return err
 	}
 
-	if err := registerMigrations(ctx, cfg, mg, migrator, client, sqlStore); err != nil {
+	if err := registerMigrations(ctx, cfg, mg, migrator, tableLocker, client, sqlStore, registry); err != nil {
 		return err
 	}
 
@@ -87,9 +106,9 @@ func RegisterMigrations(
 	sec := cfg.Raw.Section("database")
 	db := mg.DBEngine.DB().DB
 	maxOpenConns := db.Stats().MaxOpenConnections
-	if maxOpenConns <= 2 {
-		// migrations require at least 3 connections due to extra GRPC connections
-		db.SetMaxOpenConns(3)
+	if maxOpenConns <= 3 {
+		// migrations require at least 4 connections due to extra GRPC connections and DB lock
+		db.SetMaxOpenConns(4)
 		defer db.SetMaxOpenConns(maxOpenConns)
 	}
 	err := mg.RunMigrations(ctx,

@@ -19,11 +19,13 @@ import (
 
 // BenchmarkOptions configures the benchmark parameters
 type BenchmarkOptions struct {
-	NumResources     int // total number of resources to write
-	Concurrency      int // number of concurrent writers
-	NumNamespaces    int // number of different namespaces
-	NumGroups        int // number of different groups
-	NumResourceTypes int // number of different resource types
+	NumResources       int // total number of resources to write
+	Concurrency        int // number of concurrent writers
+	NumNamespaces      int // number of different namespaces
+	NumGroups          int // number of different groups
+	NumResourceTypes   int // number of different resource types
+	NumHistoryVersions int // history depth per resource for list seed (default 10)
+	NumListIterations  int // number of List calls to measure (default 100)
 }
 
 // DefaultBenchmarkOptions returns the default benchmark options
@@ -41,29 +43,60 @@ func DefaultBenchmarkOptions(t *testing.T) *BenchmarkOptions {
 	}
 
 	return &BenchmarkOptions{
-		NumResources:     envOrDefault("RESOURCES", 1000),
-		Concurrency:      envOrDefault("CONCURRENCY", 50),
-		NumNamespaces:    envOrDefault("NAMESPACES", 1),
-		NumGroups:        envOrDefault("GROUPS", 1),
-		NumResourceTypes: envOrDefault("RESOURCE_TYPES", 1),
+		NumResources:       envOrDefault("RESOURCES", 1000),
+		Concurrency:        envOrDefault("CONCURRENCY", 50),
+		NumNamespaces:      envOrDefault("NAMESPACES", 1),
+		NumGroups:          envOrDefault("GROUPS", 1),
+		NumResourceTypes:   envOrDefault("RESOURCE_TYPES", 1),
+		NumHistoryVersions: envOrDefault("HISTORY_VERSIONS", 10),
+		NumListIterations:  envOrDefault("LIST_ITERATIONS", 100),
 	}
 }
 
 func (opts *BenchmarkOptions) String() string {
 	return fmt.Sprintf(
-		"Workers=%d, Resources=%d, Namespaces=%d, Groups=%d, Resource Types=%d",
-		opts.Concurrency, opts.NumResources, opts.NumNamespaces, opts.NumGroups, opts.NumResourceTypes,
+		"Workers=%d, Resources=%d, Namespaces=%d, Groups=%d, Resource Types=%d, History Versions=%d, List Iterations=%d",
+		opts.Concurrency, opts.NumResources, opts.NumNamespaces, opts.NumGroups, opts.NumResourceTypes, opts.NumHistoryVersions, opts.NumListIterations,
 	)
 }
 
-// BenchmarkResult contains the benchmark metrics
+// BenchmarkResult contains the benchmark metrics for a particular operation.
 type BenchmarkResult struct {
 	TotalDuration time.Duration
-	WriteCount    int
+	ReqCount      int
 	Throughput    float64 // writes per second
 	P50Latency    time.Duration
 	P90Latency    time.Duration
 	P99Latency    time.Duration
+}
+
+func (r BenchmarkResult) String() string {
+	var out strings.Builder
+
+	fmt.Fprintf(&out, "Total Duration: %v\n", r.TotalDuration)
+	fmt.Fprintf(&out, "Req Count: %d\n", r.ReqCount)
+	fmt.Fprintf(&out, "Throughput: %.2f writes/sec\n", r.Throughput)
+	fmt.Fprintf(&out, "P50 Latency: %v\n", r.P50Latency)
+	fmt.Fprintf(&out, "P90 Latency: %v\n", r.P90Latency)
+	fmt.Fprintf(&out, "P99 Latency: %v\n", r.P99Latency)
+
+	return out.String()
+}
+
+// BenchmarkResults aggregates results of a benchmark run for
+// create/update/delete/list operations.
+type BenchmarkResults struct {
+	CreateResults BenchmarkResult
+	UpdateResults BenchmarkResult
+	DeleteResults BenchmarkResult
+	ListResults   BenchmarkResult
+}
+
+func (r BenchmarkResults) String() string {
+	return fmt.Sprintf(
+		"CREATE:\n%s\n\nUPDATE:\n%s\n\nDELETE:\n%s\n\nLIST:\n%s\n",
+		r.CreateResults, r.UpdateResults, r.DeleteResults, r.ListResults,
+	)
 }
 
 // initializeBackend sets up the backend with initial resources for each group and resource type combination
@@ -89,71 +122,202 @@ func initializeBackend(ctx context.Context, backend resource.StorageBackend, opt
 }
 
 // runStorageBackendBenchmark runs a write throughput benchmark
-func runStorageBackendBenchmark(ctx context.Context, backend resource.StorageBackend, opts *BenchmarkOptions) (*BenchmarkResult, error) {
-	// Create channels for workers
-	jobs := make(chan int, opts.NumResources)
-	latencies := make([]time.Duration, opts.NumResources)
+func runStorageBackendBenchmark(t *testing.T, backend resource.StorageBackend, opts *BenchmarkOptions) *BenchmarkResults {
+	performOperation := func(operation func(context.Context, int, string, string, string, string) error) BenchmarkResult {
+		// Create channels for workers
+		jobs := make(chan int, opts.NumResources)
+		latencies := make([]time.Duration, opts.NumResources)
 
-	// Fill the jobs channel
+		// Fill the jobs channel
+		for i := 0; i < opts.NumResources; i++ {
+			jobs <- i
+		}
+		close(jobs)
+
+		g, groupCtx := errgroup.WithContext(t.Context())
+		startTime := time.Now()
+
+		for workerID := 0; workerID < opts.Concurrency; workerID++ {
+			g.Go(func() error {
+				for jobID := range jobs {
+					// Calculate a unique ID for this job that's guaranteed to be unique across all workers
+					uniqueID := jobID
+
+					// Generate deterministic and unique resource details
+					namespace := fmt.Sprintf("ns-%d", uniqueID%opts.NumNamespaces)
+					group := fmt.Sprintf("group-%d", uniqueID%opts.NumGroups)
+					resourceType := fmt.Sprintf("resource-%d", uniqueID%opts.NumResourceTypes)
+					// Ensure name is unique by using the global uniqueID
+					name := fmt.Sprintf("item-%d", uniqueID)
+
+					opStart := time.Now()
+					if err := operation(groupCtx, jobID, namespace, group, resourceType, name); err != nil {
+						return err
+					}
+					latencies[jobID] = time.Since(opStart)
+				}
+
+				return nil
+			})
+		}
+
+		// Wait for all workers to complete
+		require.NoError(t, g.Wait())
+
+		// Sort latencies for percentile calculation
+		slices.Sort(latencies)
+
+		totalDuration := time.Since(startTime)
+		return BenchmarkResult{
+			TotalDuration: time.Since(startTime),
+			ReqCount:      opts.NumResources,
+			Throughput:    float64(opts.NumResources) / totalDuration.Seconds(),
+			P50Latency:    latencies[len(latencies)*50/100],
+			P90Latency:    latencies[len(latencies)*90/100],
+			P99Latency:    latencies[len(latencies)*99/100],
+		}
+	}
+
+	rvs := make([]int64, opts.NumResources)
+
+	createResult := performOperation(func(ctx context.Context, jobID int, namespace, group, resource, name string) error {
+		var err error
+		rvs[jobID], err = WriteEvent(ctx, backend, name, resourcepb.WatchEvent_ADDED,
+			WithNamespace(namespace),
+			WithGroup(group),
+			WithResource(resource),
+			WithValue(strings.Repeat("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20))) // ~1.21 KiB
+
+		return err
+	})
+
+	updateResult := performOperation(func(ctx context.Context, jobID int, namespace, group, resource, name string) error {
+		var err error
+		rvs[jobID], err = WriteEvent(ctx, backend, name, resourcepb.WatchEvent_MODIFIED,
+			WithNamespaceAndRV(namespace, rvs[jobID]),
+			WithGroup(group),
+			WithResource(resource),
+			WithValue(strings.Repeat("9876543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba", 20))) // ~1.21 KiB
+
+		return err
+	})
+
+	deleteResult := performOperation(func(ctx context.Context, jobID int, namespace, group, resource, name string) error {
+		_, err := WriteEvent(ctx, backend, name, resourcepb.WatchEvent_DELETED,
+			WithNamespaceAndRV(namespace, rvs[jobID]),
+			WithGroup(group),
+			WithResource(resource),
+		)
+
+		return err
+	})
+
+	return &BenchmarkResults{
+		CreateResults: createResult,
+		UpdateResults: updateResult,
+		DeleteResults: deleteResult,
+	}
+}
+
+// runListBenchmark seeds resources with history and measures concurrent List latency.
+func runListBenchmark(t *testing.T, backend resource.StorageBackend, opts *BenchmarkOptions) BenchmarkResult {
+	ctx := t.Context()
+
+	// All resources go into a single namespace/group/resource to maximize scan scope.
+	const (
+		listNS       = "bench-list-ns"
+		listGroup    = "bench-list-group"
+		listResource = "bench-list-resource"
+	)
+
+	// --- Seed phase (sequential to avoid Optimistic locking conflicts) ---
+	t.Log("List benchmark: seeding resources with history...")
+	seedStart := time.Now()
+
+	rvs := make([]int64, opts.NumResources)
 	for i := 0; i < opts.NumResources; i++ {
+		name := fmt.Sprintf("list-item-%d", i)
+
+		// Create
+		rv, err := WriteEvent(ctx, backend, name, resourcepb.WatchEvent_ADDED,
+			WithNamespace(listNS),
+			WithGroup(listGroup),
+			WithResource(listResource),
+			WithValue(strings.Repeat("abcdefghijklmnopqrstuvwxyz", 10)))
+		require.NoError(t, err)
+		rvs[i] = rv
+
+		// Add history versions (MODIFIED events)
+		for v := 0; v < opts.NumHistoryVersions; v++ {
+			rv, err = WriteEvent(ctx, backend, name, resourcepb.WatchEvent_MODIFIED,
+				WithNamespaceAndRV(listNS, rvs[i]),
+				WithGroup(listGroup),
+				WithResource(listResource),
+				WithValue(strings.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 10)))
+			require.NoError(t, err)
+			rvs[i] = rv
+		}
+	}
+	t.Logf("List benchmark: seeded %d resources x %d versions in %v",
+		opts.NumResources, opts.NumHistoryVersions+1, time.Since(seedStart))
+
+	// --- Measure phase (concurrent List calls) ---
+	listReq := &resourcepb.ListRequest{
+		Options: &resourcepb.ListOptions{
+			Key: &resourcepb.ResourceKey{
+				Namespace: listNS,
+				Group:     listGroup,
+				Resource:  listResource,
+			},
+		},
+	}
+
+	jobs := make(chan int, opts.NumListIterations)
+	latencies := make([]time.Duration, opts.NumListIterations)
+
+	for i := 0; i < opts.NumListIterations; i++ {
 		jobs <- i
 	}
 	close(jobs)
 
-	g, ctx := errgroup.WithContext(ctx)
-
-	// Start workers
+	g, groupCtx := errgroup.WithContext(ctx)
 	startTime := time.Now()
-	for workerID := 0; workerID < opts.Concurrency; workerID++ {
+
+	for w := 0; w < opts.Concurrency; w++ {
 		g.Go(func() error {
 			for jobID := range jobs {
-				// Calculate a unique ID for this job that's guaranteed to be unique across all workers
-				uniqueID := jobID
-
-				// Generate deterministic and unique resource details
-				namespace := fmt.Sprintf("ns-%d", uniqueID%opts.NumNamespaces)
-				group := fmt.Sprintf("group-%d", uniqueID%opts.NumGroups)
-				resourceType := fmt.Sprintf("resource-%d", uniqueID%opts.NumResourceTypes)
-				// Ensure name is unique by using the global uniqueID
-				name := fmt.Sprintf("item-%d", uniqueID)
-
-				writeStart := time.Now()
-				_, err := WriteEvent(ctx, backend, name, resourcepb.WatchEvent_ADDED,
-					WithNamespace(namespace),
-					WithGroup(group),
-					WithResource(resourceType),
-					WithValue(strings.Repeat("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20))) // ~1.21 KiB
-
+				opStart := time.Now()
+				_, err := backend.ListIterator(groupCtx, listReq, func(iter resource.ListIterator) error {
+					for iter.Next() {
+						if err := iter.Error(); err != nil {
+							return err
+						}
+						_ = iter.Value() // drain the iterator
+					}
+					return iter.Error()
+				})
 				if err != nil {
 					return err
 				}
-
-				latencies[jobID] = time.Since(writeStart)
+				latencies[jobID] = time.Since(opStart)
 			}
-
 			return nil
 		})
 	}
 
-	// Wait for all workers to complete
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
+	require.NoError(t, g.Wait())
 
-	totalDuration := time.Since(startTime)
-	throughput := float64(opts.NumResources) / totalDuration.Seconds()
-
-	// Sort latencies for percentile calculation
 	slices.Sort(latencies)
+	totalDuration := time.Since(startTime)
 
-	return &BenchmarkResult{
+	return BenchmarkResult{
 		TotalDuration: totalDuration,
-		WriteCount:    opts.NumResources,
-		Throughput:    throughput,
+		ReqCount:      opts.NumListIterations,
+		Throughput:    float64(opts.NumListIterations) / totalDuration.Seconds(),
 		P50Latency:    latencies[len(latencies)*50/100],
 		P90Latency:    latencies[len(latencies)*90/100],
 		P99Latency:    latencies[len(latencies)*99/100],
-	}, nil
+	}
 }
 
 // RunStorageBackendBenchmark runs a benchmark test for a storage backend implementation
@@ -161,20 +325,15 @@ func RunStorageBackendBenchmark(t *testing.T, backend resource.StorageBackend, o
 	// Initialize the backend
 	require.NoError(t, initializeBackend(t.Context(), backend, opts))
 
-	// Run the benchmark
-	result, err := runStorageBackendBenchmark(t.Context(), backend, opts)
-	require.NoError(t, err)
+	results := runStorageBackendBenchmark(t, backend, opts)
+
+	results.ListResults = runListBenchmark(t, backend, opts)
 
 	// Log the results for better visibility.
 	t.Logf("Benchmark Configuration: %s", opts)
 	t.Logf("")
 	t.Logf("Benchmark Results:")
-	t.Logf("Total Duration: %v", result.TotalDuration)
-	t.Logf("Write Count: %d", result.WriteCount)
-	t.Logf("Throughput: %.2f writes/sec", result.Throughput)
-	t.Logf("P50 Latency: %v", result.P50Latency)
-	t.Logf("P90 Latency: %v", result.P90Latency)
-	t.Logf("P99 Latency: %v", result.P99Latency)
+	t.Logf("\n%s", results)
 }
 
 // runSearchBackendBenchmarkWriteThroughput runs a write throughput benchmark for search backend
@@ -203,7 +362,7 @@ func runSearchBackendBenchmarkWriteThroughput(ctx context.Context, backend resou
 	size := int64(10000) // force the index to be on disk
 	index, err := backend.BuildIndex(ctx, nr, size, nil, "benchmark", func(index resource.ResourceIndex) (int64, error) {
 		return 0, nil
-	}, nil, false)
+	}, nil, false, time.Time{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize backend: %w", err)
 	}
@@ -276,7 +435,7 @@ func runSearchBackendBenchmarkWriteThroughput(ctx context.Context, backend resou
 
 	return &BenchmarkResult{
 		TotalDuration: totalDuration,
-		WriteCount:    opts.NumResources,
+		ReqCount:      opts.NumResources,
 		Throughput:    throughput,
 		P50Latency:    latencies[len(latencies)*50/100],
 		P90Latency:    latencies[len(latencies)*90/100],
@@ -294,8 +453,8 @@ func RunSearchBackendBenchmark(t *testing.T, backend resource.SearchBackend, opt
 	t.Logf("")
 	t.Logf("Benchmark Results:")
 	t.Logf("Total Duration: %v", result.TotalDuration)
-	t.Logf("Write Count: %d", result.WriteCount)
-	t.Logf("Throughput: %.2f writes/sec", result.Throughput)
+	t.Logf("Req Count: %d", result.ReqCount)
+	t.Logf("Throughput: %.2f req/sec", result.Throughput)
 	t.Logf("P50 Latency: %v", result.P50Latency)
 	t.Logf("P90 Latency: %v", result.P90Latency)
 	t.Logf("P99 Latency: %v", result.P99Latency)

@@ -8,7 +8,6 @@ import (
 	"github.com/grafana/authlib/types"
 	"github.com/grafana/grafana/pkg/apimachinery/identity"
 	"github.com/grafana/grafana/pkg/infra/log"
-	"github.com/grafana/grafana/pkg/registry/apis/dashboard/legacy"
 	"github.com/grafana/grafana/pkg/services/sqlstore/migrator"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
@@ -31,6 +30,8 @@ func WithAutoEnableMode5(cfg *setting.Cfg) MigrationRunnerOption {
 // MigrationRunner executes migrations without implementing the SQL migration interface.
 type MigrationRunner struct {
 	unifiedMigrator UnifiedMigrator
+	tableLocker     MigrationTableLocker
+	definition      MigrationDefinition
 	cfg             *setting.Cfg
 	autoEnableMode5 bool
 	log             log.Logger
@@ -39,11 +40,13 @@ type MigrationRunner struct {
 }
 
 // NewMigrationRunner creates a new migration runner.
-func NewMigrationRunner(unifiedMigrator UnifiedMigrator, migrationID string, resources []schema.GroupResource, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
+func NewMigrationRunner(unifiedMigrator UnifiedMigrator, tableLocker MigrationTableLocker, def MigrationDefinition, validators []Validator, opts ...MigrationRunnerOption) *MigrationRunner {
 	r := &MigrationRunner{
 		unifiedMigrator: unifiedMigrator,
-		log:             log.New("storage.unified.migration_runner." + migrationID),
-		resources:       resources,
+		tableLocker:     tableLocker,
+		definition:      def,
+		log:             log.New("storage.unified.migration_runner." + def.ID),
+		resources:       def.GetGroupResources(),
 		validators:      validators,
 	}
 	for _, opt := range opts {
@@ -54,11 +57,12 @@ func NewMigrationRunner(unifiedMigrator UnifiedMigrator, migrationID string, res
 
 // RunOptions configures a migration run.
 type RunOptions struct {
-	DriverName string
+	DriverName       string
+	UsingDistributor bool
 }
 
 // Run executes the migration logic for all organizations.
-func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunOptions) error {
+func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, mg *migrator.Migrator, opts RunOptions) error {
 	orgs, err := r.getAllOrgs(sess)
 	if err != nil {
 		r.log.Error("failed to get organizations", "error", err)
@@ -79,9 +83,31 @@ func (r *MigrationRunner) Run(ctx context.Context, sess *xorm.Session, opts RunO
 			r.log.Error("Failed to get transaction from session", "error", err)
 			return fmt.Errorf("failed to get transaction: %w", err)
 		}
+		// Increase page cache to prevent cache spill during bulk inserts.
+		// When the cache spills, SQLite needs an EXCLUSIVE lock which deadlocks with the
+		// SHARED lock held by the legacy database rows cursor on another connection.
+		// Configurable via [unified_storage] migration_cache_size_kb (default: 50MB).
+		cacheKB := 50000
+		if r.cfg.MigrationCacheSizeKB > 0 {
+			cacheKB = r.cfg.MigrationCacheSizeKB
+		}
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA cache_size = -%d", cacheKB)); err != nil {
+			r.log.Warn("Failed to set SQLite cache_size for migration", "error", err)
+		}
 		ctx = resource.ContextWithTransaction(ctx, tx.Tx)
 		r.log.Info("Stored migrator transaction in context for bulk operations (SQLite compatibility)")
 	}
+
+	lockTables := r.definition.GetLockTables()
+	unlockTables, err := r.tableLocker.LockMigrationTables(ctx, sess, lockTables)
+	if err != nil {
+		return fmt.Errorf("failed to lock tables for migration: %w", err)
+	}
+	defer func() {
+		if err := unlockTables(ctx); err != nil {
+			r.log.Error("error unlocking legacy tables", "error", err)
+		}
+	}()
 
 	for _, org := range orgs {
 		info, err := types.ParseNamespace(types.OrgNamespaceFormatter(org.ID))
@@ -116,7 +142,7 @@ func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, in
 
 	startTime := time.Now()
 
-	migrateOpts := legacy.MigrateOptions{
+	migrateOpts := MigrateOptions{
 		Namespace:   info.Value,
 		Resources:   r.resources,
 		WithHistory: true, // Migrate with full history
@@ -134,6 +160,19 @@ func (r *MigrationRunner) MigrateOrg(ctx context.Context, sess *xorm.Session, in
 	if response.Error != nil {
 		r.log.Error("Migration reported error", "org_id", info.OrgID, "error", response.Error.String(), "duration", time.Since(startTime))
 		return fmt.Errorf("migration failed for org %d (%s): %w", info.OrgID, info.Value, fmt.Errorf("migration error: %s", response.Error.Message))
+	}
+
+	migrationFinishedAt := time.Now()
+
+	err = r.unifiedMigrator.RebuildIndexes(ctx, RebuildIndexOptions{
+		UsingDistributor:    opts.UsingDistributor,
+		NamespaceInfo:       info,
+		Resources:           r.resources,
+		MigrationFinishedAt: migrationFinishedAt,
+	})
+	if err != nil {
+		r.log.Error("Rebuilding indexes failed", "org_id", info.OrgID, "error", err, "duration", time.Since(startTime))
+		return fmt.Errorf("rebuilding indexes failed for org %d (%s): %w", info.OrgID, info.Value, err)
 	}
 
 	// Validate the migration results
@@ -207,16 +246,16 @@ func WithAutoMigrate(cfg *setting.Cfg) ResourceMigrationOption {
 // It internally creates a MigrationRunner to handle the actual migration logic.
 func NewResourceMigration(
 	unifiedMigrator UnifiedMigrator,
-	resources []schema.GroupResource,
-	migrationID string,
+	tableLocker MigrationTableLocker,
+	def MigrationDefinition,
 	validators []Validator,
 	opts ...ResourceMigrationOption,
 ) *ResourceMigration {
-	runner := NewMigrationRunner(unifiedMigrator, migrationID, resources, validators)
+	runner := NewMigrationRunner(unifiedMigrator, tableLocker, def, validators)
 	m := &ResourceMigration{
 		runner:      runner,
-		resources:   resources,
-		migrationID: migrationID,
+		resources:   def.GetGroupResources(),
+		migrationID: def.ID,
 	}
 	for _, opt := range opts {
 		opt(m, runner)
@@ -257,7 +296,7 @@ Please investigate the failure and report it to the Grafana team so it can be ad
 
 	ctx := context.Background()
 
-	return m.runner.Run(ctx, sess, RunOptions{
+	return m.runner.Run(ctx, sess, mg, RunOptions{
 		DriverName: mg.Dialect.DriverName(),
 	})
 }
