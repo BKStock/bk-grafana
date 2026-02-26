@@ -305,8 +305,8 @@ function calculateRange(
   return { range: { min, max, delta: max! - min! }, newGlobalRange };
 }
 
-type dispCache = Map<unknown, DisplayValue>;
-const initCache = () => new Map<number, dispCache>(Array.from({ length: 16 }, (_, i) => [i - 1, new Map()]));
+// decimals -> cache mapping, -1 is unspecified decimals. pre-init caches for up to 15 decimals
+type DecimalsCache = Map<unknown, DisplayValue>;
 
 // this is a significant optimization for streaming, where we currently re-process all values in the buffer on ech update
 // via field.display(value). this can potentially be removed once we...
@@ -314,10 +314,11 @@ const initCache = () => new Map<number, dispCache>(Array.from({ length: 16 }, (_
 // 2. have the ability to selectively get display color or text (but not always both, which are each quite expensive)
 // 3. sufficently optimize text formatting and threshold color determinitation
 function cachingDisplayProcessor(disp: DisplayProcessor, maxCacheSize = 2500): DisplayProcessor {
-  // decimals -> cache mapping, -1 is unspecified decimals. pre-init caches for up to 15 decimals
-  const caches = initCache();
-
+  let caches: Map<number, DecimalsCache>;
   return (value: unknown, decimals?: DecimalCount) => {
+    // pre-allocating these maps is quite expensive, so we do it just-in-time.
+    caches ??= new Map(Array.from({ length: 16 }, (_, i) => [i - 1, new Map()]));
+
     let cache = caches.get(decimals ?? -1)!;
 
     let v = cache.get(value);
