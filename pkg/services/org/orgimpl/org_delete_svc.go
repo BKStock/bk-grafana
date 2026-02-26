@@ -67,7 +67,9 @@ func (s *DeletionService) Delete(ctx context.Context, cmd *org.DeleteOrgCommand)
 	}
 
 	// Delete migrated resources through the k8s API
-	s.k8sDeleter.deleteCollections(ctx, cmd.ID)
+	if err := s.k8sDeleter.deleteCollections(ctx, cmd.ID); err != nil {
+		return fmt.Errorf("failed to delete migrated resources for org %d: %w", cmd.ID, err)
+	}
 
 	return s.store.Delete(ctx, cmd)
 }

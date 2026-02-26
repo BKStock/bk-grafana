@@ -2,7 +2,9 @@ package orgimpl
 
 import (
 	"context"
+	"fmt"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -16,7 +18,7 @@ import (
 
 // resourceDeleter is the interface used by DeletionService.
 type resourceDeleter interface {
-	deleteCollections(ctx context.Context, orgID int64)
+	deleteCollections(ctx context.Context, orgID int64) error
 }
 
 // k8sResourceDeleter deletes org-scoped k8s resources during org deletion.
@@ -47,27 +49,31 @@ func migratedResourceGVRs() []schema.GroupVersionResource {
 }
 
 // deleteCollections deletes all resources for each migrated GVR in the given org.
-// Errors are logged as warnings rather than returned, because a missing or
-// unregistered resource should not block the rest of org deletion.
-func (d *k8sResourceDeleter) deleteCollections(ctx context.Context, orgID int64) {
+// Errors indicating a missing or unregistered resource (NotFound, MethodNotSupported)
+// are logged as warnings and do not block org deletion. All other errors are
+// propagated so that the caller fails visibly when resources cannot be cleaned up.
+func (d *k8sResourceDeleter) deleteCollections(ctx context.Context, orgID int64) error {
 	cfg, err := d.restConfig.GetRestConfig(ctx)
 	if err != nil {
-		d.log.Warn("Failed to get rest config for k8s resource deletion during org deletion", "orgId", orgID, "error", err)
-		return
+		return fmt.Errorf("get rest config: %w", err)
 	}
 
 	dyn, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		d.log.Warn("Failed to create dynamic client for k8s resource deletion during org deletion", "orgId", orgID, "error", err)
-		return
+		return fmt.Errorf("create dynamic client: %w", err)
 	}
 
 	ns := d.namespacer(orgID)
 
 	for _, gvr := range d.gvrs {
 		if err := dyn.Resource(gvr).Namespace(ns).DeleteCollection(ctx, v1.DeleteOptions{}, v1.ListOptions{}); err != nil {
-			d.log.Warn("Failed to delete resource collection during org deletion",
-				"orgId", orgID, "gvr", gvr.String(), "error", err)
+			if k8serrors.IsNotFound(err) || k8serrors.IsMethodNotSupported(err) {
+				d.log.Warn("Resource not available, skipping collection deletion",
+					"orgId", orgID, "gvr", gvr.String(), "error", err)
+				continue
+			}
+			return fmt.Errorf("delete collection %s: %w", gvr.String(), err)
 		}
 	}
+	return nil
 }
