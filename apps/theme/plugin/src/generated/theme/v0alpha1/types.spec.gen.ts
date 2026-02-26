@@ -67,6 +67,7 @@ export interface Spec {
 		secondary?: ColorSection;
 		info?: ColorSection;
 		error?: ColorSection;
+		success?: ColorSection;
 		warning?: ColorSection;
 		text?: {
 			primary?: string;

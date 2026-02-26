@@ -224,6 +224,7 @@ type ThemeV0alpha1SpecColors struct {
 	Secondary         *ThemeColorSection                 `json:"secondary,omitempty"`
 	Info              *ThemeColorSection                 `json:"info,omitempty"`
 	Error             *ThemeColorSection                 `json:"error,omitempty"`
+	Success           *ThemeColorSection                 `json:"success,omitempty"`
 	Warning           *ThemeColorSection                 `json:"warning,omitempty"`
 	Text              *ThemeV0alpha1SpecColorsText       `json:"text,omitempty"`
 	Background        *ThemeV0alpha1SpecColorsBackground `json:"background,omitempty"`
