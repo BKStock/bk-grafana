@@ -63,7 +63,11 @@ func TestIntegrationStatsDataAccess(t *testing.T) {
 			return &resourcepb.ResourceStatsResponse{Stats: s}
 		}, nil)
 
+	// Set playlists to Mode5 so they are read from unified storage (the mock)
+	cfg.EnableMode5(setting.PlaylistResource)
+
 	statsService := &sqlStatsService{
+		cfg:            cfg,
 		db:             db,
 		dashSvc:        dashSvc,
 		orgSvc:         orgSvc,

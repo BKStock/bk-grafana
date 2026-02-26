@@ -9,6 +9,7 @@ import (
 	playlistv1 "github.com/grafana/grafana/apps/playlist/pkg/apis/playlist/v1"
 	provisioningv1 "github.com/grafana/grafana/apps/provisioning/pkg/apis/provisioning/v0alpha1"
 	"github.com/grafana/grafana/pkg/apimachinery/identity"
+	"github.com/grafana/grafana/pkg/apiserver/rest"
 	"github.com/grafana/grafana/pkg/infra/db"
 	"github.com/grafana/grafana/pkg/services/apiserver/endpoints/request"
 	"github.com/grafana/grafana/pkg/services/dashboards"
@@ -114,6 +115,13 @@ func (ss *sqlStatsService) getResourceCounts(ctx context.Context, orgs []*org.Or
 	return totals, nil
 }
 
+func (ss *sqlStatsService) playlistsSQL() string {
+	if ss.cfg.UnifiedStorageConfig(setting.PlaylistResource).DualWriterMode == rest.Mode5 {
+		return `0 AS playlists,`
+	}
+	return `(SELECT COUNT(*) FROM ` + ss.db.GetDialect().Quote("playlist") + `) AS playlists,`
+}
+
 func (ss *sqlStatsService) GetAlertNotifiersUsageStats(ctx context.Context, query *stats.GetAlertNotifierUsageStatsQuery) (result []*stats.NotifierUsageStats, err error) {
 	err = ss.db.WithDbSession(ctx, func(dbSession *db.Session) error {
 		var rawSQL = `SELECT COUNT(*) AS count, type FROM ` + ss.db.GetDialect().Quote("alert_notification") + ` GROUP BY type`
@@ -158,7 +166,7 @@ func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetS
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("user") + ` WHERE ` + notServiceAccount(dialect) + `) AS users,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("data_source") + `) AS datasources,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("star") + `) AS stars,`)
-		sb.Write(`0 AS playlists,`)
+		sb.Write(ss.playlistsSQL())
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("alert") + `) AS alerts,`)
 		sb.Write(`(SELECT COUNT(*) FROM ` + dialect.Quote("correlation") + `) AS correlations,`)
 
@@ -228,14 +236,21 @@ func (ss *sqlStatsService) GetSystemStats(ctx context.Context, query *stats.GetS
 	}
 	result.Folders = folderCount
 
-	kindPlaylist := playlistv1.APIGroup + "/playlists"
 	kindRepository := provisioningv1.GROUP + "/" + provisioningv1.RepositoryResourceInfo.GroupResource().Resource
-	resourceCounts, err := ss.getResourceCounts(ctx, orgs, []string{kindPlaylist, kindRepository})
+	kindPlaylist := playlistv1.APIGroup + "/playlists"
+	unifiedKinds := []string{kindRepository}
+	if ss.cfg.UnifiedStorageConfig(setting.PlaylistResource).DualWriterMode >= rest.Mode3 {
+		unifiedKinds = append(unifiedKinds, kindPlaylist)
+	}
+
+	resourceCounts, err := ss.getResourceCounts(ctx, orgs, unifiedKinds)
 	if err != nil {
 		return result, err
 	}
-	result.Playlists = resourceCounts[kindPlaylist]
 	result.Repositories = resourceCounts[kindRepository]
+	if count, ok := resourceCounts[kindPlaylist]; ok {
+		result.Playlists = count
+	}
 
 	return result, err
 }
@@ -281,7 +296,7 @@ func (ss *sqlStatsService) GetAdminStats(ctx context.Context, query *stats.GetAd
 			SELECT COUNT(*)
 			FROM ` + dialect.Quote("data_source") + `
 		) AS datasources,
-		0 AS playlists,
+		` + ss.playlistsSQL() + `
 		(
 			SELECT COUNT(*)
 			FROM ` + dialect.Quote("star") + `
@@ -345,12 +360,14 @@ func (ss *sqlStatsService) GetAdminStats(ctx context.Context, query *stats.GetAd
 	}
 	result.Tags = tagCount
 
-	kindPlaylist := playlistv1.APIGroup + "/playlists"
-	resourceCounts, err := ss.getResourceCounts(ctx, orgs, []string{kindPlaylist})
-	if err != nil {
-		return result, err
+	if ss.cfg.UnifiedStorageConfig(setting.PlaylistResource).DualWriterMode == rest.Mode5 {
+		kindPlaylist := playlistv1.APIGroup + "/playlists"
+		resourceCounts, err := ss.getResourceCounts(ctx, orgs, []string{kindPlaylist})
+		if err != nil {
+			return result, err
+		}
+		result.Playlists = resourceCounts[kindPlaylist]
 	}
-	result.Playlists = resourceCounts[kindPlaylist]
 
 	return result, err
 }
