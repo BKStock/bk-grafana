@@ -1373,6 +1373,11 @@ export interface FeatureToggles {
   */
   externalVizSuggestions?: boolean;
   /**
+  * Enable field overrides for FieldType.nestedFrames fields (like in nested tables)
+  * @default false
+  */
+  nestedFramesFieldOverrides?: boolean;
+  /**
   * Enable Y-axis scale configuration options for pre-bucketed heatmap data (heatmap-rows)
   * @default false
   */

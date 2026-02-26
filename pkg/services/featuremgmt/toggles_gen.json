@@ -2921,6 +2921,20 @@
     },
     {
       "metadata": {
+        "name": "nestedFramesFieldOverrides",
+        "resourceVersion": "1772138828663",
+        "creationTimestamp": "2026-02-26T20:47:08Z"
+      },
+      "spec": {
+        "description": "Enable field overrides for FieldType.nestedFrames fields (like in nested tables)",
+        "stage": "experimental",
+        "codeowner": "@grafana/dataviz-squad",
+        "frontend": true,
+        "expression": "false"
+      }
+    },
+    {
+      "metadata": {
         "name": "newClickhouseConfigPageDesign",
         "resourceVersion": "1771434338561",
         "creationTimestamp": "2025-07-31T22:56:50Z",

@@ -2166,6 +2166,14 @@ var (
 			Expression:   "false",
 		},
 		{
+			Name:         "nestedFramesFieldOverrides",
+			Description:  "Enable field overrides for FieldType.nestedFrames fields (like in nested tables)",
+			Stage:        FeatureStageExperimental,
+			FrontendOnly: true,
+			Owner:        grafanaDatavizSquad,
+			Expression:   "false",
+		},
+		{
 			Name:         "heatmapRowsAxisOptions",
 			Description:  "Enable Y-axis scale configuration options for pre-bucketed heatmap data (heatmap-rows)",
 			Stage:        FeatureStageExperimental,

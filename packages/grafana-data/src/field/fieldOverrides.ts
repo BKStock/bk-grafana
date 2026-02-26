@@ -39,7 +39,9 @@ interface OverrideProps {
   properties: DynamicConfigValue[];
 }
 
-type FieldOverrideFeatureToggles = {};
+type FieldOverrideFeatureToggles = {
+  nestedFramesFieldOverrides?: boolean | undefined;
+};
 
 export function findNumericFieldMinMax(data: DataFrame[]): NumericRange {
   let min: number | null = null;
@@ -85,6 +87,7 @@ export function applyFieldOverrides(
   }
 
   const fieldConfigRegistry = options.fieldConfigRegistry ?? standardFieldConfigEditorRegistry;
+  const nestedFramesFieldOverrides = options.featureToggles?.nestedFramesFieldOverrides ?? false;
 
   let seriesIndex = 0;
   let globalRange: NumericRange | undefined = undefined;
@@ -245,8 +248,7 @@ export function applyFieldOverrides(
               );
             }
           }
-          // @todo: apply nested field overrides here
-          newValues[idx] = nestedFrames; // applyFieldOverrides(options, nestedFrames);
+          newValues[idx] = nestedFramesFieldOverrides ? applyFieldOverrides(options, nestedFrames) : nestedFrames;
         }
         field.values = newValues;
       } else if (field.type === FieldType.frame) {
