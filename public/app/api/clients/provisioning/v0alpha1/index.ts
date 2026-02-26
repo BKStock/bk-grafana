@@ -176,14 +176,6 @@ export const provisioningAPIv0alpha1 = generatedAPI.enhanceEndpoints({
             );
           }
         } catch (e) {
-          if (jobSpec.fixFolderMetadata) {
-            handleError(
-              e,
-              dispatch,
-              t('provisioning.fix-folder-metadata.error-fixing', 'Error fixing folder metadata')
-            );
-            return;
-          }
           if (e instanceof Error) {
             dispatch(
               notifyApp(

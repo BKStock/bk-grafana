@@ -28,8 +28,7 @@ function getColumnCount(hasWebhook: boolean): { xxlColumn: 5 | 4; lgColumn: 3 | 
 export function RepositoryOverview({ repo }: { repo: Repository }) {
   const styles = useStyles2(getStyles);
   const repoName = repo.metadata?.name ?? '';
-  const showFolderMetadataCheck =
-    config.featureToggles.provisioning && config.featureToggles.provisioningFolderMetadata;
+  const showFolderMetadataCheck = config.featureToggles.provisioningFolderMetadata;
   const { status: folderMetadataStatus } = useRepoMetadataStatus(repoName);
 
   const status = repo.status;
