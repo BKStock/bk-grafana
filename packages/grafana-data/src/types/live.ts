@@ -1,7 +1,7 @@
 /**
  * The channel id is defined as:
  *
- *   ${scope}/${namespace}/${path}
+ *   ${scope}/${stream}/${path}
  *
  * The scope drives how the namespace is used and controlled
  *
@@ -81,17 +81,17 @@ export interface LiveChannelStatusEvent {
    *
    * This will remain in the status until a new message is successfully received from the channel
    */
-  error?: any;
+  error?: unknown;
 }
 
 export interface LiveChannelJoinEvent {
   type: LiveChannelEventType.Join;
-  user: any; // @alpha -- experimental -- will be filled in when we improve the UI
+  user: unknown; // @alpha -- experimental -- will be filled in when we improve the UI
 }
 
 export interface LiveChannelLeaveEvent {
   type: LiveChannelEventType.Leave;
-  user: any; // @alpha -- experimental -- will be filled in when we improve the UI
+  user: unknown; // @alpha -- experimental -- will be filled in when we improve the UI
 }
 
 export interface LiveChannelMessageEvent<T> {
@@ -125,7 +125,7 @@ export function isLiveChannelMessageEvent<T>(evt: LiveChannelEvent<T>): evt is L
  * @alpha -- experimental
  */
 export interface LiveChannelPresenceStatus {
-  users: any; // @alpha -- experimental -- will be filled in when we improve the UI
+  users: unknown; // @alpha -- experimental -- will be filled in when we improve the UI
 }
 
 /**
@@ -146,7 +146,7 @@ export interface LiveChannelAddress {
    * each OnSubscribe and RunStream calls.  This value should be constant across multiple requests
    * to the same channel path
    */
-  data?: any;
+  data?: unknown;
 }
 
 /**
@@ -201,7 +201,7 @@ export function toLiveChannelId(addr: LiveChannelAddress & { namespace?: string 
   if (!stream?.length) {
     return id;
   }
-  id += '/' + stream;
+  id += '/' + stream; // or namespace
   if (!path?.length) {
     return id;
   }
