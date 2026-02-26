@@ -106,25 +106,22 @@ export function applyFieldOverrides(
     const originalFrame = data[index];
     // Need to define this new frame here as it's passed to the getLinkSupplier function inside the fields loop
     const newFrame = (result[index] = { ...originalFrame });
-    const newFields: Field[] = Array(newFrame.fields.length);
 
     // start by making a copy. looping twice is currently unavoidable, as methods downstream (like the displayName
     // uniqueness check) depend on clone already being present in the fields array.
-    for (let fieldIndex = 0; fieldIndex < newFrame.fields.length; fieldIndex++) {
-      const originalField = newFrame.fields[fieldIndex];
-
-      newFields[fieldIndex] = {
+    newFrame.fields = Array.from({ length: newFrame.fields.length }, (_, i) => {
+      const originalField = newFrame.fields[i];
+      return {
         ...originalField,
         config: cloneDeep(originalField.config),
         state: {
           ...originalField.state,
         },
       };
-    }
+    });
 
     // now that the frame has the new fields, we can mutate the fields in place.
-    newFrame.fields = newFields;
-    for (const field of newFields) {
+    for (const field of newFrame.fields) {
       const config = field.config;
 
       field.state!.scopedVars = {
@@ -393,8 +390,8 @@ export function setDynamicConfigValue(config: FieldConfig, value: DynamicConfigV
 export function setFieldConfigDefaults(config: FieldConfig, defaults: FieldConfig, context: FieldOverrideEnv) {
   // For cases where we have links on the datasource config and the panel config, we need to merge them
   if (config.links && defaults.links) {
-    // Combine the data source links and the panel default config links
-    config.links = [...config.links, ...defaults.links];
+    // Combine the data source links and the panel default config links. mutate rather than allocate new for perf reasons.
+    config.links.push(...defaults.links);
   }
 
   // if we have a base threshold set by default but not on the config, we need to merge it in
@@ -406,7 +403,7 @@ export function setFieldConfigDefaults(config: FieldConfig, defaults: FieldConfi
     !config.thresholds.steps.some((step) => step.value === -Infinity) &&
     defaultBaseStep
   ) {
-    config.thresholds.steps = [defaultBaseStep, ...config.thresholds.steps];
+    config.thresholds.steps.unshift(defaultBaseStep);
   }
 
   for (const fieldConfigProperty of context.fieldConfigRegistry.list()) {
@@ -425,9 +422,9 @@ export function setFieldConfigDefaults(config: FieldConfig, defaults: FieldConfi
         return;
       }
 
-      if (item && item.shouldApply(context.field!)) {
+      if (item?.shouldApply(context.field!)) {
         const val = item.process(get(source, item.path), context, item.settings);
-        if (val !== undefined && val !== null) {
+        if (val != null) {
           set(destination, item.path, val);
         }
       }
