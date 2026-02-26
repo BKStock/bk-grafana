@@ -59,10 +59,9 @@ func (DashboardAnnotationQuerySpec) OpenAPIModelName() string {
 
 // +k8s:openapi-gen=true
 type DashboardDataQueryKind struct {
-	Kind    string            `json:"kind"`
-	Group   string            `json:"group"`
-	Version string            `json:"version"`
-	Labels  map[string]string `json:"labels,omitempty"`
+	Kind    string `json:"kind"`
+	Group   string `json:"group"`
+	Version string `json:"version"`
 	// New type for datasource reference
 	// Not creating a new type until we figure out how to handle DS refs for group by, adhoc, and every place that uses DataSourceRef in TS.
 	Datasource *DashboardV2beta1DataQueryKindDatasource `json:"datasource,omitempty"`
@@ -2241,7 +2240,6 @@ type DashboardGroupByVariableKind struct {
 	Kind       string                                         `json:"kind"`
 	Group      string                                         `json:"group"`
 	Datasource *DashboardV2beta1GroupByVariableKindDatasource `json:"datasource,omitempty"`
-	Labels     map[string]string                              `json:"labels,omitempty"`
 	Spec       DashboardGroupByVariableSpec                   `json:"spec"`
 }
 
@@ -2302,7 +2300,6 @@ type DashboardAdhocVariableKind struct {
 	Kind       string                                       `json:"kind"`
 	Group      string                                       `json:"group"`
 	Datasource *DashboardV2beta1AdhocVariableKindDatasource `json:"datasource,omitempty"`
-	Labels     map[string]string                            `json:"labels,omitempty"`
 	Spec       DashboardAdhocVariableSpec                   `json:"spec"`
 }
 
