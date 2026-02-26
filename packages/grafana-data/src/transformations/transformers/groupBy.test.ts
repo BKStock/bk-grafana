@@ -5,7 +5,13 @@ import { mockTransformationsRegistry } from '../../utils/tests/mockTransformatio
 import { ReducerID } from '../fieldReducer';
 import { transformDataFrame } from '../transformDataFrame';
 
-import { GroupByOperationID, groupByTransformer, GroupByTransformerOptions, shouldCalculateField } from './groupBy';
+import {
+  GroupByOperationID,
+  groupByTransformer,
+  GroupByTransformerOptions,
+  shouldCalculateField,
+  groupValuesByKey,
+} from './groupBy';
 import { DataTransformerID } from './ids';
 
 // returns a simple group by / reducer pair
@@ -34,6 +40,159 @@ const getSimpleGroupByConfig = (
 describe('GroupBy transformer', () => {
   beforeAll(() => {
     mockTransformationsRegistry([groupByTransformer]);
+  });
+
+  describe('groupValuesByKey()', () => {
+    it('should return empty Map for empty frame', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'key', type: FieldType.string, values: [] },
+          { name: 'value', type: FieldType.number, values: [] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'key');
+      const result = groupValuesByKey(frame, groupByFields);
+      expect(result.size).toBe(0);
+    });
+
+    it('should group rows by a single group-by field', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'message', type: FieldType.string, values: ['one', 'two', 'two', 'three'] },
+          { name: 'values', type: FieldType.number, values: [1, 2, 3, 4] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'message');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      expect(result.size).toBe(3);
+      expect(result.has('one')).toBe(true);
+      expect(result.has('two')).toBe(true);
+      expect(result.has('three')).toBe(true);
+
+      const one = result.get('one')!;
+      expect(one['message'].values).toEqual(['one']);
+      expect(one['values'].values).toEqual([1]);
+
+      const two = result.get('two')!;
+      expect(two['message'].values).toEqual(['two', 'two']);
+      expect(two['values'].values).toEqual([2, 3]);
+
+      const three = result.get('three')!;
+      expect(three['message'].values).toEqual(['three']);
+      expect(three['values'].values).toEqual([4]);
+    });
+
+    it('should group rows by multiple group-by fields (composite key)', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'region', type: FieldType.string, values: ['EU', 'EU', 'US', 'US'] },
+          { name: 'product', type: FieldType.string, values: ['A', 'B', 'A', 'B'] },
+          { name: 'count', type: FieldType.number, values: [10, 20, 30, 40] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'region' || f.name === 'product');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      expect(result.size).toBe(4);
+
+      const euA = result.get('EU,A')!;
+      expect(euA['region'].values).toEqual(['EU']);
+      expect(euA['product'].values).toEqual(['A']);
+      expect(euA['count'].values).toEqual([10]);
+
+      const euB = result.get('EU,B')!;
+      expect(euB['count'].values).toEqual([20]);
+
+      const usA = result.get('US,A')!;
+      expect(usA['count'].values).toEqual([30]);
+
+      const usB = result.get('US,B')!;
+      expect(usB['count'].values).toEqual([40]);
+    });
+
+    it('should produce FieldMap entries with name, type, config, state, and values', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'key', type: FieldType.string, values: ['x'], config: { unit: 's' } },
+          { name: 'value', type: FieldType.number, values: [42] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'key');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      const entry = result.get('x')!;
+      expect(entry['key']).toMatchObject({
+        name: 'key',
+        type: FieldType.string,
+        config: expect.objectContaining({ displayName: 'key', unit: 's' }),
+        values: ['x'],
+      });
+      expect(entry['key'].state).toBeDefined();
+      expect(entry['value']).toMatchObject({
+        name: 'value',
+        type: FieldType.number,
+        values: [42],
+      });
+    });
+
+    it('should use display name in FieldMap when field has config.displayName', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'message', type: FieldType.string, values: ['a'], config: { displayName: 'MyMessage' } },
+          { name: 'values', type: FieldType.number, values: [1] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'message');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      const entry = result.get('a')!;
+      expect(entry['MyMessage']).toBeDefined();
+      expect(entry['MyMessage'].values).toEqual(['a']);
+      expect(entry['values'].values).toEqual([1]);
+    });
+
+    it('should handle single row (one group)', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'key', type: FieldType.string, values: ['only'] },
+          { name: 'value', type: FieldType.number, values: [100] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'key');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      expect(result.size).toBe(1);
+      const only = result.get('only')!;
+      expect(only['key'].values).toEqual(['only']);
+      expect(only['value'].values).toEqual([100]);
+    });
+
+    it('should preserve order of groups by first occurrence of key', () => {
+      const frame = toDataFrame({
+        name: 'A',
+        fields: [
+          { name: 'letter', type: FieldType.string, values: ['b', 'a', 'c', 'a', 'b'] },
+          { name: 'n', type: FieldType.number, values: [1, 2, 3, 4, 5] },
+        ],
+      });
+      const groupByFields = frame.fields.filter((f) => f.name === 'letter');
+      const result = groupValuesByKey(frame, groupByFields);
+
+      expect(result.size).toBe(3);
+      const keys = Array.from(result.keys());
+      expect(keys).toEqual(['b', 'a', 'c']);
+
+      expect(result.get('a')!['n'].values).toEqual([2, 4]);
+      expect(result.get('b')!['n'].values).toEqual([1, 5]);
+      expect(result.get('c')!['n'].values).toEqual([3]);
+    });
   });
 
   it('should not apply transformation if config is missing group by fields', async () => {
