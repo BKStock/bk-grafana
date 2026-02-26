@@ -10,17 +10,18 @@ import { reportInteraction } from '@grafana/runtime';
 import { SceneVariable, SceneVariableState } from '@grafana/scenes';
 import { useStyles2, Stack, Button, EmptyState, TextLink } from '@grafana/ui';
 
-import { isVariableEditable } from '../../serialization/sceneVariablesSetToVariables';
 import { DashboardInteractions } from '../../utils/interactions';
 import { VariablesDependenciesButton } from '../../variables/VariablesDependenciesButton';
 import { UsagesToNetwork, VariableUsageTree } from '../../variables/utils';
 
 import { VariableEditorListRow } from './VariableEditorListRow';
+import { isVariableEditable } from './utils';
 
 export interface Props {
   variables: Array<SceneVariable<SceneVariableState>>;
   usages: VariableUsageTree[];
   usagesNetwork: UsagesToNetwork[];
+  hasProvisionedVariables?: boolean;
   onAdd: () => void;
   onChangeOrder: (fromIndex: number, toIndex: number) => void;
   onDuplicate: (identifier: string) => void;
@@ -32,6 +33,7 @@ export function VariableEditorList({
   variables,
   usages,
   usagesNetwork,
+  hasProvisionedVariables,
   onChangeOrder,
   onDelete,
   onDuplicate,
@@ -60,9 +62,11 @@ export function VariableEditorList({
     <EmptyVariablesList onAdd={onVariableAdd} />
   ) : (
     <Stack direction="column" gap={3}>
-      <h5 className={styles.sectionHeading}>
-        <Trans i18nKey="dashboard-scene.variable-editor-list.user-defined-heading">User defined variables</Trans>
-      </h5>
+      {hasProvisionedVariables && (
+        <h5 className={styles.sectionHeading}>
+          <Trans i18nKey="dashboard-scene.variable-editor-list.user-defined-heading">User defined variables</Trans>
+        </h5>
+      )}
       <table
         className={classNames('filter-table', 'filter-table--hover', styles.tableContainer)}
         data-testid={selectors.pages.Dashboard.Settings.Variables.List.table}

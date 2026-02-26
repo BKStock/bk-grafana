@@ -1,18 +1,21 @@
-import { NavModel, NavModelItem, PageLayoutType, arrayUtils } from '@grafana/data';
+import { css } from '@emotion/css';
+
+import { GrafanaTheme2, NavModel, NavModelItem, PageLayoutType, arrayUtils } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { SceneComponentProps, SceneObjectBase } from '@grafana/scenes';
 import { DashboardLink } from '@grafana/schema';
+import { Icon, Stack, TagList, useStyles2 } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 
 import { DashboardScene } from '../scene/DashboardScene';
 import { NavToolbarActions } from '../scene/NavToolbarActions';
 import { DashboardLinkForm } from '../settings/links/DashboardLinkForm';
 import { DashboardLinkList } from '../settings/links/DashboardLinkList';
-import { SystemLinksSection } from '../settings/links/SystemLinksSection';
-import { NEW_LINK } from '../settings/links/utils';
+import { NEW_LINK, isLinkEditable } from '../settings/links/utils';
 import { getDashboardSceneFor } from '../utils/utils';
 
 import { EditListViewSceneUrlSync } from './EditListViewSceneUrlSync';
+import { ProvisionedControlsSection, SourceIcon } from './ProvisionedControlsSection';
 import { DashboardEditView, DashboardEditListViewState, useDashboardEditPageNav } from './utils';
 
 export interface DashboardLinksEditViewState extends DashboardEditListViewState {}
@@ -85,7 +88,7 @@ export class DashboardLinksEditView extends SceneObjectBase<DashboardLinksEditVi
     const links = this.links;
     let count = 0;
     for (let i = 0; i < links.length; i++) {
-      if (links[i].origin === undefined) {
+      if (isLinkEditable(links[i])) {
         if (count === editableIndex) {
           return i;
         }
@@ -105,8 +108,8 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
   const dashboard = getDashboardSceneFor(model);
   const { links } = dashboard.useState();
   const { navModel, pageNav } = useDashboardEditPageNav(dashboard, model.getUrlKey());
-  const defaultLinks = links.filter((link) => link.origin != null);
-  const editableLinks = links.filter((link) => link.origin === undefined);
+  const defaultLinks = links.filter((link) => !isLinkEditable(link));
+  const editableLinks = links.filter(isLinkEditable);
   const linkToEdit = editIndex !== undefined ? editableLinks[editIndex] : undefined;
 
   if (linkToEdit) {
@@ -127,16 +130,65 @@ function DashboardLinksEditViewRenderer({ model }: SceneComponentProps<Dashboard
       <NavToolbarActions dashboard={dashboard} />
       <DashboardLinkList
         links={editableLinks}
+        hasProvisionedLinks={defaultLinks.length > 0}
         onNew={model.onNewLink}
         onEdit={model.onEdit}
         onDelete={model.onDelete}
         onDuplicate={model.onDuplicate}
         onOrderChange={model.onOrderChange}
       />
-      {defaultLinks.length > 0 && <SystemLinksSection links={defaultLinks} />}
+      {defaultLinks.length > 0 && <ProvisionedLinksSection links={defaultLinks} />}
     </Page>
   );
 }
+
+const LINK_COLUMNS = [
+  { i18nKey: 'dashboard-scene.dashboard-link-list.type', defaultText: 'Type' },
+  { i18nKey: 'dashboard-scene.dashboard-link-list.info', defaultText: 'Info' },
+];
+
+function ProvisionedLinksSection({ links }: { links: DashboardLink[] }) {
+  const styles = useStyles2(getProvisionedLinkStyles);
+
+  return (
+    <ProvisionedControlsSection columns={LINK_COLUMNS}>
+      {links.map((link, index) => (
+        <tr key={`${link.title}-${index}`}>
+          <td role="gridcell">
+            <Icon name="external-link-alt" /> &nbsp; {link.type}
+          </td>
+          <td role="gridcell">
+            <Stack>
+              {link.title && <span className={styles.titleWrapper}>{link.title}</span>}
+              {link.type === 'link' && <span className={styles.urlWrapper}>{link.url}</span>}
+              {link.type === 'dashboards' && <TagList tags={link.tags ?? []} />}
+            </Stack>
+          </td>
+          <td role="gridcell" className={styles.sourceCell}>
+            <SourceIcon origin={link.origin} />
+          </td>
+        </tr>
+      ))}
+    </ProvisionedControlsSection>
+  );
+}
+
+const getProvisionedLinkStyles = (theme: GrafanaTheme2) => ({
+  titleWrapper: css({
+    width: '20vw',
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+  }),
+  urlWrapper: css({
+    width: '40vw',
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+  }),
+  sourceCell: css({
+    width: '1%',
+    textAlign: 'center' as const,
+  }),
+});
 
 interface EditLinkViewProps {
   link?: DashboardLink;

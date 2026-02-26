@@ -242,7 +242,23 @@ describe('VariablesEditView', () => {
       expect(getByText('Provisioned by data source')).toBeInTheDocument();
     });
 
-    it('should show User defined variables heading when editable variables exist', () => {
+    it('should not show User defined variables heading when no provisioned variables exist', () => {
+      const { queryByText } = render(<variableView.Component model={variableView} />);
+
+      expect(queryByText('User defined variables')).not.toBeInTheDocument();
+    });
+
+    it('should show User defined variables heading when provisioned variables exist', () => {
+      const variables = variableView.getVariableSet().state.variables;
+      const originVariable = new CustomVariable({
+        name: 'dsVar2',
+        query: 'val1, val2',
+        value: 'val1',
+        text: 'val1',
+        origin: { type: 'datasource', group: 'prometheus' },
+      });
+      variableView.getVariableSet().setState({ variables: [...variables, originVariable] });
+
       const { getByText } = render(<variableView.Component model={variableView} />);
 
       expect(getByText('User defined variables')).toBeInTheDocument();

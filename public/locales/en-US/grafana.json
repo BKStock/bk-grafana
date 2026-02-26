@@ -6887,6 +6887,11 @@
       },
       "title-close": "Close"
     },
+    "provisioned-controls-section": {
+      "label": "Provisioned by data source",
+      "tooltip": "Added by the {{pluginName}} plugin",
+      "tooltip-unknown": "Added by a data source plugin"
+    },
     "provisioned-delete-modal": {
       "cannot-be-deleted": "This dashboard is managed by Grafana provisioning and cannot be deleted. Remove the dashboard from the config file to delete it.",
       "file-path": "File path: {{dashboardId}}",
@@ -7064,16 +7069,6 @@
       "switch-options": "Switch options",
       "value-pair-type": "Value pair type",
       "value-pair-type-description": "Choose the type of values for the switch states"
-    },
-    "system-links-section": {
-      "label": "Provisioned by data source",
-      "tooltip": "Added by the {{pluginName}} plugin",
-      "tooltip-unknown": "Added by a data source plugin"
-    },
-    "system-variables-section": {
-      "label": "Provisioned by data source",
-      "tooltip": "Added by the {{pluginName}} plugin",
-      "tooltip-unknown": "Added by a data source plugin"
     },
     "text-box-variable": {
       "name-default-value": "Default value"
