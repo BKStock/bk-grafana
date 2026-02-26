@@ -14,6 +14,10 @@ keywords:
 
 Traces to profiles lets you navigate from a trace span directly to the profiling data for that span. You configure the integration in the Tempo data source, which connects your tracing data in Tempo with your profiling data in Pyroscope.
 
+{{< admonition type="note" >}}
+Your application must be instrumented for profiles and traces. For more information, refer to [Link traces to profiles](https://grafana.com/docs/pyroscope/<PYROSCOPE_VERSION>/configure-client/trace-span-profiles/).
+{{< /admonition >}}
+
 [//]: # 'Shared content for Trace to profiles in the Tempo data source'
 
 {{< docs/shared source="grafana" lookup="datasources/tempo-traces-to-profiles.md" version="<GRAFANA VERSION>" >}}
