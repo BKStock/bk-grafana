@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import z from 'zod';
 
 import { UserStorage } from '@grafana/runtime/internal';
+
+import { isLoading as isLoadingState, isUninitialized, useAsync } from '../../hooks/useAsync';
 
 const STORAGE_NAMESPACE = 'alerting';
 const KEY_NAME_OVERRIDES = 'triagePredefinedNameOverrides';
@@ -25,50 +28,20 @@ export interface UseTriagePredefinedOverridesResult {
   setDefaultSearchId: (id: string | null) => Promise<void>;
 }
 
-function isRecordOfStrings(value: unknown): value is Record<string, string> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false;
-  }
-  return Object.entries(value).every(([, v]) => typeof v === 'string');
-}
+const nameOverridesSchema = z.record(z.string(), z.string());
+const dismissedIdsSchema = z.array(z.string());
+const defaultSearchIdSchema = z.string().min(1).nullable();
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
-
-function parseJsonRecord(raw: string | null): Record<string, string> {
+function parseJsonWithSchema<T>(raw: string | null, schema: z.ZodType<T>, fallback: T): T {
   if (raw == null || raw === '') {
-    return {};
+    return fallback;
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    return isRecordOfStrings(parsed) ? parsed : {};
+    const result = schema.safeParse(parsed);
+    return result.success ? result.data : fallback;
   } catch {
-    return {};
-  }
-}
-
-function parseJsonStringArray(raw: string | null): string[] {
-  if (raw == null || raw === '') {
-    return [];
-  }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isStringArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function parseDefaultSearchId(raw: string | null): string | null {
-  if (raw == null || raw === '') {
-    return null;
-  }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === 'string' && parsed.length > 0 ? parsed : null;
-  } catch {
-    return null;
+    return fallback;
   }
 }
 
@@ -76,14 +49,35 @@ function parseDefaultSearchId(raw: string | null): string | null {
  * Hook for persisting user customisations to predefined triage saved searches:
  * custom names (rename) and dismissed IDs (delete = hide from list).
  */
+type OverridesData = {
+  nameOverrides: Record<string, string>;
+  dismissedIds: string[];
+  defaultSearchId: string | null;
+};
+
 export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResult {
   const [nameOverrides, setNameOverridesState] = useState<Record<string, string>>({});
   const [dismissedIds, setDismissedIdsState] = useState<string[]>([]);
   const [defaultSearchId, setDefaultSearchIdState] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const userStorage = useMemo(() => new UserStorage(STORAGE_NAMESPACE), []);
   const hasLoadedRef = useRef(false);
+
+  const loadOverrides = useCallback(async (): Promise<OverridesData> => {
+    const [overridesRaw, dismissedRaw, defaultIdRaw] = await Promise.all([
+      userStorage.getItem(KEY_NAME_OVERRIDES),
+      userStorage.getItem(KEY_DISMISSED),
+      userStorage.getItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY),
+    ]);
+    return {
+      nameOverrides: parseJsonWithSchema(overridesRaw, nameOverridesSchema, {}),
+      dismissedIds: parseJsonWithSchema(dismissedRaw, dismissedIdsSchema, []),
+      defaultSearchId: parseJsonWithSchema(defaultIdRaw, defaultSearchIdSchema, null),
+    };
+  }, [userStorage]);
+
+  const [{ execute: executeLoad }, loadState] = useAsync(loadOverrides);
+  const isLoading = isLoadingState(loadState) || isUninitialized(loadState);
 
   useEffect(() => {
     if (hasLoadedRef.current) {
@@ -91,23 +85,21 @@ export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResu
     }
     hasLoadedRef.current = true;
 
-    const load = async () => {
+    const apply = async () => {
       try {
-        const [overridesRaw, dismissedRaw, defaultIdRaw] = await Promise.all([
-          userStorage.getItem(KEY_NAME_OVERRIDES),
-          userStorage.getItem(KEY_DISMISSED),
-          userStorage.getItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY),
-        ]);
-        setNameOverridesState(parseJsonRecord(overridesRaw));
-        setDismissedIdsState(parseJsonStringArray(dismissedRaw));
-        setDefaultSearchIdState(parseDefaultSearchId(defaultIdRaw));
-      } finally {
-        setIsLoading(false);
+        const data = await executeLoad();
+        if (data) {
+          setNameOverridesState(data.nameOverrides);
+          setDismissedIdsState(data.dismissedIds);
+          setDefaultSearchIdState(data.defaultSearchId);
+        }
+      } catch {
+        // Ignore; useAsync tracks error state; we keep initial empty values
       }
     };
 
-    load();
-  }, [userStorage]);
+    apply();
+  }, [executeLoad]);
 
   const persistOverrides = useCallback(
     async (next: Record<string, string>) => {
