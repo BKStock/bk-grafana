@@ -1,4 +1,3 @@
-import { DataSourceInstanceSettings } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 import { Icon } from '@grafana/ui';
 import { DataSourceLogo } from 'app/features/datasources/components/picker/DataSourceLogo';
@@ -12,31 +11,6 @@ import { getEditorType } from '../utils';
 import { CardTitle } from './CardTitle';
 import { SidebarCard } from './SidebarCard';
 
-// Only queries and expressions can error so we only need this in QueryCard
-const QueryCardIcon = ({
-  isError,
-  editorType,
-  queryDsSettings,
-}: {
-  isError: boolean;
-  editorType: QueryEditorType;
-  queryDsSettings: DataSourceInstanceSettings | undefined;
-}) => {
-  // if (isError) {
-  //   return <Icon name="exclamation-triangle" size="sm" color={QUERY_EDITOR_COLORS.error} />;
-  // }
-  if (editorType === QueryEditorType.Query) {
-    return <DataSourceLogo dataSource={queryDsSettings} size={14} />;
-  }
-  return (
-    <Icon
-      name={QUERY_EDITOR_TYPE_CONFIG[editorType].icon}
-      color={QUERY_EDITOR_TYPE_CONFIG[editorType].color}
-      size="sm"
-    />
-  );
-};
-
 export const QueryCard = ({ query }: { query: DataQuery }) => {
   const editorType = getEditorType(query);
   const queryDsSettings = useDatasource(query.datasource);
@@ -45,7 +19,7 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
   const { data } = useQueryRunnerContext();
 
   // Note: when a query is hidden, it is removed from the error list :(
-  const isError = data?.errors?.some((e) => e.refId === query.refId) ?? false;
+  const error = data?.errors?.find((e) => e.refId === query.refId)?.message;
   const isSelected = selectedQuery?.refId === query.refId;
   const isHidden = !!query.hide;
 
@@ -53,7 +27,7 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
     name: query.refId,
     type: editorType,
     isHidden,
-    error: data?.errors?.find((e) => e.refId === query.refId)?.message,
+    error,
   };
 
   return (
@@ -66,7 +40,15 @@ export const QueryCard = ({ query }: { query: DataQuery }) => {
       onDuplicate={() => duplicateQuery(query.refId)}
       onToggleHide={() => toggleQueryHide(query.refId)}
     >
-      <QueryCardIcon isError={isError} editorType={editorType} queryDsSettings={queryDsSettings} />
+      {editorType === QueryEditorType.Query ? (
+        <DataSourceLogo dataSource={queryDsSettings} size={14} />
+      ) : (
+        <Icon
+          name={QUERY_EDITOR_TYPE_CONFIG[editorType].icon}
+          color={QUERY_EDITOR_TYPE_CONFIG[editorType].color}
+          size="sm"
+        />
+      )}
       <CardTitle title={query.refId} isHidden={isHidden} />
     </SidebarCard>
   );

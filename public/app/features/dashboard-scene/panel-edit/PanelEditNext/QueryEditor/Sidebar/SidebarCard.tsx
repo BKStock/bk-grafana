@@ -111,6 +111,11 @@ export const SidebarCard = ({
                 onDelete={onDelete}
                 onDuplicate={onDuplicate}
                 onToggleHide={onToggleHide}
+                order={{
+                  delete: 1,
+                  duplicate: 0,
+                  hide: 2,
+                }}
               />
             </div>
           </div>

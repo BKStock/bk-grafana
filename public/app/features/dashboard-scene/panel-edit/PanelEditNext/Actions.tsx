@@ -16,6 +16,13 @@ export interface ActionItem {
   alertState?: AlertState | null;
 }
 
+interface ActionButtonConfig {
+  id: string;
+  icon: IconName;
+  label: string;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
 interface ActionsProps {
   contentHeader?: boolean;
   handleResetFocus?: () => void;
@@ -23,13 +30,11 @@ interface ActionsProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onToggleHide?: () => void;
-}
-
-interface ActionButtonConfig {
-  id: string;
-  icon: IconName;
-  label: string;
-  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  order?: {
+    delete: number;
+    duplicate: number;
+    hide: number;
+  };
 }
 
 export function Actions({
@@ -39,6 +44,7 @@ export function Actions({
   onDelete,
   onDuplicate,
   onToggleHide,
+  order,
 }: ActionsProps) {
   const styles = useStyles2(getStyles);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -88,46 +94,53 @@ export function Actions({
     handleResetFocus?.();
   }, [handleResetFocus]);
 
-  const actionButtons = useMemo<ActionButtonConfig[]>(
-    () =>
-      [
-        onDuplicate && {
-          id: 'duplicate',
-          icon: 'copy',
-          label: labels.duplicate,
-          onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation();
-            onDuplicate();
-          },
+  const actionButtons = useMemo<ActionButtonConfig[]>(() => {
+    const orderMap: Record<string, number> = {
+      duplicate: order?.duplicate ?? 0,
+      delete: order?.delete ?? 1,
+      hide: order?.hide ?? 2,
+    };
+
+    return [
+      onDuplicate && {
+        id: 'duplicate',
+        icon: 'copy',
+        label: labels.duplicate,
+        onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.stopPropagation();
+          onDuplicate();
         },
-        onDelete && {
-          id: 'delete',
-          icon: 'trash-alt',
-          label: labels.remove,
-          onClick: handleDelete,
+      },
+      onDelete && {
+        id: 'delete',
+        icon: 'trash-alt',
+        label: labels.remove,
+        onClick: handleDelete,
+      },
+      onToggleHide && {
+        id: 'hide',
+        icon: item.isHidden ? 'eye-slash' : 'eye',
+        label: item.isHidden ? labels.show : labels.hide,
+        onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.stopPropagation();
+          onToggleHide();
         },
-        onToggleHide && {
-          id: 'toggle-hide',
-          icon: item.isHidden ? 'eye-slash' : 'eye',
-          label: item.isHidden ? labels.show : labels.hide,
-          onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation();
-            onToggleHide();
-          },
-        },
-      ].filter((btn): btn is ActionButtonConfig => Boolean(btn)),
-    [
-      onDuplicate,
-      labels.duplicate,
-      labels.show,
-      labels.hide,
-      labels.remove,
-      onToggleHide,
-      item.isHidden,
-      onDelete,
-      handleDelete,
+      },
     ]
-  );
+      .filter((btn): btn is ActionButtonConfig => Boolean(btn))
+      .sort((a, b) => (orderMap[a.id] ?? 0) - (orderMap[b.id] ?? 0));
+  }, [
+    onDuplicate,
+    labels.duplicate,
+    labels.show,
+    labels.hide,
+    labels.remove,
+    onToggleHide,
+    item.isHidden,
+    onDelete,
+    handleDelete,
+    order,
+  ]);
 
   return (
     <>

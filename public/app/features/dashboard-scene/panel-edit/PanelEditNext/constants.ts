@@ -39,7 +39,6 @@ export const QUERY_EDITOR_COLORS = {
     hoverBg: '#1D293D',
     headerBg: '#20262F',
   },
-  //error: '#D10E5C',
   error: '#E7000B',
 };
 
