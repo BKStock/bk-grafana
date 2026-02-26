@@ -109,16 +109,18 @@ export function applyFieldOverrides(
 
     // start by making a copy. looping twice is currently unavoidable, as methods downstream (like the displayName
     // uniqueness check) depend on clone already being present in the fields array.
-    newFrame.fields = Array.from({ length: newFrame.fields.length }, (_, i) => {
+    const newFields = Array(newFrame.fields.length);
+    for (let i = 0; i < newFrame.fields.length; i++) {
       const originalField = newFrame.fields[i];
-      return {
+      newFields[i] = {
         ...originalField,
         config: cloneDeep(originalField.config),
         state: {
           ...originalField.state,
         },
       };
-    });
+    }
+    newFrame.fields = newFields;
 
     // now that the frame has the new fields, we can mutate the fields in place.
     for (const field of newFrame.fields) {
@@ -130,7 +132,7 @@ export function applyFieldOverrides(
             data,
             frame: newFrame,
             frameIndex: index,
-            field: field,
+            field,
           },
         },
       };
