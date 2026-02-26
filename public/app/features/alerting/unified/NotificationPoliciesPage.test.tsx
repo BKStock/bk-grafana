@@ -589,8 +589,6 @@ describe('findRoutesMatchingFilters', () => {
 });
 
 const uiMultiRoute = {
-  /** Policy table row by name */
-  routeContainer: (name: string) => byTestId(`routing-tree_${name}`),
   /** Search box for routing policies */
   policyFilter: byRole('textbox', { name: /search routing trees/ }),
 };
@@ -611,15 +609,13 @@ describe('alertingMultiplePolicies Feature Flag', () => {
     grantUserPermissions([AccessControlAction.AlertingNotificationsExternalRead, ...PERMISSIONS_NOTIFICATION_POLICIES]);
   });
 
-  it('Should render PoliciesList when alertingMultiplePolicies feature flag is enabled', async () => {
+  it('Should render MultiplePoliciesView when alertingMultiplePolicies feature flag is enabled', async () => {
     config.featureToggles.alertingMultiplePolicies = true;
 
     renderNotificationPolicies();
-    await uiMultiRoute.routeContainer('user-defined').find();
+    await screen.findByTestId('search-query-input');
 
-    expect(uiMultiRoute.policyFilter.get()).toBeInTheDocument();
-    // This is rendered only when displaying the full policy, it shouldn't appear in the List view.
-    expect(ui.rootRouteContainer.query()).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('am-root-route-container').length).toBeGreaterThan(0);
   });
 
   it('Should not render PoliciesList when alertingMultiplePolicies feature flag is disabled', async () => {
@@ -692,12 +688,30 @@ describe('alertingNavigationV2 respects alertingMultiplePolicies', () => {
   describe('when alertingMultiplePolicies is enabled', () => {
     testWithFeatureToggles({ enable: ['alertingNavigationV2', 'alertingMultiplePolicies'] });
 
-    it('Should render PoliciesList', async () => {
-      renderNotificationPolicies();
-      await uiMultiRoute.routeContainer('user-defined').find();
+    it('Should render MultiplePoliciesView', async () => {
+      render(
+        <>
+          <AppNotificationList />
+          <NotificationPolicies />
+        </>,
+        {
+          historyOptions: {
+            initialEntries: [`/alerting/routes?${ALERTMANAGER_NAME_QUERY_KEY}=${GRAFANA_RULES_SOURCE_NAME}`],
+          },
+          preloadedState: {
+            navIndex: {
+              'notification-config': {
+                id: 'notification-config',
+                text: 'Notification configuration',
+                url: '/alerting/notifications',
+              },
+            },
+          },
+        }
+      );
+      await screen.findByTestId('search-query-input');
 
-      expect(uiMultiRoute.policyFilter.get()).toBeInTheDocument();
-      expect(ui.rootRouteContainer.query()).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('am-root-route-container').length).toBeGreaterThan(0);
     });
   });
 });
