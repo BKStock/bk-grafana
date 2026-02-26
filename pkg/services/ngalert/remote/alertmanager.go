@@ -350,7 +350,6 @@ func (am *Alertmanager) buildConfiguration(ctx context.Context, c alertingNotify
 		switch t.Kind {
 		case alertingTemplates.GrafanaKind:
 			templateFiles[t.Name] = t.Template
-			break
 		case alertingTemplates.MimirKind:
 			templates = append(templates, definition.PostableApiTemplate{
 				Name:    t.Name,

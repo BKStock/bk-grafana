@@ -57,7 +57,6 @@ type alertmanager struct {
 	decryptFn            alertingNotify.GetDecryptedValueFn
 	crypto               Crypto
 	features             featuremgmt.FeatureToggles
-	dynamicLimits        alertingNotify.DynamicLimits
 }
 
 // maintenanceOptions represent the options for components that need maintenance on a frequency within the Alertmanager.
