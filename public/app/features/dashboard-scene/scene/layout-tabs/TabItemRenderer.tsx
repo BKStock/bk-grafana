@@ -71,8 +71,9 @@ export function TabItemRenderer({ model }: SceneComponentProps<TabItem>) {
             truncate
             className={cx(
               isConditionallyHidden && styles.hidden,
+              isSelectable && !isSelected && !isSourceSelected && 'dashboard-selectable-element',
               (isSelected || isSourceSelected) && 'dashboard-selected-element',
-              isSelectable && !isSelected && 'dashboard-selectable-element',
+              (isSelected || isSourceSelected) && styles.selectedTab,
               isDropTarget && 'dashboard-drop-target'
             )}
             active={isActive}
@@ -162,6 +163,11 @@ export function TabItemLayoutRenderer({ tab, isEditing }: TabItemLayoutRendererP
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
+  selectedTab: css({
+    '&.dashboard-selected-element': {
+      outlineOffset: '-2px',
+    },
+  }),
   dragging: css({
     cursor: 'move',
   }),

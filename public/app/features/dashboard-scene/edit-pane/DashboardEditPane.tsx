@@ -214,13 +214,21 @@ export class DashboardEditPane extends SceneObjectBase<DashboardEditPaneState> {
 
   private selectElement(element: ElementSelectionContextItem, options: ElementSelectionOnSelectOptions) {
     let obj = sceneGraph.findByKey(this, element.id);
-    if (obj) {
-      const sourceKey = getRepeatCloneSourceKey(obj);
-      if (sourceKey) {
-        obj = sceneGraph.findByKey(this, sourceKey);
-      }
-      this.selectObject(obj, obj.state.key!, options);
+    if (!obj) {
+      console.warn('Cannot find element by key="%s"!', element.id);
+      return;
     }
+
+    const sourceKey = getRepeatCloneSourceKey(obj);
+    if (sourceKey) {
+      obj = sceneGraph.findByKey(this, sourceKey);
+      if (!obj) {
+        console.warn('Cannot find element by source key="%s"!', sourceKey);
+        return;
+      }
+    }
+
+    this.selectObject(obj, obj.state.key!, options);
   }
 
   public getSelection(): SceneObject | SceneObject[] | undefined {

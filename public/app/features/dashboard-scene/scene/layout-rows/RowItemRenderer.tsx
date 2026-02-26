@@ -104,8 +104,8 @@ export function RowItemRenderer({ model }: SceneComponentProps<RowItem>) {
             isCollapsed && styles.wrapperCollapsed,
             shouldGrow && styles.wrapperGrow,
             conditionalRenderingClass,
+            !isSelected && !isSourceSelected && selectableHighlight && 'dashboard-selectable-element',
             (isSelected || isSourceSelected) && 'dashboard-selected-element',
-            !isSelected && selectableHighlight && 'dashboard-selectable-element',
             isDropTarget && 'dashboard-drop-target'
           )}
           onPointerDown={(evt) => {
