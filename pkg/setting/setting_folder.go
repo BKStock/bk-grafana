@@ -4,7 +4,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const maxNestedFolderDepth = 7
+const MaxNestedFolderDepth = 7
 const DefaultMaxNestedFolderDepth = 4
 
 func maxDeptFolderSettings(iniFile *ini.File) int {
@@ -14,8 +14,8 @@ func maxDeptFolderSettings(iniFile *ini.File) int {
 
 	folderSection := iniFile.Section("folder")
 	cfgMaxNestedFolderDepth := folderSection.Key("max_nested_folder_depth").MustInt(DefaultMaxNestedFolderDepth)
-	if cfgMaxNestedFolderDepth > maxNestedFolderDepth {
-		cfgMaxNestedFolderDepth = maxNestedFolderDepth
+	if cfgMaxNestedFolderDepth > MaxNestedFolderDepth {
+		cfgMaxNestedFolderDepth = MaxNestedFolderDepth
 	}
 
 	if cfgMaxNestedFolderDepth <= 0 {
