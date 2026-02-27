@@ -16,7 +16,6 @@ const GROUP_HEADER_HEIGHT = 32;
 const FILTER_ROW_HEIGHT = 32;
 const ROW_GAP = 8;
 const SKELETON_ROW_COUNT = 5;
-const EMPTY_MULTI_VALUES: string[] = [];
 
 interface DashboardFiltersOverviewProps {
   adhocFilters?: AdHocFiltersVariable;
@@ -122,7 +121,7 @@ export const DashboardFiltersOverview = ({
                   operatorValue={operatorValue}
                   isMultiOperator={MULTI_OPERATOR_VALUES.has(operatorValue)}
                   singleValue={state.singleValuesByKey[keyValue] ?? ''}
-                  multiValues={state.multiValuesByKey[keyValue] ?? EMPTY_MULTI_VALUES}
+                  multiValues={state.multiValuesByKey[keyValue] ?? []}
                   isGroupBy={state.isGrouped[keyValue] ?? false}
                   isOrigin={state.isOriginByKey[keyValue] ?? false}
                   isRestorable={
