@@ -1,7 +1,8 @@
 import { css } from '@emotion/css';
 import { uniqueId } from 'lodash';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, FormProvider, RegisterOptions, useForm, useFormContext } from 'react-hook-form';
+import { useFirstMountState } from 'react-use';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
@@ -608,14 +609,13 @@ export function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
   const evaluateForId = 'eval-for-input';
   const currentPendingPeriod = watch('evaluateFor');
 
-  const isInitialRender = useRef(true);
+  const isFirstMount = useFirstMountState();
   useEffect(() => {
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
+    if (isFirstMount) {
       return;
     }
     trigger('evaluateFor');
-  }, [evaluateEvery, currentPendingPeriod, trigger]);
+  }, [evaluateEvery, currentPendingPeriod, trigger, isFirstMount]);
 
   const setPendingPeriod = (pendingPeriod: string) => {
     setValue('evaluateFor', pendingPeriod);
