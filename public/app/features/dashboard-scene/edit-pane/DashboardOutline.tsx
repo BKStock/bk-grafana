@@ -47,7 +47,7 @@ function DashboardOutlineNode({ sceneObject, editPane, isEditing, depth, index }
   const styles = useStyles2(getStyles);
   const key = sceneObject.state.key;
   const [isCollapsed, setIsCollapsed] = useState(depth > 0);
-  const { isSelected, onSelect } = useElementSelection(key);
+  const { isSelected } = useElementSelection(key);
   const isCloned = useMemo(() => isRepeatCloneOrChildOf(sceneObject), [sceneObject]);
   const editableElement = useMemo(() => getEditableElementFor(sceneObject)!, [sceneObject]);
 
@@ -65,9 +65,11 @@ function DashboardOutlineNode({ sceneObject, editPane, isEditing, depth, index }
   const onNodeClicked = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Only select via clicking outline never deselect
+    // Select directly via editPane.selectObject since the outline already has the
+    // sceneObject reference. This avoids sceneGraph.findByKey which only finds objects
+    // in the scene graph (outline containers like DashboardLinksSet are not).
     if (!isSelected) {
-      onSelect?.(e);
+      editPane.selectObject(sceneObject, key!);
     }
 
     editableElement.scrollIntoView?.();
