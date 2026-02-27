@@ -3,6 +3,7 @@ package datasource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -10,8 +11,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	datasource "github.com/grafana/grafana/pkg/apis/datasource/v0alpha1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/grafana/grafana/pkg/services/datasources"
 )
 
 type subHealthREST struct {
@@ -46,22 +46,13 @@ func (r *subHealthREST) NewConnectOptions() (runtime.Object, bool, string) {
 	return nil, false, ""
 }
 
-// FIXME: this endpoint has not been tested yet, so it is not enabled by default.
-var healthEnabled = false
-
 func (r *subHealthREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	if !healthEnabled {
-		return nil, &apierrors.StatusError{
-			ErrStatus: metav1.Status{
-				Status: metav1.StatusFailure,
-				Code:   http.StatusNotImplemented,
-			},
-		}
-	}
-
+	backend.Logger.Error("2: NEW API IS CONNECTED")
 	pluginCtx, err := r.builder.getPluginContext(ctx, name)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, datasources.ErrDataSourceNotFound) {
+			return nil, r.builder.datasourceResourceInfo.NewNotFound(name)
+		}
 	}
 	ctx = backend.WithGrafanaConfig(ctx, pluginCtx.GrafanaConfig)
 	ctx = contextualMiddlewares(ctx)
@@ -74,6 +65,7 @@ func (r *subHealthREST) Connect(ctx context.Context, name string, opts runtime.O
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		backend.Logger.Error("3: NEW API HANDLER IS CALLED")
 		rsp := &datasource.HealthCheckResult{}
 		rsp.Code = int(healthResponse.Status)
 		rsp.Status = healthResponse.Status.String()

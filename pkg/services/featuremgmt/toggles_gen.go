@@ -853,4 +853,8 @@ const (
 	// FlagDsAbstractionApp
 	// Registers the dsabstraction app for querying datasources via unified SQL
 	FlagDsAbstractionApp = "dsAbstractionApp"
+
+	// FlagDatasourcesApiServerEnableHealthEndpoint
+	// Handle datasource health requests to the legacy API routes by querying the new datasource api group endpoints behind the scenes.
+	FlagDatasourcesApiServerEnableHealthEndpoint = "datasourcesApiServerEnableHealthEndpoint"
 )
