@@ -45,25 +45,22 @@ function parseJsonWithSchema<T>(raw: string | null, schema: z.ZodType<T>, fallba
   }
 }
 
-/**
- * Hook for persisting user customisations to predefined triage saved searches:
- * custom names (rename) and dismissed IDs (delete = hide from list).
- */
-type OverridesData = {
+/** Data shape returned by the predefined overrides loader. */
+export interface TriagePredefinedOverridesData {
   nameOverrides: Record<string, string>;
   dismissedIds: string[];
   defaultSearchId: string | null;
-};
+}
 
-export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResult {
-  const [nameOverrides, setNameOverridesState] = useState<Record<string, string>>({});
-  const [dismissedIds, setDismissedIdsState] = useState<string[]>([]);
-  const [defaultSearchId, setDefaultSearchIdState] = useState<string | null>(null);
+/**
+ * Factory function to create a loader for triage predefined overrides.
+ * Mirrors createStorageLoader in useGenericSavedSearches for consistent patterns.
+ * Can be reused by loadDefaultTriageSavedSearch or other callers that need override data.
+ */
+export function createPredefinedOverridesLoader(): () => Promise<TriagePredefinedOverridesData> {
+  const userStorage = new UserStorage(STORAGE_NAMESPACE);
 
-  const userStorage = useMemo(() => new UserStorage(STORAGE_NAMESPACE), []);
-  const hasLoadedRef = useRef(false);
-
-  const loadOverrides = useCallback(async (): Promise<OverridesData> => {
+  return async (): Promise<TriagePredefinedOverridesData> => {
     const [overridesRaw, dismissedRaw, defaultIdRaw] = await Promise.all([
       userStorage.getItem(KEY_NAME_OVERRIDES),
       userStorage.getItem(KEY_DISMISSED),
@@ -74,8 +71,22 @@ export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResu
       dismissedIds: parseJsonWithSchema(dismissedRaw, dismissedIdsSchema, []),
       defaultSearchId: parseJsonWithSchema(defaultIdRaw, defaultSearchIdSchema, null),
     };
-  }, [userStorage]);
+  };
+}
 
+/**
+ * Hook for persisting user customisations to predefined triage saved searches:
+ * custom names (rename) and dismissed IDs (delete = hide from list).
+ */
+export function useTriagePredefinedOverrides(): UseTriagePredefinedOverridesResult {
+  const [nameOverrides, setNameOverridesState] = useState<Record<string, string>>({});
+  const [dismissedIds, setDismissedIdsState] = useState<string[]>([]);
+  const [defaultSearchId, setDefaultSearchIdState] = useState<string | null>(null);
+
+  const userStorage = useMemo(() => new UserStorage(STORAGE_NAMESPACE), []);
+  const hasLoadedRef = useRef(false);
+
+  const loadOverrides = useMemo(() => createPredefinedOverridesLoader(), []);
   const [{ execute: executeLoad }, loadState] = useAsync(loadOverrides);
   const isLoading = isLoadingState(loadState) || isUninitialized(loadState);
 

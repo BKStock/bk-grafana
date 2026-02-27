@@ -1,5 +1,3 @@
-import { UserStorage } from '@grafana/runtime/internal';
-
 import { SavedSearch } from '../../components/saved-searches/savedSearchesSchema';
 import {
   UseGenericSavedSearchesResult,
@@ -10,7 +8,7 @@ import {
 } from '../../hooks/useGenericSavedSearches';
 import { getTriagePredefinedSearches } from '../triagePredefinedSearches';
 
-import { TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY } from './useTriagePredefinedOverrides';
+import { createPredefinedOverridesLoader } from './useTriagePredefinedOverrides';
 
 export const TRIAGE_SAVED_SEARCHES_STORAGE_KEY = 'triageSavedSearches';
 
@@ -36,18 +34,8 @@ export function useTriageSavedSearches(): UseTriageSavedSearchesResult {
  * Used by auto-apply hooks to load default search on first visit.
  */
 export async function loadDefaultTriageSavedSearch(): Promise<SavedSearch | null> {
-  const userStorage = new UserStorage('alerting');
-  const defaultIdRaw = await userStorage.getItem(TRIAGE_DEFAULT_SEARCH_ID_STORAGE_KEY);
-
-  let defaultId: string | null = null;
-  if (defaultIdRaw != null && defaultIdRaw !== '') {
-    try {
-      const parsed: unknown = JSON.parse(defaultIdRaw);
-      defaultId = typeof parsed === 'string' && parsed.length > 0 ? parsed : null;
-    } catch {
-      defaultId = null;
-    }
-  }
+  const loadOverrides = createPredefinedOverridesLoader();
+  const { defaultSearchId: defaultId } = await loadOverrides();
 
   const loadSavedSearches = createStorageLoader(TRIAGE_CONFIG);
 
