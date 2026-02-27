@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -169,6 +170,7 @@ func TestIntegrationProvisioning_CreatingAndGetting(t *testing.T) {
 			if extensions.IsEnterprise {
 				assert.ElementsMatch(collect, []provisioning.RepositoryType{
 					provisioning.LocalRepositoryType,
+					provisioning.GitRepositoryType,
 					provisioning.GitHubRepositoryType,
 					provisioning.BitbucketRepositoryType,
 					provisioning.GitLabRepositoryType,
@@ -176,6 +178,7 @@ func TestIntegrationProvisioning_CreatingAndGetting(t *testing.T) {
 			} else {
 				assert.ElementsMatch(collect, []provisioning.RepositoryType{
 					provisioning.LocalRepositoryType,
+					provisioning.GitRepositoryType,
 					provisioning.GitHubRepositoryType,
 				}, settings.AvailableRepositoryTypes)
 			}
@@ -275,6 +278,24 @@ func TestIntegrationProvisioning_RepositoryValidation(t *testing.T) {
 				return localTmp
 			}(),
 			expectedErr: "cannot have both remove and release orphan resources finalizers",
+		},
+		{
+			name: "should error if unknown finalizer is set",
+			repo: func() *unstructured.Unstructured {
+				localTmp := helper.RenderObject(t, "testdata/local-readonly.json.tmpl", map[string]any{
+					"Name":        "repo-with-unknown-finalizer",
+					"SyncEnabled": true,
+				})
+
+				// Setting an unknown finalizer
+				localTmp.SetFinalizers([]string{
+					repository.CleanFinalizer,
+					"unknown.finalizer.example.com",
+				})
+
+				return localTmp
+			}(),
+			expectedErr: "unknown finalizer: unknown.finalizer.example.com",
 		},
 		{
 			name: "should succeed with repository with no token but referencing Connection",
@@ -457,6 +478,57 @@ func TestIntegrationProvisioning_RepositoryValidation(t *testing.T) {
 		createdRepo := unstructuredToRepository(t, created)
 		require.Equal(t, int64(10), createdRepo.Spec.Sync.IntervalSeconds, "interval should be updated with default value")
 	})
+
+	t.Run("should automatically add finalizers during creation", func(t *testing.T) {
+		r := helper.RenderObject(t, "testdata/local-readonly.json.tmpl", map[string]any{
+			"Name":        "repo-auto-finalizers",
+			"SyncEnabled": false,
+		})
+
+		// Verify the template doesn't have finalizers set (or set them explicitly to nil)
+		r.SetFinalizers(nil)
+
+		created, err := helper.Repositories.Resource.Create(ctx, r, metav1.CreateOptions{})
+		require.NoError(t, err, "repository creation should succeed")
+
+		// Verify finalizers were automatically added by the mutator
+		createdRepo := unstructuredToRepository(t, created)
+		require.NotEmpty(t, createdRepo.Finalizers, "finalizers should be automatically added")
+		require.Contains(t, createdRepo.Finalizers, repository.RemoveOrphanResourcesFinalizer, "should contain RemoveOrphanResourcesFinalizer")
+		require.Contains(t, createdRepo.Finalizers, repository.CleanFinalizer, "should contain CleanFinalizer")
+	})
+
+	t.Run("should re-add finalizers when removed during update", func(t *testing.T) {
+		// Create a repository with finalizers
+		r := helper.RenderObject(t, "testdata/local-readonly.json.tmpl", map[string]any{
+			"Name":        "repo-update-finalizers",
+			"SyncEnabled": false,
+		})
+
+		created, err := helper.Repositories.Resource.Create(ctx, r, metav1.CreateOptions{})
+		require.NoError(t, err, "repository creation should succeed")
+
+		createdRepo := unstructuredToRepository(t, created)
+		require.NotEmpty(t, createdRepo.Finalizers, "finalizers should be present after creation")
+		require.Contains(t, createdRepo.Finalizers, repository.RemoveOrphanResourcesFinalizer, "should contain RemoveOrphanResourcesFinalizer")
+		require.Contains(t, createdRepo.Finalizers, repository.CleanFinalizer, "should contain CleanFinalizer")
+
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			storedRepo, err := helper.Repositories.Resource.Get(ctx, "repo-update-finalizers", metav1.GetOptions{})
+			require.NoError(t, err, "repository retrieve should succeed")
+
+			// Update the repository and try to remove finalizers
+			storedRepo.SetFinalizers([]string{})
+			updated, err := helper.Repositories.Resource.Update(ctx, storedRepo, metav1.UpdateOptions{})
+			require.NoError(collect, err, "repository update should succeed")
+
+			// Verify finalizers were re-added by the mutator
+			updatedRepo := unstructuredToRepository(t, updated)
+			require.NotEmpty(collect, updatedRepo.Finalizers, "finalizers should be re-added after update")
+			require.Contains(collect, updatedRepo.Finalizers, repository.RemoveOrphanResourcesFinalizer, "should contain RemoveOrphanResourcesFinalizer")
+			require.Contains(collect, updatedRepo.Finalizers, repository.CleanFinalizer, "should contain CleanFinalizer")
+		}, waitTimeoutDefault, waitIntervalDefault)
+	})
 }
 
 func TestIntegrationProvisioning_FailInvalidSchema(t *testing.T) {
@@ -554,7 +626,7 @@ func TestIntegrationProvisioning_CreatingGitHubRepository(t *testing.T) {
 	found, err := helper.DashboardsV1.Resource.List(ctx, metav1.ListOptions{})
 	require.NoError(t, err, "can list values")
 
-	names := []string{}
+	names := make([]string, 0, len(found.Items))
 	for _, v := range found.Items {
 		names = append(names, v.GetName())
 	}
@@ -623,6 +695,33 @@ func TestIntegrationProvisioning_CreatingGitHubRepository(t *testing.T) {
 				require.Equal(t, test.output, url)
 			})
 		}
+	})
+}
+
+func TestIntegrationProvisioning_ReadOnlyRepositoryNoWebhook(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
+	helper := runGrafana(t)
+	ctx := context.Background()
+
+	t.Run("repository with no workflows should not create a webhook", func(t *testing.T) {
+		repoName := "readonly-no-webhook"
+		input := helper.RenderObject(t, "testdata/github-readonly.json.tmpl", map[string]any{
+			"Name":        repoName,
+			"SyncEnabled": false,
+		})
+
+		_, err := helper.Repositories.Resource.Create(ctx, input, metav1.CreateOptions{})
+		require.NoError(t, err, "failed to create read-only repository")
+
+		helper.WaitForHealthyRepository(t, repoName)
+
+		repoObj, err := helper.Repositories.Resource.Get(ctx, repoName, metav1.GetOptions{})
+		require.NoError(t, err, "failed to get repository")
+
+		repo := unstructuredToRepository(t, repoObj)
+		require.Empty(t, repo.Spec.Workflows, "repository should have no workflows (read-only)")
+		require.Nil(t, repo.Status.Webhook, "read-only repository should not have a webhook")
 	})
 }
 
@@ -921,6 +1020,26 @@ spec:
 		name, _, _ := unstructured.NestedString(obj.Object, "resource", "upsert", "metadata", "name")
 		require.True(t, strings.HasPrefix(name, "prefix-"), "should generate name")
 	})
+
+	t.Run("folder not allowed", func(t *testing.T) {
+		code := 0
+
+		result := helper.AdminREST.Post().
+			Namespace("default").
+			Resource("repositories").
+			Name(repo).
+			SubResource("files", "folder.json").
+			Body([]byte(`apiVersion: folder.grafana.app/v1beta1
+kind: Folder
+metadata:
+  name: someFolder
+spec:
+  title: Test Folder
+`)).Do(ctx).StatusCode(&code)
+		require.Error(t, result.Error(), "should return error")
+		require.Contains(t, result.Error().Error(), "cannot declare folders through files")
+		require.Equal(t, http.StatusBadRequest, code, "expect bad request result")
+	})
 }
 
 func TestIntegrationProvisioning_ImportAllPanelsFromLocalRepository(t *testing.T) {
@@ -1206,6 +1325,102 @@ func TestIntegrationProvisioning_RefsPermissions(t *testing.T) {
 
 		require.NoError(t, result.Error(), "admin should be able to GET refs")
 		require.Equal(t, http.StatusOK, statusCode, "should return 200 OK")
+	})
+}
+
+func TestIntegrationProvisioning_EmptyPath(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
+	helper := runGrafana(t)
+	ctx := context.Background()
+
+	t.Run("repository with empty path syncs from root", func(t *testing.T) {
+		const repo = "empty-path-test"
+		testRepo := TestRepo{
+			Name:     repo,
+			Template: "testdata/github-empty-path.json.tmpl",
+			Target:   "folder",
+			Values: map[string]any{
+				"SyncEnabled": true,
+			},
+			ExpectedDashboards: 3, // Syncs 3 dashboards from grafana/ directory
+			ExpectedFolders:    6, // Creates 6 folders: repo root, assets, gifs, grafana, DemoFolder, DemoDeeperFolder
+		}
+		helper.CreateRepo(t, testRepo)
+
+		// Verify the repository has empty path
+		repoObj, err := helper.Repositories.Resource.Get(ctx, repo, metav1.GetOptions{})
+		require.NoError(t, err)
+		path, _, _ := unstructured.NestedString(repoObj.Object, "spec", "github", "path")
+		require.Equal(t, "", path, "repository should have empty path")
+
+		// Clean up
+		err = helper.Repositories.Resource.Delete(ctx, repo, metav1.DeleteOptions{})
+		require.NoError(t, err)
+	})
+
+	t.Run("multiple repositories with empty path - creation succeeds but sync warns on ownership conflicts", func(t *testing.T) {
+		const repo1 = "empty-path-repo-1"
+		const repo2 = "empty-path-repo-2"
+
+		// Step 1: Create first repository with empty path - syncs successfully
+		testRepo1 := TestRepo{
+			Name:     repo1,
+			Template: "testdata/github-empty-path.json.tmpl",
+			Target:   "folder",
+			Values: map[string]any{
+				"SyncEnabled": true,
+			},
+			ExpectedDashboards: 3, // Successfully syncs 3 dashboards
+			ExpectedFolders:    6, // Successfully creates 6 folders
+		}
+		helper.CreateRepo(t, testRepo1)
+
+		// Step 2: Create second repository with same empty path
+		// Creation should succeed (no duplicate path validation error)
+		// but sync should warn because dashboards are owned by repo1
+		testRepo2 := TestRepo{
+			Name:     repo2,
+			Template: "testdata/github-empty-path.json.tmpl",
+			Target:   "folder",
+			Values: map[string]any{
+				"SyncEnabled": true,
+			},
+			SkipResourceAssertions: true, // Skip because we can't easily count per-repo resources
+		}
+		helper.CreateRepo(t, testRepo2)
+
+		// Verify both repositories have empty paths
+		repo1Obj, err := helper.Repositories.Resource.Get(ctx, repo1, metav1.GetOptions{})
+		require.NoError(t, err)
+		path1, _, _ := unstructured.NestedString(repo1Obj.Object, "spec", "github", "path")
+		require.Equal(t, "", path1, "repo1 should have empty path")
+
+		repo2Obj, err := helper.Repositories.Resource.Get(ctx, repo2, metav1.GetOptions{})
+		require.NoError(t, err)
+		path2, _, _ := unstructured.NestedString(repo2Obj.Object, "spec", "github", "path")
+		require.Equal(t, "", path2, "repo2 should have empty path")
+
+		// Verify repo2 sync completed with warning state (ownership conflicts)
+		syncState, _, _ := unstructured.NestedString(repo2Obj.Object, "status", "sync", "state")
+		require.Equal(t, "warning", syncState, "repo2 sync should complete with warning state due to ownership conflicts")
+
+		// Verify global resource counts:
+		// - Folders: 12 total (6 from repo1 + 6 from repo2) - folders are duplicated per repository
+		// - Dashboards: 3 total (only from repo1) - repo2's dashboards fail with ownership conflicts
+		dashboards, err := helper.DashboardsV1.Resource.List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+		require.Len(t, dashboards.Items, 3, "should have 3 dashboards (only from repo1)")
+
+		folders, err := helper.Folders.Resource.List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+		require.Len(t, folders.Items, 12, "should have 12 folders (6 from repo1 + 6 from repo2)")
+
+		// Clean up
+		err = helper.Repositories.Resource.Delete(ctx, repo1, metav1.DeleteOptions{})
+		require.NoError(t, err)
+		err = helper.Repositories.Resource.Delete(ctx, repo2, metav1.DeleteOptions{})
+		require.NoError(t, err)
 	})
 }
 
@@ -1988,4 +2203,123 @@ func TestIntegrationRepositoryController_EnterpriseWiring(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestIntegrationProvisioning_ConcurrentRepositoryCreation tests creating multiple repositories
+// concurrently with secure tokens, which triggers secret storage operations.
+// This simulates what happens with 'grafanactl resources push' when pushing multiple
+// repository definitions at once.
+//
+// Before PR #118820, this would frequently fail with:
+//
+//	Error: migration failed (id = add lease_created index to secret_secure_value):
+//	database is locked (5) (SQLITE_BUSY)
+func TestIntegrationProvisioning_ConcurrentRepositoryCreation(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
+	helper := runGrafana(t)
+	ctx := context.Background()
+
+	// Number of repositories to create concurrently
+	// This simulates what happens with 'grafanactl resources push' when pushing
+	// multiple repository definitions at once
+	const numRepos = 10
+
+	// Use sync.WaitGroup to ensure all goroutines complete
+	var wg sync.WaitGroup
+	type result struct {
+		name string
+		err  error
+	}
+	results := make(chan result, numRepos)
+
+	// Create repositories concurrently
+	for i := 0; i < numRepos; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			repoName := fmt.Sprintf("concurrent-repo-%d", idx)
+
+			// Create repository with secure token (this triggers secret storage migrations)
+			repo := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "provisioning.grafana.app/v0alpha1",
+					"kind":       "Repository",
+					"metadata": map[string]any{
+						"name":      repoName,
+						"namespace": "default",
+					},
+					"spec": map[string]any{
+						"title":       fmt.Sprintf("Concurrent Test Repo %d", idx),
+						"description": fmt.Sprintf("Test repository for concurrent creation stress test %d", idx),
+						"type":        "github",
+						"github": map[string]any{
+							"url":    "https://github.com/grafana/grafana-git-sync-demo",
+							"branch": "integration-test",
+							"path":   "grafana/",
+						},
+						"sync": map[string]any{
+							"enabled": false,
+						},
+					},
+					"secure": map[string]any{
+						// Include a secure token to trigger secret storage operations
+						"token": map[string]any{
+							"create": fmt.Sprintf("test-token-%d", idx),
+						},
+					},
+				},
+			}
+
+			_, err := helper.Repositories.Resource.Create(ctx, repo, metav1.CreateOptions{})
+			results <- result{name: repoName, err: err}
+		}(i)
+	}
+
+	// Close the results channel once all goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect all results
+	var errors []error
+	successCount := 0
+	for res := range results {
+		if res.err != nil {
+			errors = append(errors, fmt.Errorf("%s: %w", res.name, res.err))
+		} else {
+			successCount++
+		}
+	}
+
+	// All repositories should be created successfully without SQLITE_BUSY errors
+	if len(errors) > 0 {
+		t.Errorf("Failed to create %d/%d repositories concurrently:", len(errors), numRepos)
+		for _, err := range errors {
+			t.Logf("  - %v", err)
+			// Check specifically for SQLITE_BUSY errors
+			if strings.Contains(err.Error(), "SQLITE_BUSY") || strings.Contains(err.Error(), "database is locked") {
+				t.Errorf("SQLITE_BUSY deadlock detected! PR #118820 may not have fully resolved the issue.")
+			}
+		}
+		t.FailNow()
+	}
+
+	require.Equal(t, numRepos, successCount, "All repositories should be created successfully")
+
+	// Verify all repositories exist and have their secure tokens
+	for i := 0; i < numRepos; i++ {
+		repoName := fmt.Sprintf("concurrent-repo-%d", i)
+		repo, err := helper.Repositories.Resource.Get(ctx, repoName, metav1.GetOptions{})
+		require.NoError(t, err, "Repository %s should exist", repoName)
+
+		// Verify the secure token was created
+		tokenName, found, err := unstructured.NestedString(repo.Object, "secure", "token", "name")
+		require.NoError(t, err, "Should be able to read secure token name")
+		require.True(t, found, "Repository %s should have a secure token", repoName)
+		require.NotEmpty(t, tokenName, "Secure token name should not be empty")
+	}
+
+	t.Logf("Successfully created %d repositories concurrently without deadlocks", numRepos)
 }

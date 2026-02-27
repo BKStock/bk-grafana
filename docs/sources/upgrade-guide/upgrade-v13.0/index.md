@@ -8,7 +8,7 @@ keywords:
   - '13.0'
 title: Upgrade to Grafana v13.0
 menuTitle: Upgrade to v13.0
-weight: 497
+weight: 496
 ---
 
 # Upgrade to Grafana v13.0
@@ -26,7 +26,7 @@ As part of our [migration in Grafana 13 to React 19](https://grafana.com/blog/re
 
 Follow this sequence for best results:
 
-#### Upgrade your grafana to latest patch version for the version you are running
+#### Upgrade your Grafana to latest patch version for the version you are running
 To ensure that the changes that are necessary for React 19 upgrade are in place in your Grafana version, please update to the latest minor version available for your Grafana. You can check which one it is on our [downloads page](https://grafana.com/grafana/download)
 
 #### Update all of your plugins

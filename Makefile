@@ -21,6 +21,8 @@ GO_BUILD_FLAGS += $(if $(GO_BUILD_CGO),-cgo-enabled=$(GO_BUILD_CGO))
 GO_TEST_FLAGS += $(if $(GO_BUILD_TAGS),-tags=$(GO_BUILD_TAGS))
 GIT_BASE = remotes/origin/main
 
+CUE = cue
+
 # GNU xargs has flag -r, and BSD xargs (e.g. MacOS) has that behaviour by default
 XARGSR = $(shell xargs --version 2>&1 | grep -q GNU && echo xargs -r || echo xargs)
 
@@ -136,17 +138,17 @@ i18n-extract-enterprise:
 else
 i18n-extract-enterprise:
 	@echo "Extracting i18n strings for Enterprise"
-	cd public/locales/enterprise && yarn run i18next-cli extract --sync-primary
+	cd public/locales/enterprise && LANG=en_US.UTF-8 yarn run i18next-cli extract --sync-primary
 endif
 
 .PHONY: i18n-extract
 i18n-extract: i18n-extract-enterprise
 	@echo "Extracting i18n strings for OSS"
-	yarn run i18next-cli extract --sync-primary
+	LANG=en_US.UTF-8 yarn run i18next-cli extract --sync-primary
 	@echo "Extracting i18n strings for packages"
-	yarn run packages:i18n-extract
+	LANG=en_US.UTF-8 yarn run packages:i18n-extract
 	@echo "Extracting i18n strings for plugins"
-	yarn run plugin:i18n-extract
+	LANG=en_US.UTF-8 yarn run plugin:i18n-extract
 
 ##@ Building
 .PHONY: gen-cue
@@ -179,7 +181,7 @@ app ?=
 .PHONY: gen-apps
 gen-apps: do-gen-apps gofmt ## Generate code for Grafana App SDK apps and run gofmt. Use app=<name> to generate for a specific app.
 ## NOTE: codegen produces some openapi files that result in circular dependencies
-## for now, we revert the zz_openapi_gen.go files before comparison  	  
+## for now, we revert the zz_openapi_gen.go files before comparison
 	@if [ -n "$$CODEGEN_VERIFY" ]; then \
 	  git checkout HEAD -- apps/alerting/rules/pkg/apis/alerting/v0alpha1/zz_openapi_gen.go; \
 		git checkout HEAD -- apps/iam/pkg/apis/iam/v0alpha1/zz_openapi_gen.go; \
@@ -252,8 +254,8 @@ gen-app-manifests-unistore: ## Generate unified storage app manifests list
 .PHONY: fix-cue
 fix-cue:
 	@echo "formatting cue files"
-	$(cue) fix kinds/**/*.cue
-	$(cue) fix public/app/plugins/**/**/*.cue
+	$(CUE) fix kinds/**/*.cue
+	$(CUE) fix public/app/plugins/**/**/*.cue
 
 .PHONY: gen-jsonnet
 gen-jsonnet:

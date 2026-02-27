@@ -95,6 +95,14 @@ const (
 	// Next generation provisioning... and git
 	FlagProvisioning = "provisioning"
 
+	// FlagProvisioningFolderMetadata
+	// Allow setting folder metadata for provisioned folders
+	FlagProvisioningFolderMetadata = "provisioningFolderMetadata"
+
+	// FlagProvisioningExport
+	// Enable export functionality for provisioned resources
+	FlagProvisioningExport = "provisioningExport"
+
 	// FlagGrafanaAPIServerEnsureKubectlAccess
 	// Start an additional https handler and write kubectl options
 	FlagGrafanaAPIServerEnsureKubectlAccess = "grafanaAPIServerEnsureKubectlAccess"
@@ -198,6 +206,18 @@ const (
 	// FlagQueryServiceRewrite
 	// Rewrite requests targeting /ds/query to the query service
 	FlagQueryServiceRewrite = "queryServiceRewrite"
+
+	// FlagDatasourcesRerouteLegacyCRUDAPIs
+	// Handle datasource CRUD requests to the legacy API routes by querying the new datasource api group endpoints behind the scenes.
+	FlagDatasourcesRerouteLegacyCRUDAPIs = "datasourcesRerouteLegacyCRUDAPIs"
+
+	// FlagDatasourcesApiServerEnableResourceEndpoint
+	// Handle datasource resource requests to the legacy API routes by querying the new datasource api group endpoints behind the scenes.
+	FlagDatasourcesApiServerEnableResourceEndpoint = "datasourcesApiServerEnableResourceEndpoint"
+
+	// FlagDatasourcesApiServerEnableResourceEndpointFrontend
+	// Send Datsource resource requests to K8s /apis/ API routes instead of the legacy /api/datasources/uid/{uid}/resources/{path} routes.
+	FlagDatasourcesApiServerEnableResourceEndpointFrontend = "datasourcesApiServerEnableResourceEndpointFrontend"
 
 	// FlagCloudWatchBatchQueries
 	// Runs CloudWatch metrics queries as separate batches
@@ -406,10 +426,6 @@ const (
 	// FlagDataplaneAggregator
 	// Enable grafana dataplane aggregator
 	FlagDataplaneAggregator = "dataplaneAggregator"
-
-	// FlagNewFiltersUI
-	// Enables new combobox style UI for the Ad hoc filters variable in scenes architecture
-	FlagNewFiltersUI = "newFiltersUI"
 
 	// FlagAppPlatformGrpcClientAuth
 	// Enables the gRPC client to authenticate with the App Platform by using ID &amp; access tokens
@@ -646,10 +662,6 @@ const (
 	// Enables create, delete, and update mutations for resources owned by IAM identity
 	FlagKubernetesAuthnMutation = "kubernetesAuthnMutation"
 
-	// FlagKubernetesExternalGroupMapping
-	// Routes external group mapping requests from /api to the /apis endpoint
-	FlagKubernetesExternalGroupMapping = "kubernetesExternalGroupMapping"
-
 	// FlagRestoreDashboards
 	// Enables restore deleted dashboards feature
 	FlagRestoreDashboards = "restoreDashboards"
@@ -681,10 +693,6 @@ const (
 	// FlagPreferLibraryPanelTitle
 	// Prefer library panel title over viz panel title.
 	FlagPreferLibraryPanelTitle = "preferLibraryPanelTitle"
-
-	// FlagTabularNumbers
-	// Use fixed-width numbers globally in the UI
-	FlagTabularNumbers = "tabularNumbers"
 
 	// FlagNewInfluxDSConfigPageDesign
 	// Enables new design for the InfluxDB data source configuration page
@@ -766,10 +774,6 @@ const (
 	// Enables the raw DSL query editor in the Elasticsearch data source
 	FlagElasticsearchRawDSLQuery = "elasticsearchRawDSLQuery"
 
-	// FlagKubernetesAnnotations
-	// Enables app platform API for annotations
-	FlagKubernetesAnnotations = "kubernetesAnnotations"
-
 	// FlagAwsDatasourcesHttpProxy
 	// Enables http proxy settings for aws datasources
 	FlagAwsDatasourcesHttpProxy = "awsDatasourcesHttpProxy"
@@ -799,10 +803,54 @@ const (
 	FlagKubernetesTeamBindings = "kubernetesTeamBindings"
 
 	// FlagKubernetesTeamsHandlerRedirect
-	// Redirects the request to teams related endpoints to the app platform API
+	// Redirects the request of the team endpoints to the app platform APIs
 	FlagKubernetesTeamsHandlerRedirect = "kubernetesTeamsHandlerRedirect"
+
+	// FlagKubernetesExternalGroupMappingsApi
+	// Enables external group mapping APIs in the app platform
+	FlagKubernetesExternalGroupMappingsApi = "kubernetesExternalGroupMappingsApi"
+
+	// FlagKubernetesExternalGroupMappingsRedirect
+	// Redirects the request of the external group mapping endpoints to the app platform APIs
+	FlagKubernetesExternalGroupMappingsRedirect = "kubernetesExternalGroupMappingsRedirect"
+
+	// FlagKubernetesTeamSync
+	// Use the new APIs for syncing users to teams
+	FlagKubernetesTeamSync = "kubernetesTeamSync"
 
 	// FlagAlertingMultiplePolicies
 	// Enables the ability to create multiple alerting policies
 	FlagAlertingMultiplePolicies = "alertingMultiplePolicies"
+
+	// FlagAlertingIgnorePendingForNoDataAndError
+	// Makes NoData and Error alerts fire immediately, without &#39;pending&#39; stage
+	FlagAlertingIgnorePendingForNoDataAndError = "alertingIgnorePendingForNoDataAndError"
+
+	// FlagAlertingNotificationHistoryRuleViewer
+	// Enables the notification history tab in the rule viewer
+	FlagAlertingNotificationHistoryRuleViewer = "alertingNotificationHistoryRuleViewer"
+
+	// FlagAlertingNotificationHistoryGlobal
+	// Enables the notification history global menu item viewer
+	FlagAlertingNotificationHistoryGlobal = "alertingNotificationHistoryGlobal"
+
+	// FlagReact19
+	// Whether to use the new React 19 runtime
+	FlagReact19 = "react19"
+
+	// FlagFrontendServiceUseSettingsService
+	// Enables the frontend service to fetch tenant-specific settings overrides from the settings service
+	FlagFrontendServiceUseSettingsService = "frontendServiceUseSettingsService"
+
+	// FlagManagedPluginsV2
+	// Enables managed plugins v2 (expanded rollout, community plugin coverage)
+	FlagManagedPluginsV2 = "managedPluginsV2"
+
+	// FlagRememberUserOrgForSso
+	// Remember the last viewed organization for users using SSO
+	FlagRememberUserOrgForSso = "rememberUserOrgForSso"
+
+	// FlagDsAbstractionApp
+	// Registers the dsabstraction app for querying datasources via unified SQL
+	FlagDsAbstractionApp = "dsAbstractionApp"
 )
