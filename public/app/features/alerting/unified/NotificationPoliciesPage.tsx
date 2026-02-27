@@ -174,16 +174,6 @@ function PolicyTreeTab() {
     setManualDefaultExpanded(undefined);
   }, []);
 
-  const hasActiveFilters = Boolean(contactPointFilter) || labelMatchersFilter.length > 0;
-  // Auto-expand when filters are active, unless the user has explicitly collapsed
-  const defaultExpanded = manualDefaultExpanded ?? hasActiveFilters;
-  const isAllExpanded = defaultExpanded && expandedOverrides.size === 0;
-
-  const toggleAllExpanded = useCallback(() => {
-    setManualDefaultExpanded(!defaultExpanded);
-    clear();
-  }, [defaultExpanded, clear]);
-
   const sortedPolicies = useMemo(() => sortPoliciesDefaultFirst(allPolicies), [allPolicies]);
 
   // Filter to only selected trees (or all if no selection)
@@ -196,6 +186,16 @@ function PolicyTreeTab() {
       return selectedPolicyTreeNames.includes(name);
     });
   }, [sortedPolicies, selectedPolicyTreeNames]);
+
+  const hasActiveFilters = Boolean(contactPointFilter) || labelMatchersFilter.length > 0;
+  // Auto-expand when there is only one visible tree or filters are active; collapse when there are multiple trees
+  const defaultExpanded = manualDefaultExpanded ?? (visiblePolicies.length === 1 || hasActiveFilters);
+  const isAllExpanded = defaultExpanded && expandedOverrides.size === 0;
+
+  const toggleAllExpanded = useCallback(() => {
+    setManualDefaultExpanded(!defaultExpanded);
+    clear();
+  }, [defaultExpanded, clear]);
 
   // Single-tree mode: show filters but no collapse/expand or create button
   if (!useMultiplePolicies) {
