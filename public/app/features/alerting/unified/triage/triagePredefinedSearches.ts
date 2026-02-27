@@ -9,10 +9,9 @@
 
 import { t } from '@grafana/i18n';
 
-import { toUrl } from '../../../variables/adhoc/urlParser';
 import { SavedSearch } from '../components/saved-searches/savedSearchesSchema';
 
-import { URL_PARAMS } from './constants';
+import { buildTriageQueryStringFromParts } from './scene/triageSavedSearchUtils';
 import { defaultTimeRange } from './scene/utils';
 
 /** Prefix for predefined search IDs; used to identify predefined items for overrides and dismissed handling. */
@@ -20,35 +19,6 @@ export const TRIAGE_PREDEFINED_SEARCH_ID_PREFIX = 'triage-predefined-';
 
 /** Label for evaluation group in state history / GRAFANA_ALERTS metric. */
 const EVAL_GROUP_LABEL = 'rule_group';
-
-/**
- * Builds a triage saved search query string from groupBy, filters, and optional time range.
- * Uses the same format as serializeTriageState for consistency.
- */
-function buildTriageQueryString(options: {
-  groupBy: string[];
-  filters?: Array<{ key: string; operator: '=' | '=!'; value: string }>;
-  from?: string;
-  to?: string;
-}): string {
-  const params = new URLSearchParams();
-
-  if (options.filters?.length) {
-    const filterStrings = toUrl(options.filters.map((f) => ({ key: f.key, operator: f.operator, value: f.value })));
-    filterStrings.forEach((s) => params.append(URL_PARAMS.filters, s));
-  }
-
-  options.groupBy.forEach((key) => {
-    if (key) {
-      params.append(URL_PARAMS.groupBy, key);
-    }
-  });
-
-  params.set(URL_PARAMS.timeFrom, options.from ?? defaultTimeRange.from);
-  params.set(URL_PARAMS.timeTo, options.to ?? defaultTimeRange.to);
-
-  return params.toString();
-}
 
 const PREDEFINED_IDS = [
   `${TRIAGE_PREDEFINED_SEARCH_ID_PREFIX}folder-evalgroup-firing`,
@@ -72,34 +42,42 @@ export function getTriagePredefinedSearches(): SavedSearch[] {
         'Filter: Firing; Group by: Folder and Evaluation group'
       ),
       isDefault: false,
-      query: buildTriageQueryString({
-        groupBy: ['grafana_folder', EVAL_GROUP_LABEL],
+      query: buildTriageQueryStringFromParts({
         filters: [{ key: 'alertstate', operator: '=', value: 'firing' }],
+        groupBy: ['grafana_folder', EVAL_GROUP_LABEL],
+        from: defaultTimeRange.from,
+        to: defaultTimeRange.to,
       }),
     },
     {
       id: PREDEFINED_IDS[1],
       name: t('alerting.triage.saved-searches.predefined.firing-only', 'Filter: Firing'),
       isDefault: false,
-      query: buildTriageQueryString({
-        groupBy: [],
+      query: buildTriageQueryStringFromParts({
         filters: [{ key: 'alertstate', operator: '=', value: 'firing' }],
+        groupBy: [],
+        from: defaultTimeRange.from,
+        to: defaultTimeRange.to,
       }),
     },
     {
       id: PREDEFINED_IDS[2],
       name: t('alerting.triage.saved-searches.predefined.folder-evalgroup', 'Group by: Folder and Evaluation group'),
       isDefault: false,
-      query: buildTriageQueryString({
+      query: buildTriageQueryStringFromParts({
         groupBy: ['grafana_folder', EVAL_GROUP_LABEL],
+        from: defaultTimeRange.from,
+        to: defaultTimeRange.to,
       }),
     },
     {
       id: PREDEFINED_IDS[3],
       name: t('alerting.triage.saved-searches.predefined.folder-firing', 'Group by: Folder'),
       isDefault: false,
-      query: buildTriageQueryString({
+      query: buildTriageQueryStringFromParts({
         groupBy: ['grafana_folder'],
+        from: defaultTimeRange.from,
+        to: defaultTimeRange.to,
       }),
     },
   ];
