@@ -359,17 +359,12 @@ type Cfg struct {
 	SATokenExpirationDayLimit int
 
 	// Annotations
-	AnnotationCleanupJobBatchSize          int64
-	AnnotationMaximumTagsLength            int64
-	AlertingAnnotationCleanupSetting       AnnotationCleanupSettings
-	DashboardAnnotationCleanupSettings     AnnotationCleanupSettings
-	APIAnnotationCleanupSettings           AnnotationCleanupSettings
-	KubernetesAnnotationsAppEnabled        bool
-	KubernetesAnnotationsStoreBackend      string // "sql" (default) or "grpc"
-	KubernetesAnnotationsGRPCAddress       string // gRPC server address (e.g., "localhost:9090")
-	KubernetesAnnotationsGRPCUseTLS        bool   // Enable TLS for gRPC connection (default: false)
-	KubernetesAnnotationsGRPCTLSCAFile     string // Path to CA certificate file (optional)
-	KubernetesAnnotationsGRPCTLSSkipVerify bool   // Skip TLS verification (insecure, for testing)
+	AnnotationCleanupJobBatchSize      int64
+	AnnotationMaximumTagsLength        int64
+	AlertingAnnotationCleanupSetting   AnnotationCleanupSettings
+	DashboardAnnotationCleanupSettings AnnotationCleanupSettings
+	APIAnnotationCleanupSettings       AnnotationCleanupSettings
+	AnnotationAppPlatform              AnnotationAppPlatformSettings
 
 	// GrafanaJavascriptAgent config
 	GrafanaJavascriptAgent GrafanaJavascriptAgent
@@ -859,12 +854,15 @@ func (cfg *Cfg) readAnnotationSettings() error {
 	section := cfg.Raw.Section("annotations")
 	cfg.AnnotationCleanupJobBatchSize = section.Key("cleanupjob_batchsize").MustInt64(100)
 	cfg.AnnotationMaximumTagsLength = section.Key("tags_length").MustInt64(500)
-	cfg.KubernetesAnnotationsAppEnabled = section.Key("kubernetes_annotations_app_enabled").MustBool(false)
-	cfg.KubernetesAnnotationsStoreBackend = section.Key("kubernetes_annotations_store_backend").MustString("sql")
-	cfg.KubernetesAnnotationsGRPCAddress = section.Key("kubernetes_annotations_grpc_address").MustString("localhost:9090")
-	cfg.KubernetesAnnotationsGRPCUseTLS = section.Key("kubernetes_annotations_grpc_use_tls").MustBool(false)
-	cfg.KubernetesAnnotationsGRPCTLSCAFile = section.Key("kubernetes_annotations_grpc_tls_ca_file").MustString("")
-	cfg.KubernetesAnnotationsGRPCTLSSkipVerify = section.Key("kubernetes_annotations_grpc_tls_skip_verify").MustBool(false)
+
+	// App Platform annotations API
+	appPlatformSection := cfg.Raw.Section("annotations.app_platform")
+	cfg.AnnotationAppPlatform.Enabled = appPlatformSection.Key("enabled").MustBool(false)
+	cfg.AnnotationAppPlatform.StoreBackend = appPlatformSection.Key("store_backend").MustString("sql")
+	cfg.AnnotationAppPlatform.GRPCAddress = appPlatformSection.Key("grpc_address").MustString("localhost:9090")
+	cfg.AnnotationAppPlatform.GRPCUseTLS = appPlatformSection.Key("grpc_use_tls").MustBool(false)
+	cfg.AnnotationAppPlatform.GRPCTLSCAFile = appPlatformSection.Key("grpc_tls_ca_file").MustString("")
+	cfg.AnnotationAppPlatform.GRPCTLSSkipVerify = appPlatformSection.Key("grpc_tls_skip_verify").MustBool(false)
 
 	switch {
 	case cfg.AnnotationMaximumTagsLength > 4096:
@@ -924,6 +922,15 @@ func (cfg *Cfg) readExpressionsSettings() {
 type AnnotationCleanupSettings struct {
 	MaxAge   time.Duration
 	MaxCount int64
+}
+
+type AnnotationAppPlatformSettings struct {
+	Enabled           bool
+	StoreBackend      string // "sql" (default) or "grpc"
+	GRPCAddress       string // gRPC server address (e.g., "localhost:9090")
+	GRPCUseTLS        bool   // Enable TLS for gRPC connection (default: false)
+	GRPCTLSCAFile     string // Path to CA certificate file (optional)
+	GRPCTLSSkipVerify bool   // Skip TLS verification (insecure, for testing)
 }
 
 func EnvKey(sectionName string, keyName string) string {

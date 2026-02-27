@@ -64,10 +64,10 @@ func RegisterAppInstaller(
 
 	// Choose storage backend based on configuration
 	var store Store
-	switch cfg.KubernetesAnnotationsStoreBackend {
+	switch cfg.AnnotationAppPlatform.StoreBackend {
 	case "grpc":
 		var dialOpts []grpc.DialOption
-		if cfg.KubernetesAnnotationsGRPCUseTLS {
+		if cfg.AnnotationAppPlatform.GRPCUseTLS {
 			tlsConfig, err := loadTLSConfig(cfg)
 			if err != nil {
 				return nil, fmt.Errorf("failed to load TLS config: %w", err)
@@ -78,11 +78,11 @@ func RegisterAppInstaller(
 		}
 
 		grpcConn, err := grpc.NewClient(
-			cfg.KubernetesAnnotationsGRPCAddress,
+			cfg.AnnotationAppPlatform.GRPCAddress,
 			dialOpts...,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to annotation gRPC server at %s: %w", cfg.KubernetesAnnotationsGRPCAddress, err)
+			return nil, fmt.Errorf("failed to connect to annotation gRPC server at %s: %w", cfg.AnnotationAppPlatform.GRPCAddress, err)
 		}
 		store = NewStoreGRPC(grpcConn)
 	case "sql":
@@ -131,8 +131,8 @@ func RegisterAppInstaller(
 
 func loadTLSConfig(cfg *setting.Cfg) (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
-	if cfg.KubernetesAnnotationsGRPCTLSCAFile != "" {
-		caCert, err := os.ReadFile(cfg.KubernetesAnnotationsGRPCTLSCAFile)
+	if cfg.AnnotationAppPlatform.GRPCTLSCAFile != "" {
+		caCert, err := os.ReadFile(cfg.AnnotationAppPlatform.GRPCTLSCAFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA file: %w", err)
 		}
@@ -144,7 +144,7 @@ func loadTLSConfig(cfg *setting.Cfg) (*tls.Config, error) {
 		tlsConfig.RootCAs = caCertPool
 	}
 
-	if cfg.KubernetesAnnotationsGRPCTLSSkipVerify {
+	if cfg.AnnotationAppPlatform.GRPCTLSSkipVerify {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
