@@ -12659,7 +12659,8 @@
     "fix-folder-metadata": {
       "button": "Fix folder IDs",
       "error-fixing": "Error fixing folder metadata",
-      "fixing": "Fixing..."
+      "fixing": "Fixing...",
+      "success": "Folder metadata fix started. This will continue in the background."
     },
     "folder-permissions": {
       "loading": "Loading..."

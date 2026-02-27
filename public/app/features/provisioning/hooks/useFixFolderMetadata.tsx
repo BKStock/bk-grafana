@@ -1,7 +1,7 @@
 import { t, Trans } from '@grafana/i18n';
 import { Spinner } from '@grafana/ui';
 import { useCreateRepositoryJobsMutation } from 'app/api/clients/provisioning/v0alpha1';
-import { createErrorNotification } from 'app/core/copy/appNotification';
+import { createErrorNotification, createSuccessNotification } from 'app/core/copy/appNotification';
 import { notifyApp } from 'app/core/reducers/appNotification';
 import { dispatch } from 'app/store/store';
 
@@ -19,6 +19,18 @@ export function useFixFolderMetadata(repositoryName: string) {
     }
     createJob({ name: repositoryName, jobSpec: { action: 'fixFolderMetadata', fixFolderMetadata: {} } })
       .unwrap()
+      .then(() => {
+        dispatch(
+          notifyApp(
+            createSuccessNotification(
+              t(
+                'provisioning.fix-folder-metadata.success',
+                'Folder metadata fix started. This will continue in the background.'
+              )
+            )
+          )
+        );
+      })
       .catch(() => {
         dispatch(
           notifyApp(
