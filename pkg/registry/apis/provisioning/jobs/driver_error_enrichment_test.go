@@ -26,7 +26,7 @@ func TestErrorEnrichmentLogic(t *testing.T) {
 		expectedNotContains []string
 	}{
 		{
-			name:         "worker error is enriched with job context",
+			name:         "expired error includes helpful hint",
 			originalErr:  errors.New("expired"),
 			action:       provisioning.JobActionPull,
 			repository:   "my-repo",
@@ -35,6 +35,8 @@ func TestErrorEnrichmentLogic(t *testing.T) {
 			expectedContains: []string{
 				"pull job for repository 'my-repo' failed",
 				"expired",
+				"Check if authentication credentials",
+				"OAuth token",
 			},
 		},
 		{
@@ -64,15 +66,54 @@ func TestErrorEnrichmentLogic(t *testing.T) {
 			},
 		},
 		{
-			name:         "generic error gets full context",
-			originalErr:  errors.New("network connection failed"),
+			name:         "unauthorized error includes helpful hint",
+			originalErr:  errors.New("unauthorized"),
 			action:       provisioning.JobActionPull,
 			repository:   "test-repo",
 			duration:     1 * time.Second,
 			jobctxErr:    nil,
 			expectedContains: []string{
 				"pull job for repository 'test-repo' failed",
-				"network connection failed",
+				"unauthorized",
+				"Verify authentication credentials",
+			},
+		},
+		{
+			name:         "not found error includes helpful hint",
+			originalErr:  errors.New("repository not found"),
+			action:       provisioning.JobActionPull,
+			repository:   "missing-repo",
+			duration:     1 * time.Second,
+			jobctxErr:    nil,
+			expectedContains: []string{
+				"pull job for repository 'missing-repo' failed",
+				"repository not found",
+				"Verify repository exists",
+			},
+		},
+		{
+			name:         "rate limit error includes helpful hint",
+			originalErr:  errors.New("rate limit exceeded"),
+			action:       provisioning.JobActionPush,
+			repository:   "test-repo",
+			duration:     1 * time.Second,
+			jobctxErr:    nil,
+			expectedContains: []string{
+				"push job for repository 'test-repo' failed",
+				"rate limit exceeded",
+				"API rate limit exceeded",
+			},
+		},
+		{
+			name:         "generic error without hint",
+			originalErr:  errors.New("unknown error occurred"),
+			action:       provisioning.JobActionPull,
+			repository:   "test-repo",
+			duration:     1 * time.Second,
+			jobctxErr:    nil,
+			expectedContains: []string{
+				"pull job for repository 'test-repo' failed",
+				"unknown error occurred",
 			},
 		},
 	}
@@ -94,8 +135,14 @@ func TestErrorEnrichmentLogic(t *testing.T) {
 				// Lease expiry - add job context to existing message
 				err = apifmt.Errorf("%s (action: %s, repository: %s)", err.Error(), action, repo)
 			} else {
-				// Worker errors - wrap with full context
-				err = apifmt.Errorf("%s job for repository '%s' failed: %w", action, repo, err)
+				// Worker errors - wrap with full context and helpful hints
+				errMsg := err.Error()
+				hint := getErrorHint(errMsg)
+				if hint != "" {
+					err = apifmt.Errorf("%s job for repository '%s' failed: %s. %s", action, repo, errMsg, hint)
+				} else {
+					err = apifmt.Errorf("%s job for repository '%s' failed: %w", action, repo, err)
+				}
 			}
 
 			enrichedMsg := err.Error()

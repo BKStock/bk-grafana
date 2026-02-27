@@ -246,8 +246,14 @@ func (d *jobDriver) claimAndProcessOneJob(ctx context.Context) error {
 			// Lease expiry - add job context to existing message
 			err = apifmt.Errorf("%s (action: %s, repository: %s)", err.Error(), action, repo)
 		} else {
-			// Worker errors - wrap with full context
-			err = apifmt.Errorf("%s job for repository '%s' failed: %w", action, repo, err)
+			// Worker errors - wrap with full context and helpful hints
+			errMsg := err.Error()
+			hint := getErrorHint(errMsg)
+			if hint != "" {
+				err = apifmt.Errorf("%s job for repository '%s' failed: %s. %s", action, repo, errMsg, hint)
+			} else {
+				err = apifmt.Errorf("%s job for repository '%s' failed: %w", action, repo, err)
+			}
 		}
 	}
 
@@ -405,6 +411,48 @@ func (d *jobDriver) processJob(ctx context.Context, recorder JobProgressRecorder
 	err := apifmt.Errorf("no workers were registered to handle the job")
 	span.RecordError(err)
 	return err
+}
+
+// getErrorHint returns a helpful hint based on common error patterns
+func getErrorHint(errMsg string) string {
+	errMsgLower := strings.ToLower(errMsg)
+
+	// Authentication/authorization errors
+	if strings.Contains(errMsgLower, "expired") {
+		return "Check if authentication credentials (OAuth token, PAT, etc.) need to be refreshed"
+	}
+	if strings.Contains(errMsgLower, "unauthorized") || strings.Contains(errMsgLower, "401") {
+		return "Verify authentication credentials are valid"
+	}
+	if strings.Contains(errMsgLower, "forbidden") || strings.Contains(errMsgLower, "403") {
+		return "Check if credentials have sufficient permissions for this operation"
+	}
+
+	// Network/connectivity errors
+	if strings.Contains(errMsgLower, "connection refused") || strings.Contains(errMsgLower, "connection reset") {
+		return "Check network connectivity and repository URL"
+	}
+	if strings.Contains(errMsgLower, "timeout") || strings.Contains(errMsgLower, "timed out") {
+		return "Repository may be slow or unreachable. Consider increasing timeout or checking network"
+	}
+	if strings.Contains(errMsgLower, "no such host") || strings.Contains(errMsgLower, "dns") {
+		return "Verify repository URL is correct and accessible"
+	}
+
+	// Repository/resource errors
+	if strings.Contains(errMsgLower, "not found") || strings.Contains(errMsgLower, "404") {
+		return "Verify repository exists and is accessible with current credentials"
+	}
+	if strings.Contains(errMsgLower, "already exists") || strings.Contains(errMsgLower, "conflict") {
+		return "Resource already exists. Check for conflicting changes"
+	}
+
+	// Rate limiting
+	if strings.Contains(errMsgLower, "rate limit") || strings.Contains(errMsgLower, "429") {
+		return "API rate limit exceeded. Wait before retrying or check rate limit quotas"
+	}
+
+	return "" // No specific hint available
 }
 
 func (d *jobDriver) onProgress() ProgressFn {
