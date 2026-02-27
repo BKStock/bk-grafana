@@ -99,7 +99,7 @@ export const FilterRow = memo(
     const handleOpenValuesMenu = async () => {
       setIsLoadingValues(true);
       const options = await getValueOptions(keyValue, operatorValue, '');
-      setValueOptions(options as Array<SelectableValue<string>>);
+      setValueOptions(options.map((o) => ({ label: o.label, value: o.value })));
       setIsLoadingValues(false);
       setIsValuesMenuOpen(true);
     };
