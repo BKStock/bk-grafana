@@ -17,9 +17,6 @@ export function AnnotationTooltipBody({
   annoIdx: number;
 }) {
   const styles = useStyles2(getStyles);
-  console.log('tags', tags);
-  console.log('text', text);
-  console.log('title', title);
   // @todo double check alertText functionality, previously if(annoVals.alertId?.[annoIdx] !== undefined && annoVals.newState?.[annoIdx])) we didn't set the text
   return (
     <div className={styles.body}>
@@ -28,7 +25,9 @@ export function AnnotationTooltipBody({
       {alertText}
       <div>
         <Stack gap={0.5} wrap={true}>
-          {tags?.[annoIdx]?.length ? tags?.[annoIdx]?.map?.((t, i) => <Tag name={t} key={`${t}-${i}`} />) : null}
+          {tags?.[annoIdx]?.length
+            ? tags?.[annoIdx]?.map?.((t, i) => <Tag data-testid={'annotation-tag'} name={t} key={`${t}-${i}`} />)
+            : null}
         </Stack>
       </div>
     </div>

@@ -84,6 +84,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     userSelect: 'text',
   }),
   header: css({
+    label: 'annotation-header',
     padding: theme.spacing(0.5, 1),
     borderBottom: `1px solid ${theme.colors.border.weak}`,
     fontWeight: theme.typography.fontWeightBold,

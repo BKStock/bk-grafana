@@ -64,9 +64,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
   return { clusterIdx, clusters };
 };
 export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) => {
-  console.log('useAnnotationClustering');
   const { outAnnos } = useMemo(() => {
-    console.log('useAnnotationClustering memo');
     const clusteredAnnotations: DataFrame[] = [];
 
     // per-frame clustering
@@ -100,8 +98,6 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
 
           const hasTimeEndField = timeEndFrame.fields.findIndex((field) => field.name === 'timeEnd') !== -1;
 
-          console.log('hasTimeEndField', { hasTimeEndField, timeEndFrame });
-
           if (!hasTimeEndField) {
             timeEndFrame.fields.push({
               type: FieldType.time,
@@ -111,14 +107,10 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
             });
           }
 
-          console.log('hasTimeEndField', { hasTimeEndField, timeEndFrame });
-
           // append cluster regions to frame
           clusters.forEach((idxs, ci) => {
             timeEndFrame.fields.forEach((field) => {
               const vals = field.values;
-              console.log('clusters vals', vals);
-
               // @todo clean up
               if (field.name === 'time') {
                 // Push the first clustered annotation as the annotation region start time
@@ -143,7 +135,6 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
                 vals.push('indices:  ' + idxs.join(', '));
                 // vals.push(ci);
               } else if (field.name === 'clusterIdx') {
-                console.log('clusterIdx', { ci, vals, field, timeEndFrame, clusters });
                 // Update the cluster index?
                 vals.push(ci);
               } else if (field.name === 'source') {

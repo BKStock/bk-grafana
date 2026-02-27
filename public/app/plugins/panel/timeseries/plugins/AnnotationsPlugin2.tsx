@@ -71,6 +71,7 @@ const buildWipAnnoFrame = (newRange: TimeRange2) => {
       time: newRange.from,
       timeEnd: isRegion ? newRange.to : null,
       isRegion: isRegion,
+      // #00d3ffff
       color: DEFAULT_ANNOTATION_COLOR_HEX8,
     },
   ]);
@@ -164,13 +165,9 @@ export const AnnotationsPlugin2 = ({
       const shouldRenderRegion = !annotationsOptions?.multiLane || annotationsOptions.clustering || true;
       const shouldRenderLine = true;
 
-      console.log('xAnnos', xAnnos);
-
       // Multi-lane annotations do not support vertical lines or shaded regions
       xAnnos.forEach((frame) => {
         const vals = getVals(frame);
-        const clusterIdx = vals.clusterIdx;
-        console.log('clusterIdx', clusterIdx);
 
         // render line
         if (shouldRenderLine) {
@@ -254,7 +251,7 @@ export const AnnotationsPlugin2 = ({
 
       // this forces a second redraw after uPlot is updated (in the Plot.tsx didUpdate) with new data/scales
       // and ensures the anno marker positions in the dom are re-rendered in correct places
-      // (this is temp fix until uPlot integrtion is refactored)
+      // (this is temp fix until uPlot integration is refactored)
       setTimeout(() => {
         forceUpdate();
       }, 0);
@@ -374,5 +371,7 @@ const getStyles = () => ({
 });
 
 const isClusterRegion = (vals: Record<string, Array<number | undefined>>, i: number) => {
-  return !vals.isRegion[i] && vals.clusterIdx?.[i] !== undefined && vals.clusterIdx[i] >= 0;
+  return (
+    !vals.isRegion[i] && vals.clusterIdx?.[i] !== undefined && vals.clusterIdx?.[i] !== null && vals.clusterIdx[i] >= 0
+  );
 };

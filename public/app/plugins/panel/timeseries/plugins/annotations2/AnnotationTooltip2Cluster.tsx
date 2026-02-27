@@ -39,7 +39,6 @@ export const AnnotationTooltip2Cluster = ({
 
       if (annoVals.alertId?.[i] !== undefined && annoVals.newState?.[i]) {
         alertText = annoVals.data?.[i] ? alertDef.getAlertAnnotationText(annoVals.data[i]) : '';
-        console.log('alertText vs ', alertText);
         // @todo text vs title
       } else if (annoVals.title?.[i]) {
         text = annoVals.title[i] + (text ? `<br />${text}` : '');
