@@ -1252,16 +1252,10 @@ export class DashboardModel implements TimeModel {
   }
 
   canEditAnnotations(dashboardUID?: string) {
-    if (!dashboardUID) {
-      return false;
-    }
     return !!this.meta.annotationsPermissions?.dashboard.canEdit;
   }
 
   canDeleteAnnotations(dashboardUID?: string) {
-    if (!dashboardUID) {
-      return false;
-    }
     return !!this.meta.annotationsPermissions?.dashboard.canDelete;
   }
 
