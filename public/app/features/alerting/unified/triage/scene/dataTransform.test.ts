@@ -62,23 +62,6 @@ describe('convertToWorkbenchRows', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array when frame is missing required Time field', () => {
-      const result = convertToWorkbenchRows([
-        {
-          fields: [
-            { name: 'alertname', type: FieldType.string, values: ['TestAlert'], config: {} },
-            { name: 'grafana_folder', type: FieldType.string, values: ['folder'], config: {} },
-            { name: 'grafana_rule_uid', type: FieldType.string, values: ['uid'], config: {} },
-            { name: 'alertstate', type: FieldType.string, values: ['firing'], config: {} },
-            { name: 'Value', type: FieldType.number, values: [1], config: {} },
-          ],
-          length: 1,
-        },
-      ]);
-
-      expect(result).toEqual([]);
-    });
-
     it('should return empty array when frame is missing required alertname field', () => {
       const result = convertToWorkbenchRows([
         {
@@ -130,11 +113,10 @@ describe('convertToWorkbenchRows', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array when frame is missing alertstate field', () => {
+    it('should return rule rows with zero instance counts when alertstate field is missing', () => {
       const result = convertToWorkbenchRows([
         {
           fields: [
-            { name: 'Time', type: FieldType.time, values: [1000], config: {} },
             { name: 'alertname', type: FieldType.string, values: ['TestAlert'], config: {} },
             { name: 'grafana_folder', type: FieldType.string, values: ['Folder'], config: {} },
             { name: 'grafana_rule_uid', type: FieldType.string, values: ['uid'], config: {} },
@@ -144,7 +126,13 @@ describe('convertToWorkbenchRows', () => {
         },
       ]);
 
-      expect(result).toEqual([]);
+      expect(result).toEqual([
+        {
+          type: 'alertRule',
+          metadata: { title: 'TestAlert', folder: 'Folder', ruleUID: 'uid' },
+          instanceCounts: { firing: 0, pending: 0 },
+        },
+      ]);
     });
   });
 

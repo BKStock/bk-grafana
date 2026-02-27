@@ -9,18 +9,11 @@ import { PromAlertingRuleState } from 'app/types/unified-alerting-dto';
 
 import { FIELD_NAMES } from '../constants';
 
+import { normalizeFrame } from './dataTransform';
 import { summaryInstanceCountQuery, summaryRuleCountQuery } from './queries';
 import { useQueryFilter } from './utils';
 
 type AlertState = PromAlertingRuleState.Firing | PromAlertingRuleState.Pending;
-
-export interface RuleFrame {
-  alertstate: AlertState;
-  alertname: string;
-  grafana_folder: string;
-  grafana_rule_uid: string;
-  Value: number;
-}
 
 export function parseAlertstateFilter(filter: string): AlertState[] {
   const hasFiring = filter.match(/alertstate\s*=~?\s*"firing"/);
@@ -70,10 +63,9 @@ export function countRules(ruleFrame: DataFrame, alertstateFilter: AlertState[])
 }
 
 export function countInstances(instanceFrame: DataFrame) {
-  const alertstateField = instanceFrame.fields.find((f) => f.name === FIELD_NAMES.alertstate);
-  const valueField = instanceFrame.fields.find(
-    (f) => f.name === FIELD_NAMES.value || f.name.startsWith(FIELD_NAMES.valuePrefix)
-  );
+  const frame = normalizeFrame(instanceFrame);
+  const alertstateField = frame.fields.find((f) => f.name === FIELD_NAMES.alertstate);
+  const valueField = frame.fields.find((f) => f.name === FIELD_NAMES.value);
 
   if (!alertstateField || !valueField) {
     return { firing: 0, pending: 0 };

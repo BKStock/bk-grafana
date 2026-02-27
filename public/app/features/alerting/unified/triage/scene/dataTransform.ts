@@ -107,11 +107,12 @@ function extractRequiredFields(frame: DataFrame, fieldIndex: Map<string, number>
 
 // Builds tree structure in one pass through data, avoiding intermediate row objects
 export function convertToWorkbenchRows(series: DataFrame[], groupBy: string[] = []): WorkbenchRow[] {
-  if (!series.at(0)?.fields.length) {
+  const firstFrame = series.at(0);
+  if (!firstFrame?.fields.length) {
     return [];
   }
 
-  const frame = normalizeFrame(series[0]);
+  const frame = normalizeFrame(firstFrame);
 
   const fieldIndex = new Map<string, number>();
   for (let i = 0; i < frame.fields.length; i++) {
