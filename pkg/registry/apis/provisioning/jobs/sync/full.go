@@ -85,6 +85,13 @@ func FullSync(
 	}
 	span.SetAttributes(attribute.Bool("pre_check_quota", true))
 
+	repositoryResources.SetFolderCreationInterceptor(func(ctx context.Context, folder resources.Folder) error {
+		if !quotaTracker.TryAcquire() {
+			return quotas.NewQuotaExceededError(fmt.Errorf("resource quota exceeded while creating folder %s", folder.Path))
+		}
+		return nil
+	})
+
 	return applyChanges(ctx, changes, clients, repositoryResources, progress, tracer, maxSyncWorkers, metrics, quotaTracker)
 }
 
@@ -172,17 +179,8 @@ func applyChange(ctx context.Context, change ResourceFileChange, clients resourc
 	}
 
 	// Handle folders based on action type
+	// Quota for folder creation is enforced by the creation interceptor inside EnsureFolderPathExist.
 	if safepath.IsDir(change.Path) {
-		if change.Action == repository.FileActionCreated && !quotaTracker.TryAcquire() {
-			progress.Record(ctx, jobs.NewFolderResult(change.Path).
-				WithAction(change.Action).
-				WithError(quotas.NewQuotaExceededError(fmt.Errorf("resource quota exceeded, skipping creation of %s", change.Path))).
-				AsSkipped().
-				Build())
-			return
-		}
-
-		// For non-deletions, ensure folder exists
 		ensureFolderCtx, ensureFolderSpan := tracer.Start(ctx, "provisioning.sync.full.apply_changes.ensure_folder_exists")
 		resultBuilder := jobs.NewFolderResult(change.Path).WithAction(change.Action)
 

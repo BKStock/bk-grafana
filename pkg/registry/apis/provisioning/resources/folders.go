@@ -35,17 +35,23 @@ func (e *PathCreationError) Error() string {
 	return fmt.Sprintf("failed to create path %s: %v", e.Path, e.Err)
 }
 
+// FolderCreationInterceptor is called before a folder is created during path
+// traversal. Return an error to prevent the folder from being created.
+type FolderCreationInterceptor func(ctx context.Context, folder Folder) error
+
 type FolderManager struct {
-	repo   repository.ReaderWriter
-	tree   FolderTree
-	client dynamic.ResourceInterface
+	repo        repository.ReaderWriter
+	tree        FolderTree
+	client      dynamic.ResourceInterface
+	interceptor FolderCreationInterceptor
 }
 
 func NewFolderManager(repo repository.ReaderWriter, client dynamic.ResourceInterface, lookup FolderTree) *FolderManager {
 	return &FolderManager{
-		repo:   repo,
-		tree:   lookup,
-		client: client,
+		repo:        repo,
+		tree:        lookup,
+		client:      client,
+		interceptor: func(context.Context, Folder) error { return nil },
 	}
 }
 
@@ -59,6 +65,10 @@ func (fm *FolderManager) Tree() FolderTree {
 
 func (fm *FolderManager) SetTree(tree FolderTree) {
 	fm.tree = tree
+}
+
+func (fm *FolderManager) SetFolderCreationInterceptor(interceptor FolderCreationInterceptor) {
+	fm.interceptor = interceptor
 }
 
 // EnsureFoldersExist creates the folder structure in the cluster.
@@ -87,8 +97,14 @@ func (fm *FolderManager) EnsureFolderPathExist(ctx context.Context, filePath str
 			return nil
 		}
 
+		if err := fm.interceptor(ctx, f); err != nil {
+			return &PathCreationError{
+				Path: f.Path,
+				Err:  err,
+			}
+		}
+
 		if err := fm.EnsureFolderExists(ctx, f, parent); err != nil {
-			// Wrap in PathCreationError to indicate which path failed
 			return &PathCreationError{
 				Path: f.Path,
 				Err:  fmt.Errorf("ensure folder exists: %w", err),

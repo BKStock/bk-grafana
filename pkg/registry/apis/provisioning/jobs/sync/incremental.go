@@ -48,6 +48,13 @@ func IncrementalSync(ctx context.Context, repo repository.Versioned, previousRef
 		return nil
 	}
 
+	repositoryResources.SetFolderCreationInterceptor(func(ctx context.Context, folder resources.Folder) error {
+		if !quotaTracker.TryAcquire() {
+			return quotas.NewQuotaExceededError(fmt.Errorf("resource quota exceeded while creating folder %s", folder.Path))
+		}
+		return nil
+	})
+
 	progress.SetTotal(ctx, len(diff))
 	progress.SetMessage(ctx, "replicating versioned changes")
 	applyStart := time.Now()
