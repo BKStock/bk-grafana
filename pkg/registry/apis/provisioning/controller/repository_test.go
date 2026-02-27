@@ -711,22 +711,20 @@ func TestRepositoryController_shouldResync_StaleSyncStatus(t *testing.T) {
 	}
 }
 
-// capturingStatusPatcher records all Patch calls for later inspection.
-type capturingStatusPatcher struct {
-	calls [][]map[string]interface{}
+// capturePatcher captures all patch operations for inspection in tests.
+type capturePatcher struct {
+	ops []map[string]interface{}
 }
 
-func (c *capturingStatusPatcher) Patch(_ context.Context, _ *provisioning.Repository, ops ...map[string]interface{}) error {
-	c.calls = append(c.calls, ops)
+func (c *capturePatcher) Patch(_ context.Context, _ *provisioning.Repository, patchOperations ...map[string]interface{}) error {
+	c.ops = append(c.ops, patchOperations...)
 	return nil
 }
 
-func (c *capturingStatusPatcher) findPatchOp(path string) (map[string]interface{}, bool) {
-	for _, ops := range c.calls {
-		for _, op := range ops {
-			if op["path"] == path {
-				return op, true
-			}
+func (c *capturePatcher) findPatchOp(path string) (map[string]interface{}, bool) {
+	for _, op := range c.ops {
+		if op["path"] == path {
+			return op, true
 		}
 	}
 	return nil, false
@@ -802,7 +800,7 @@ func TestRepositoryController_process_QuotaUpdateTriggersReconciliation(t *testi
 			require.NoError(t, indexer.Add(repo))
 			repoLister := listers.NewRepositoryLister(indexer)
 
-			patcher := &capturingStatusPatcher{}
+			patcher := &capturePatcher{}
 
 			healthMetrics := NewMockHealthMetricsRecorder(t)
 			healthMetrics.EXPECT().
@@ -842,10 +840,10 @@ func TestRepositoryController_process_QuotaUpdateTriggersReconciliation(t *testi
 			assert.NoError(t, err)
 
 			if tc.expectReconcile {
-				assert.NotEmpty(t, patcher.calls,
+				assert.NotEmpty(t, patcher.ops,
 					"expected status patcher to be called during reconciliation")
 			} else {
-				assert.Empty(t, patcher.calls,
+				assert.Empty(t, patcher.ops,
 					"expected no status patch when reconciliation is skipped")
 			}
 
@@ -878,16 +876,6 @@ func TestRepositoryController_process_QuotaUpdateTriggersReconciliation(t *testi
 			}
 		})
 	}
-}
-
-// capturePatcher captures all patch operations for inspection in tests.
-type capturePatcher struct {
-	ops []map[string]interface{}
-}
-
-func (c *capturePatcher) Patch(_ context.Context, _ *provisioning.Repository, patchOperations ...map[string]interface{}) error {
-	c.ops = append(c.ops, patchOperations...)
-	return nil
 }
 
 // TestRepositoryController_process_ConditionsNotOverwritten verifies that the reconciliation loop
