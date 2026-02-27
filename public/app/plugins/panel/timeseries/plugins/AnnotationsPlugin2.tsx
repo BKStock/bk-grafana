@@ -132,7 +132,7 @@ export const AnnotationsPlugin2 = ({
     annotations: xAnnos,
     clusteringMode,
     plotBox: plot?.bbox,
-    timeRange: { from: plot?.scales.x.min ?? -1, to: plot?.scales.x.max ?? -1 },
+    timeRange: { from: plot?.scales?.x?.min ?? -1, to: plot?.scales?.x?.max ?? -1 },
   });
   const exitWipEdit = useCallback(() => {
     setNewRange(null);

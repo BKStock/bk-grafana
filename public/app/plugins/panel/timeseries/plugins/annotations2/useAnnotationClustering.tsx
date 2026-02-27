@@ -16,64 +16,6 @@ enum ClusteringMode {
   Render = 'render',
 }
 
-const buildAnnotationClusters = (frame: DataFrame, timeVals: number[], plotBox: BBox, timeRange: TimeRange2) => {
-  const isRegionVals: boolean[] =
-    frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
-  const clusterIdx: Array<number | null> = Array(timeVals.length).fill(null);
-  const clusters: number[][] = [];
-
-  let thisCluster: number[] = [];
-  let prevIdx = null;
-
-  // 15min in millis
-  // todo: compute this from pixel space, to make dynamic, like 10px -> millis
-
-  // 10% of box width
-  // annotations are 10x, but we want to leave 24px of space between annos so everything is clickable
-  const pixelThreshold = 24 * uPlot.pxRatio;
-  const dt = timeRange.to - timeRange.from;
-  const plotWidth = plotBox?.width;
-  const thresholdRatio = pixelThreshold / plotWidth;
-  const mergeThreshold = thresholdRatio * dt;
-
-  for (let j = 0; j < timeVals.length; j++) {
-    let time = timeVals[j];
-
-    // Don't cluster regions?
-    if (!isRegionVals[j]) {
-      if (prevIdx != null) {
-        // if we're within the threshold
-        if (time - timeVals[prevIdx] <= mergeThreshold) {
-          // open cluster
-          if (thisCluster.length === 0) {
-            thisCluster.push(prevIdx);
-            clusterIdx[prevIdx] = clusters.length;
-            // console.log('cluster::open', { prevIdx, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
-          }
-          thisCluster.push(j);
-          clusterIdx[j] = clusters.length;
-        } else {
-          // close cluster
-          if (thisCluster.length > 0) {
-            clusters.push(thisCluster);
-            // console.log('cluster::close', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
-            thisCluster = [];
-          }
-        }
-      }
-
-      prevIdx = j;
-    }
-  }
-
-  // close cluster
-  if (thisCluster.length > 0) {
-    clusters.push(thisCluster);
-    // console.log('cluster::lateClose', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
-  }
-
-  return { clusterIdx, clusters };
-};
 export const useAnnotationClustering = ({ annotations, clusteringMode, plotBox, timeRange }: Props) => {
   const { outAnnos } = useMemo(() => {
     const clusteredAnnotations: DataFrame[] = [];
@@ -180,4 +122,59 @@ export const useAnnotationClustering = ({ annotations, clusteringMode, plotBox, 
   }, [annotations, clusteringMode, plotBox, timeRange]);
 
   return outAnnos;
+};
+const buildAnnotationClusters = (frame: DataFrame, timeVals: number[], plotBox: BBox, timeRange: TimeRange2) => {
+  const isRegionVals: boolean[] =
+    frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
+  const clusterIdx: Array<number | null> = Array(timeVals.length).fill(null);
+  const clusters: number[][] = [];
+
+  let thisCluster: number[] = [];
+  let prevIdx = null;
+  const mergeThreshold = calculateMergeThreshold(timeRange, plotBox);
+
+  for (let j = 0; j < timeVals.length; j++) {
+    let time = timeVals[j];
+
+    // Don't cluster regions?
+    if (!isRegionVals[j]) {
+      if (prevIdx != null) {
+        // if we're within the threshold
+        if (time - timeVals[prevIdx] <= mergeThreshold) {
+          // open cluster
+          if (thisCluster.length === 0) {
+            thisCluster.push(prevIdx);
+            clusterIdx[prevIdx] = clusters.length;
+            // console.log('cluster::open', { prevIdx, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
+          }
+          thisCluster.push(j);
+          clusterIdx[j] = clusters.length;
+        } else {
+          // close cluster
+          if (thisCluster.length > 0) {
+            clusters.push(thisCluster);
+            // console.log('cluster::close', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
+            thisCluster = [];
+          }
+        }
+      }
+
+      prevIdx = j;
+    }
+  }
+
+  // close cluster
+  if (thisCluster.length > 0) {
+    clusters.push(thisCluster);
+    // console.log('cluster::lateClose', { thisCluster, clusters: { ...clusters }, clusterIdx: { ...clusterIdx } });
+  }
+
+  return { clusterIdx, clusters };
+};
+const calculateMergeThreshold = (timeRange: TimeRange2, plotBox) => {
+  const pixelThreshold = 24 * uPlot.pxRatio;
+  const dt = timeRange.to - timeRange.from;
+  const plotWidth = plotBox?.width;
+  const thresholdRatio = pixelThreshold / plotWidth;
+  return thresholdRatio * dt;
 };
