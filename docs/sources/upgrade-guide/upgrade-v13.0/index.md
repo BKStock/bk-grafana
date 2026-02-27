@@ -5,7 +5,7 @@ keywords:
   - configuration
   - documentation
   - upgrade
-  - '12.4'
+  - '13.0'
 title: Upgrade to Grafana v13.0
 menuTitle: Upgrade to v13.0
 weight: 496
