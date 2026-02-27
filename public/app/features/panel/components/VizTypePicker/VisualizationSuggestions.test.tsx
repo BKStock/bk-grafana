@@ -692,7 +692,7 @@ describe('VisualizationSuggestions', () => {
 
     it('should call onChange with withModKey: false when getPresets throws', async () => {
       mockGetPresets.mockRejectedValue(new Error('Failed to load presets'));
-      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const mockOnChange = jest.fn();
       const mockOnShowPresets = jest.fn();
@@ -720,7 +720,7 @@ describe('VisualizationSuggestions', () => {
       });
 
       expect(mockOnShowPresets).not.toHaveBeenCalled();
-      jest.restoreAllMocks();
+      consoleErrorSpy.mockRestore();
     });
 
     it('should call onChange with withModKey: false when onShowPresets is not provided', async () => {
