@@ -5,7 +5,7 @@ import Skeleton from 'react-loading-skeleton';
 
 import { DashboardHit } from '@grafana/api-clients/rtkq/dashboard/v0alpha1';
 import { t } from '@grafana/i18n';
-import { Alert, Column, InteractiveTable, Text, TextLink } from '@grafana/ui';
+import { Alert, Column, EmptyState, InteractiveTable, TextLink } from '@grafana/ui';
 import { useSearchDashboardsAndFoldersQuery } from 'app/api/clients/dashboard/v0alpha1';
 import { useGetFolderParentsQuery } from 'app/api/clients/folder/v1beta1';
 import { GENERAL_FOLDER_TITLE, GENERAL_FOLDER_UID } from 'app/features/search/constants';
@@ -69,7 +69,17 @@ export function TeamFolders({ teamUid }: { teamUid: string }) {
   }
 
   if (!isLoading && !folders.length) {
-    return <Text color="secondary">{t('teams.team-pages.team-folders.empty', 'No folders owned by this team')}</Text>;
+    return (
+      <EmptyState
+        variant="call-to-action"
+        message={t('teams.team-pages.team-folders.empty-state-message', 'This team does not own any folders yet.')}
+      >
+        {t(
+          'teams.team-pages.team-folders.empty-state-content',
+          'You can set up ownership of a folder from folder detail page'
+        )}
+      </EmptyState>
+    );
   }
 
   return (
