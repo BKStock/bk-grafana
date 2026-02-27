@@ -122,6 +122,22 @@ describe('VisualizationCardGrid', () => {
 
       expect(onItemClick).toHaveBeenCalledWith(mockItem[0], 0);
     });
+
+    it('should not call onChange when an unrelated key is pressed on a card', async () => {
+      render(
+        <VisualizationCardGrid
+          items={mockItem}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      const card = screen.getByTestId('card-ts-hash').closest('[role="button"]')!;
+      fireEvent.keyDown(card, { key: 'ArrowDown' });
+
+      expect(onItemClick).not.toHaveBeenCalled();
+    });
   });
 
   describe('grouped items', () => {

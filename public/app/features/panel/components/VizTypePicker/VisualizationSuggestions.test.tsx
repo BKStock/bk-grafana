@@ -9,9 +9,16 @@ import * as getAllSuggestionsModule from '../../suggestions/getAllSuggestions';
 import * as getPresetsModule from '../../suggestions/getPresets';
 
 import { VisualizationSuggestions } from './VisualizationSuggestions';
+import { PANEL_STATES, VizSuggestionsInteractions } from './interactions';
 
 jest.mock('../../suggestions/getAllSuggestions');
 jest.mock('../../suggestions/getPresets');
+jest.mock('./interactions', () => ({
+  ...jest.requireActual('./interactions'),
+  VizSuggestionsInteractions: {
+    suggestionAccepted: jest.fn(),
+  },
+}));
 jest.mock('./VisualizationSuggestionCard', () => ({
   VisualizationSuggestionCard: ({
     suggestion,
@@ -32,15 +39,7 @@ jest.mock('./VizTypePickerPlugin', () => ({
     </button>
   ),
 }));
-jest.mock('../../state/util', () => ({
-  ...jest.requireActual('../../state/util'),
-  getAllPanelPluginMeta: () => [
-    { id: 'timeseries', name: 'Time series', sort: 0, hideFromList: false },
-    { id: 'text', name: 'Text', sort: 1, hideFromList: false },
-    { id: 'dashlist', name: 'Dashboard list', sort: 2, hideFromList: false },
-    { id: 'alertlist', name: 'Alert list', sort: 3, hideFromList: false },
-  ],
-}));
+
 jest.mock('@grafana/runtime', () => ({
   ...jest.requireActual('@grafana/runtime'),
   config: {
@@ -49,6 +48,20 @@ jest.mock('@grafana/runtime', () => ({
       newVizSuggestions: true,
     },
   },
+}));
+
+jest.mock('@grafana/runtime/internal', () => ({
+  ...jest.requireActual('@grafana/runtime/internal'),
+  useListedPanelPluginMetas: jest.fn().mockReturnValue({
+    loading: false,
+    error: undefined,
+    value: [
+      { id: 'timeseries', name: 'Time series', sort: 0, hideFromList: false },
+      { id: 'text', name: 'Text', sort: 1, hideFromList: false },
+      { id: 'dashlist', name: 'Dashboard list', sort: 2, hideFromList: false },
+      { id: 'alertlist', name: 'Alert list', sort: 3, hideFromList: false },
+    ],
+  }),
 }));
 
 describe('VisualizationSuggestions', () => {
@@ -463,6 +476,44 @@ describe('VisualizationSuggestions', () => {
     await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
 
     expect(mockOnChange).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'timeseries', withModKey: false }));
+  });
+
+  it('should report panelState as new_panel when isNewPanel is true and panel is not unconfigured', async () => {
+    const mockOnChange = jest.fn();
+    const existingPanel = { type: 'timeseries' } as PanelModel;
+    const dataWithSeries: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    render(
+      <VisualizationSuggestions
+        onChange={mockOnChange}
+        data={dataWithSeries}
+        panel={existingPanel}
+        searchQuery=""
+        isNewPanel={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+    expect(VizSuggestionsInteractions.suggestionAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({ panelState: PANEL_STATES.NEW_PANEL })
+    );
   });
 
   describe('no-data panel list', () => {
