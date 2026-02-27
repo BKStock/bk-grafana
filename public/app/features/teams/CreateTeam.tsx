@@ -11,7 +11,7 @@ import { contextSrv } from 'app/core/services/context_srv';
 import { Role } from 'app/types/accessControl';
 import { TeamDTO } from 'app/types/teams';
 
-import { getStatusCardProps, StepResultAlert, useCreateTeamOrchestrate } from './CreateTeamResultCard';
+import { getStatusCardProps, StepResultAlert, useCreateTeamOrchestrate } from './CreateTeamAPICalls';
 
 const pageNav: NavModelItem = {
   icon: 'users-alt',
@@ -37,11 +37,8 @@ const CreateTeam = (): JSX.Element => {
   );
 
   // TODO: should we allow to click create again after error?
-  const showCreateButton = !teamCreationStatus || folderCreationStatus?.state === 'error';
-  const formLocked =
-    teamCreationStatus?.state === 'loading' ||
-    teamCreationStatus?.state === 'success' ||
-    folderCreationStatus?.state === 'loading';
+  const showCreateButton = !teamCreationStatus || teamCreationStatus?.state === 'error';
+  const formLocked = !showCreateButton;
 
   return (
     <Page navId="teams" pageNav={pageNav}>
@@ -105,6 +102,7 @@ const CreateTeam = (): JSX.Element => {
               </Button>
             )}
 
+            {/* Report team creation progress */}
             <Stack direction="column" gap={1}>
               {teamCreationStatus && (
                 <StepResultAlert

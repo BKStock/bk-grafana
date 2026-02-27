@@ -95,11 +95,11 @@ export function useCreateTeamOrchestrate(pendingRoles: Role[], autocreateTeamFol
     }
   }
 
-  // Trigger to create a team and optionally also a folder. Each one has its own state to inform user about the progress
-  // or an error.
+  // Trigger to create a team and optionally also roles and folder. Each one has its own state to inform user about the
+  // progress or an error.
   const createTeam = async (formModel: TeamDTO) => {
     //
-    // Create team first
+    // Create a team first
     //
     reportState({ state: 'loading' }, 'createTeam');
     const mutationArg: CreateTeamApiArg & { showSuccessAlert?: boolean } = {
@@ -109,7 +109,7 @@ export function useCreateTeamOrchestrate(pendingRoles: Role[], autocreateTeamFol
     };
     const { data: teamData, error: teamError } = await createTeamTrigger(mutationArg);
 
-    // It shouldn't happen that we have success and no data, but the types are setup that way so we check it here
+    // It shouldn't happen that we have success and no data, but the types are set up that way, so we check it here
     if (teamError || !teamData?.uid || !teamData?.teamId) {
       reportState({ state: 'error', error: teamError }, 'createTeam');
       return;
@@ -117,6 +117,9 @@ export function useCreateTeamOrchestrate(pendingRoles: Role[], autocreateTeamFol
 
     reportState({ state: 'success', data: teamData.uid }, 'createTeam');
 
+    //
+    // Create roles if requested
+    //
     if (pendingRoles && pendingRoles.length) {
       await contextSrv.fetchUserPermissions();
       if (contextSrv.licensedAccessControlEnabled() && canUpdateRoles()) {
@@ -136,29 +139,33 @@ export function useCreateTeamOrchestrate(pendingRoles: Role[], autocreateTeamFol
       }
     }
 
-    if (!autocreateTeamFolder) {
-      return;
-    }
-
     //
     // Create folder if requested
     //
-    reportState({ state: 'loading' }, 'createFolder');
-    const { data: folderData, error: folderError } = await createFolderTrigger({
-      title: formModel.name,
-      teamOwnerReferences: [{ uid: teamData.uid, name: formModel.name }],
-    });
+    if (autocreateTeamFolder) {
+      reportState({ state: 'loading' }, 'createFolder');
+      const { data: folderData, error: folderError } = await createFolderTrigger({
+        title: formModel.name,
+        teamOwnerReferences: [{ uid: teamData.uid, name: formModel.name }],
+      });
 
-    if (folderError || !folderData?.url) {
-      reportState({ state: 'error', error: folderError }, 'createFolder');
-      return;
+      if (folderError || !folderData?.url) {
+        reportState({ state: 'error', error: folderError }, 'createFolder');
+        return;
+      }
+      reportState({ state: 'success', data: folderData.url }, 'createFolder');
     }
-    reportState({ state: 'success', data: folderData.url }, 'createFolder');
   };
 
   return { teamCreationStatus, folderCreationStatus, rolesCreationStatus, trigger: createTeam };
 }
 
+/**
+ * Based on the status of the API call step, generate appropriate props for the alert.
+ * @param status
+ * @param type
+ * @param href
+ */
 export function getStatusCardProps(status: CallStatus, type: CallTypes, href?: string): CardProps {
   const messages = getMessages()[type];
   if (status.state === 'error') {
