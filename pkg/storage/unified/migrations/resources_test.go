@@ -280,8 +280,8 @@ func TestResourceMigration_AutoMigrateEnablesMode5(t *testing.T) {
 			}
 
 			def := MigrationDefinition{
-				MigrationID: "test-auto-migrate",
-				Resources:   resourceInfos,
+				ID:        "test-auto-migrate",
+				Resources: resourceInfos,
 			}
 
 			// Create the migration with options
