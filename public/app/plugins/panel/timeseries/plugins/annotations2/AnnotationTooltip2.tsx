@@ -136,7 +136,7 @@ export const AnnotationTooltip2 = ({
         <div>
           <Stack gap={0.5} wrap={true}>
             {annoVals.tags?.[annoIdx]?.map((t: string, i: number) => (
-              <Tag name={t} key={`${t}-${i}`} />
+              <Tag data-testid={'annotation-tag'} name={t} key={`${t}-${i}`} />
             ))}
           </Stack>
         </div>

@@ -331,11 +331,6 @@ describe('AnnotationsPlugin2', () => {
     it.todo('can create annotation');
   });
 
-  describe('options', () => {
-    it.todo('clustering');
-    it.todo('multiLane');
-  });
-
   describe('annotation fields', () => {
     // @todo when the id field is set to 0 we're supposed to disable editing?
     it.todo('id');
