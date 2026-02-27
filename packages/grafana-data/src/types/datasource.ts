@@ -696,10 +696,6 @@ export interface DrilldownsApplicability {
   applicable: boolean;
   reason?: string;
   origin?: string;
-  // position of the entry in the input filters/groupByKeys array. Together with
-  // key and origin forms a unique composite key so consumers can match results back
-  // when multiple entries share the same key (e.g. cluster=dev1, cluster=dev2).
-  index?: number;
 }
 
 export interface DataSourceJsonData {

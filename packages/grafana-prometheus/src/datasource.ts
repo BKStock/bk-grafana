@@ -595,8 +595,8 @@ export class PrometheusDatasource
       }
     } catch {
       return [
-        ...filters.map((f, i) => ({ key: f.key, index: i, applicable: true, origin: f.origin })),
-        ...groupByKeys.map((k, i) => ({ key: k, index: filters.length + i, applicable: true })),
+        ...filters.map((f) => ({ key: f.key, applicable: true, origin: f.origin })),
+        ...groupByKeys.map((k) => ({ key: k, applicable: true })),
       ];
     }
 
@@ -672,7 +672,6 @@ export class PrometheusDatasource
       if (!isLastWithCompositeKey || overriddenByUserFilter) {
         results.push({
           key: f.key,
-          index: i,
           applicable: false,
           reason: 'Overridden by another filter with the same key',
           origin: f.origin,
@@ -683,7 +682,6 @@ export class PrometheusDatasource
       if (!availableLabelKeysSet.has(f.key)) {
         results.push({
           key: f.key,
-          index: i,
           applicable: false,
           reason: `Label "${f.key}" not found in the queried metrics`,
           origin: f.origin,
@@ -696,7 +694,6 @@ export class PrometheusDatasource
         if (f.operator === '=' && !availableValues.has(f.value)) {
           results.push({
             key: f.key,
-            index: i,
             applicable: false,
             reason: `Value "${f.value}" not found for label "${f.key}"`,
             origin: f.origin,
@@ -709,7 +706,6 @@ export class PrometheusDatasource
           if (!hasAnyValidValue) {
             results.push({
               key: f.key,
-              index: i,
               applicable: false,
               reason: `None of the selected values exist for label "${f.key}"`,
               origin: f.origin,
@@ -719,37 +715,25 @@ export class PrometheusDatasource
         }
       }
 
-      results.push({ key: f.key, index: i, applicable: true, origin: f.origin });
+      results.push({ key: f.key, applicable: true, origin: f.origin });
     });
 
     // GroupBy keys: only key existence matters, last occurrence wins for duplicates.
-    // Indices continue after filters so each entry has a globally unique index.
     const groupByLastIndex = new Map<string, number>();
     groupByKeys.forEach((k, i) => groupByLastIndex.set(k, i));
-    const groupByIndexOffset = filters.length;
 
     groupByKeys.forEach((k, i) => {
       if (groupByLastIndex.get(k) !== i) {
-        results.push({
-          key: k,
-          index: groupByIndexOffset + i,
-          applicable: false,
-          reason: 'Overridden by another group-by with the same key',
-        });
+        results.push({ key: k, applicable: false, reason: 'Overridden by another group-by with the same key' });
         return;
       }
 
       if (!availableLabelKeysSet.has(k)) {
-        results.push({
-          key: k,
-          index: groupByIndexOffset + i,
-          applicable: false,
-          reason: `Label "${k}" not found in the queried metrics`,
-        });
+        results.push({ key: k, applicable: false, reason: `Label "${k}" not found in the queried metrics` });
         return;
       }
 
-      results.push({ key: k, index: groupByIndexOffset + i, applicable: true });
+      results.push({ key: k, applicable: true });
     });
 
     return results;

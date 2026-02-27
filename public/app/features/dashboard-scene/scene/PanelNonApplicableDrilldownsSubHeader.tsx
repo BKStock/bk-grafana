@@ -2,7 +2,7 @@ import { css, cx } from '@emotion/css';
 import { useLayoutEffect, useMemo, useState } from 'react';
 import { useMeasure } from 'react-use';
 
-import { DrilldownsApplicability, GrafanaTheme2 } from '@grafana/data';
+import { GrafanaTheme2 } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
 import { AdHocFiltersVariable, GroupByVariable, SceneQueryRunner } from '@grafana/scenes';
 import { Tooltip, measureText, useStyles2, useTheme2 } from '@grafana/ui';
@@ -28,17 +28,12 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
   const [visibleCount, setVisibleCount] = useState<number>(0);
 
   const nonApplicable = useMemo(() => {
-    const applicability: DrilldownsApplicability[] | undefined = queryRunner.getNonApplicableFilters();
+    const applicability = queryRunner.getNonApplicableFilters();
     if (!applicability) {
       return [];
     }
 
     const items: Array<{ label: string; reason?: string }> = [];
-
-    const applicabilityMap = new Map<string, DrilldownsApplicability>();
-    applicability.forEach((entry) => {
-      applicabilityMap.set(`${entry.key}${entry.origin ? `-${entry.origin}` : ''}-${entry.index ?? ''}`, entry);
-    });
 
     const filters = filtersState?.filters ?? [];
     const originFilters = filtersState?.originFilters ?? [];
@@ -47,7 +42,7 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
     if (filterValues.length) {
       const nonApplicableFilters = filterValues
         .map((filter, i) => {
-          const result = applicabilityMap.get(`${filter.key}${filter.origin ? `-${filter.origin}` : ''}-${i}`);
+          const result = i < applicability.length ? applicability[i] : undefined;
           if (result && !result.applicable) {
             return { filter, reason: result.reason };
           }
@@ -72,7 +67,8 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
 
       for (let gi = 0; gi < groupByValues.length; gi++) {
         const groupByKey = groupByValues[gi];
-        const apiResult = applicabilityMap.get(`${groupByKey}-${groupByIndexOffset + gi}`);
+        const resultIdx = groupByIndexOffset + gi;
+        const apiResult = resultIdx < applicability.length ? applicability[resultIdx] : undefined;
         if (apiResult && !apiResult.applicable) {
           items.push({ label: String(groupByKey), reason: apiResult.reason });
           continue;
