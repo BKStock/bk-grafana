@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	folderv1 "github.com/grafana/grafana/apps/folder/pkg/apis/folder/v1beta1"
@@ -14,6 +15,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/registry/apis/provisioning/resources"
+	authzextv1 "github.com/grafana/grafana/pkg/services/authz/proto/v1"
 	"github.com/grafana/grafana/pkg/services/authz/zanzana"
 )
 
@@ -27,6 +29,13 @@ type Reconciler struct {
 	tracer        tracing.Tracer
 
 	workQueue chan string
+
+	globalRoleTuplesMu sync.RWMutex
+	globalRoleTuples   []*openfgav1.TupleKey
+
+	// resolved effective permissions per GlobalRole name (for Role composition)
+	globalRolePermsMu sync.RWMutex
+	globalRolePerms   map[string][]*authzextv1.RolePermission
 }
 
 // Config holds the reconciler configuration.
@@ -44,7 +53,7 @@ func (c Config) queueSize() int {
 	return c.QueueSize
 }
 
-// GVRs that need to be reconciled from Unistore to Zanzana.
+// GVRs that need to be reconciled from Unistore to Zanzana (namespaced).
 var reconcileGVRs = []schema.GroupVersionResource{
 	folderv1.FolderResourceInfo.GroupVersionResource(),
 	iamv0.RoleInfo.GroupVersionResource(),
@@ -52,6 +61,7 @@ var reconcileGVRs = []schema.GroupVersionResource{
 	iamv0.ResourcePermissionInfo.GroupVersionResource(),
 	iamv0.TeamBindingResourceInfo.GroupVersionResource(),
 	iamv0.UserResourceInfo.GroupVersionResource(),
+	iamv0.GlobalRoleBindingKind().GroupVersionResource(),
 }
 
 // NewReconciler creates a new reconciler instance.
@@ -70,6 +80,30 @@ func NewReconciler(
 		tracer:        tracer,
 		workQueue:     make(chan string, cfg.queueSize()),
 	}
+}
+
+func (r *Reconciler) setGlobalRoleTuples(tuples []*openfgav1.TupleKey) {
+	r.globalRoleTuplesMu.Lock()
+	defer r.globalRoleTuplesMu.Unlock()
+	r.globalRoleTuples = tuples
+}
+
+func (r *Reconciler) getGlobalRoleTuples() []*openfgav1.TupleKey {
+	r.globalRoleTuplesMu.RLock()
+	defer r.globalRoleTuplesMu.RUnlock()
+	return r.globalRoleTuples
+}
+
+func (r *Reconciler) setGlobalRolePerms(perms map[string][]*authzextv1.RolePermission) {
+	r.globalRolePermsMu.Lock()
+	defer r.globalRolePermsMu.Unlock()
+	r.globalRolePerms = perms
+}
+
+func (r *Reconciler) getGlobalRolePerms() map[string][]*authzextv1.RolePermission {
+	r.globalRolePermsMu.RLock()
+	defer r.globalRolePermsMu.RUnlock()
+	return r.globalRolePerms
 }
 
 // Run starts the reconciler's main loop and worker goroutines.
@@ -111,6 +145,16 @@ func (r *Reconciler) Run(ctx context.Context) error {
 
 // queueAllNamespaces lists all OpenFGA stores and queues them for reconciliation.
 func (r *Reconciler) queueAllNamespaces(ctx context.Context) {
+	// Fetch global role tuples once per tick and cache them for all namespaces.
+	globalTuples, globalPerms, err := r.fetchAndTranslateClusterGVRs(ctx)
+	if err != nil {
+		r.logger.Error("Failed to fetch global roles", "error", err)
+		globalTuples, globalPerms = nil, nil
+	}
+
+	r.setGlobalRoleTuples(globalTuples)
+	r.setGlobalRolePerms(globalPerms)
+
 	stores, err := r.server.ListAllStores(ctx)
 	if err != nil {
 		r.logger.Error("Failed to list stores", "error", err)
