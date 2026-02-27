@@ -43,7 +43,7 @@ jest.mock('app/features/alerting/unified/api/ruler');
 
 jest.mock('app/features/plugins/importer/pluginImporter', () => ({
   pluginImporter: {
-    importDataSource: () => Promise.resolve(new DataSourcePlugin(PrometheusDatasource as any)),
+    importDataSource: () => Promise.resolve(new DataSourcePlugin(PrometheusDatasource as never)),
   },
 }));
 

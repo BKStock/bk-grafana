@@ -2,7 +2,7 @@ import { render } from 'test/test-utils';
 import { byTestId, byText } from 'testing-library-selector';
 
 import { DataSourcePlugin } from '@grafana/data';
-import { PrometheusDatasource, PromOptions } from '@grafana/prometheus';
+import { PromOptions, PrometheusDatasource } from '@grafana/prometheus';
 import { setPluginLinksHook } from '@grafana/runtime';
 import config from 'app/core/config';
 import { setupDataSources } from 'app/features/alerting/unified/testSetup/datasources';
@@ -31,7 +31,7 @@ import { DataSourceType, GRAFANA_RULES_SOURCE_NAME } from './utils/datasource';
 jest.mock('./api/ruler');
 jest.mock('app/features/plugins/importer/pluginImporter', () => ({
   pluginImporter: {
-    importDataSource: () => Promise.resolve(new DataSourcePlugin(PrometheusDatasource as any)),
+    importDataSource: () => Promise.resolve(new DataSourcePlugin(PrometheusDatasource as never)),
   },
 }));
 jest.mock('@grafana/assistant', () => ({
