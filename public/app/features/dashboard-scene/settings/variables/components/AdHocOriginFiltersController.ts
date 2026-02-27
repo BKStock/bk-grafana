@@ -41,11 +41,12 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
 
   updateFilter(filter: AdHocFilterWithLabels, update: Partial<AdHocFilterWithLabels>): void {
     if (filter === this.wip) {
-      if ('value' in update && update.value !== '') {
-        this.setFilters([...this.filters, { ...this.wip, ...update, origin: 'dashboard' }]);
+      const merged = { ...this.wip, ...update };
+      if ('value' in update && update.value !== '' && merged.key) {
+        this.setFilters([...this.filters, { ...merged, origin: 'dashboard' }]);
         this.setWip(undefined);
       } else {
-        this.setWip({ ...this.wip, ...update });
+        this.setWip(merged);
       }
       return;
     }
