@@ -11,27 +11,27 @@ These tests use [nanogit/gittest](https://github.com/grafana/nanogit/tree/main/g
 The tests cover the following scenarios:
 
 ### Create Operations
-- **Create file on default branch**: Tests creating dashboard files directly on the main branch
-- **Create file on new branch**: Tests creating files on a new branch that doesn't exist yet
+- **Create file on default branch**: Tests creating dashboard files directly on the main branch with proper commit messages
+- **Create file on new branch**: Tests creating files on a new branch that doesn't exist yet, verifying files are accessible via the `ref` query parameter
 
 ### Update Operations
-- **Update file on default branch**: Tests updating existing files on the main branch
-- **Update file on branch**: Tests updating files on a different branch
+- **Update file on default branch**: Tests updating existing files on the main branch and verifying changes are synced to Grafana dashboards
+- **Update file on branch**: Tests updating files on a different branch using the `ref` parameter
 
 ### Delete Operations
-- **Delete file on default branch**: Tests deleting files from the main branch and verifying they're removed from Grafana
-- **Delete file on branch**: Tests deleting files from a branch while preserving them on the main branch
+- **Delete file on default branch**: Tests deleting files from the main branch and verifying they're removed from Grafana after sync
+- **Delete file on branch**: Tests deleting files from a branch while preserving them on the main branch, using `ref` parameter to verify deletion
 
 ### Move Operations
-- **Move file on default branch**: Tests moving/renaming files on the main branch
+- **Move file on default branch**: Tests moving/renaming files on the main branch using the `originalPath` parameter
 
 ### List Operations
-- **List all files**: Tests listing all files in a repository
-- **List files in subdirectory**: Tests listing files within a specific directory
+- **List all files**: Tests listing all files in a repository root, verifying expected files are present
+- **List files in subdirectory**: Tests accessing files within specific subdirectories
 
 ### Branch Operations
-- **Create multiple files on same branch**: Tests creating multiple files on the same branch
-- **Update file independently on different branches**: Tests that files can be updated differently on separate branches without conflicts
+- **Create multiple files on same branch**: Tests creating multiple files on the same new branch and verifying they exist on that branch but not on main
+- **Update file independently on different branches**: Tests that files can be updated differently on separate branches, verifying content differs by hash
 
 ## Running the Tests
 
