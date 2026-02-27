@@ -28,7 +28,9 @@ import { NEW_LINK } from './utils';
 
 export function openAddLinkPane(dashboard: DashboardScene) {
   const currentLinks = dashboard.state.links ?? [];
-  const newLink: DashboardLink = { ...NEW_LINK };
+  // default to dropdown for new links because if a dashboard has a lot of links,
+  // the side pane will be pushed down the page and be unscrollable
+  const newLink: DashboardLink = { ...NEW_LINK, asDropdown: true };
   const linkIndex = currentLinks.length;
 
   linkEditActions.addLink({ dashboard, link: newLink });

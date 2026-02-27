@@ -7,7 +7,7 @@ export const NEW_LINK: DashboardLink = {
   tooltip: '',
   type: 'dashboards',
   url: '',
-  asDropdown: true,
+  asDropdown: false,
   tags: [],
   targetBlank: false,
   keepTime: false,
