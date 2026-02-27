@@ -108,7 +108,7 @@ Switch layout type and/or update layout properties at a path. Omit `layoutType` 
 }
 ```
 
-Allowed conversions are same-category only: `RowsLayout` <-> `TabsLayout` (group) or `GridLayout` <-> `AutoGridLayout` (grid).
+Allowed conversions are same-category only: `RowsLayout` <-> `TabsLayout` (group) or `GridLayout` <-> `AutoGridLayout` (grid). Providing `options` for a non-AutoGrid layout type returns an error.
 
 ---
 
@@ -547,11 +547,17 @@ Partial update of an existing panel. Only provided fields are applied. Options a
       }
     }
   },
-  "changes": [{ "path": "/elements/panel-abc", "previousValue": null, "newValue": "..." }]
+  "changes": [
+    {
+      "path": "/elements/panel-abc",
+      "previousValue": { "kind": "Panel", "spec": { "...": "previous state" } },
+      "newValue": "..."
+    }
+  ]
 }
 ```
 
-Same `{ element, layoutItem }` shape as ADD_PANEL and MOVE_PANEL.
+Same `{ element, layoutItem }` shape as ADD_PANEL and MOVE_PANEL. The `transparent` field in the spec maps to the internal `displayMode` state (`true` -> `"transparent"`, `false` -> `"default"`).
 
 ### `REMOVE_PANEL`
 
@@ -575,8 +581,8 @@ Remove one or more panels by element name.
   "success": true,
   "data": { "removed": ["panel-abc", "panel-def"] },
   "changes": [
-    { "path": "/elements/panel-abc", "previousValue": "existed", "newValue": null },
-    { "path": "/elements/panel-def", "previousValue": "existed", "newValue": null }
+    { "path": "/elements/panel-abc", "previousValue": { "kind": "Panel", "spec": { "...": "..." } }, "newValue": null },
+    { "path": "/elements/panel-def", "previousValue": { "kind": "Panel", "spec": { "...": "..." } }, "newValue": null }
   ]
 }
 ```
@@ -690,7 +696,13 @@ Move a panel to a different group or reposition it within a grid. The `layoutIte
       }
     }
   },
-  "changes": [{ "path": "/elements/panel-abc", "previousValue": null, "newValue": { "parent": "/rows/1" } }]
+  "changes": [
+    {
+      "path": "/elements/panel-abc",
+      "previousValue": { "kind": "GridLayoutItem", "spec": { "x": 0, "y": 0, "width": 12, "height": 8 } },
+      "newValue": { "parent": "/rows/1" }
+    }
+  ]
 }
 ```
 

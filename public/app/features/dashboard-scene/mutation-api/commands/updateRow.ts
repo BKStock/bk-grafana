@@ -22,6 +22,7 @@ export const updateRowCommand: MutationCommand<UpdateRowPayload> = {
 
   payloadSchema: payloads.updateRow,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;

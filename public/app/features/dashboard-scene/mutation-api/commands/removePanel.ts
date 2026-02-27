@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 
+import { getElements } from '../../serialization/layoutSerializers/utils';
 import { getLayoutManagerFor, getVizPanelKeyForPanelId } from '../../utils/utils';
 
 import { payloads } from './schemas';
@@ -21,6 +22,7 @@ export const removePanelCommand: MutationCommand<RemovePanelPayload> = {
 
   payloadSchema: payloads.removePanel,
   permission: requiresEdit,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;
@@ -30,6 +32,15 @@ export const removePanelCommand: MutationCommand<RemovePanelPayload> = {
       const { elements } = payload;
       const removed: string[] = [];
       const errors: string[] = [];
+      const previousElements = new Map<string, unknown>();
+
+      const fullElements = getElements(scene.state.body, scene);
+      for (const element of elements) {
+        const name = element.name;
+        if (fullElements[name]) {
+          previousElements.set(name, fullElements[name]);
+        }
+      }
 
       for (const element of elements) {
         const elementName = element.name;
@@ -75,7 +86,7 @@ export const removePanelCommand: MutationCommand<RemovePanelPayload> = {
         data: { removed },
         changes: removed.map((name) => ({
           path: `/elements/${name}`,
-          previousValue: 'existed',
+          previousValue: previousElements.get(name) ?? null,
           newValue: null,
         })),
         warnings: errors.length > 0 ? errors.map((e) => `Partial failure: ${e}`) : undefined,

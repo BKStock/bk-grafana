@@ -332,6 +332,10 @@ describe('Panel mutation commands', () => {
       });
 
       expect(result.success).toBe(true);
+      expect(result.changes).toHaveLength(1);
+      const prev = result.changes[0].previousValue as { kind: string; spec: { title: string } };
+      expect(prev.kind).toBe('Panel');
+      expect(prev.spec.title).toBe('Original Title');
       const body = scene.state.body as unknown as DefaultGridLayoutManager;
       expect(body.getVizPanels()[0].state.title).toBe('New Title');
     });
@@ -545,6 +549,10 @@ describe('Panel mutation commands', () => {
       });
 
       expect(result.success).toBe(true);
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0].previousValue).toBeDefined();
+      expect(result.changes[0].previousValue).not.toBe('existed');
+      expect(result.changes[0].newValue).toBeNull();
       const body = scene.state.body as unknown as DefaultGridLayoutManager;
       expect(body.getVizPanels()).toHaveLength(0);
     });
@@ -627,6 +635,9 @@ describe('Panel mutation commands', () => {
       });
 
       expect(result.success).toBe(true);
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0].previousValue).toBeDefined();
+      expect(result.changes[0].previousValue).not.toBeNull();
       const data = result.data as PanelElementEntry;
       expect(data.layoutItem.kind).toBe('GridLayoutItem');
       expect(data.layoutItem.spec.x).toBe(12);

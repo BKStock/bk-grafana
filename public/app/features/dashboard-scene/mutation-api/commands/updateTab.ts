@@ -22,6 +22,7 @@ export const updateTabCommand: MutationCommand<UpdateTabPayload> = {
 
   payloadSchema: payloads.updateTab,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;

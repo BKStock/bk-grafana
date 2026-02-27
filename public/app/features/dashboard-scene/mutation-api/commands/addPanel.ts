@@ -30,6 +30,7 @@ export const addPanelCommand: MutationCommand<AddPanelPayload> = {
 
   payloadSchema: payloads.addPanel,
   permission: requiresEdit,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;

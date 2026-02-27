@@ -59,7 +59,10 @@ function resolveEffectivePosition(
 ): { x?: number; y?: number; width?: number; height?: number } | undefined {
   if (payload.layoutItem) {
     const spec = payload.layoutItem.spec;
-    if (spec && (spec.x !== undefined || spec.y !== undefined || spec.width !== undefined || spec.height !== undefined)) {
+    if (
+      spec &&
+      (spec.x !== undefined || spec.y !== undefined || spec.width !== undefined || spec.height !== undefined)
+    ) {
       return spec;
     }
     return undefined;
@@ -126,6 +129,7 @@ export const movePanelCommand: MutationCommand<MovePanelPayload> = {
 
   payloadSchema: payloads.movePanel,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;
@@ -157,6 +161,8 @@ export const movePanelCommand: MutationCommand<MovePanelPayload> = {
 
         emitLayoutItemKindWarnings(payload.layoutItem?.kind, isAutoGrid, isDefaultGrid, warnings);
 
+        const previousPosition = serializeResultLayoutItem(vizPanel, elementName);
+
         if (effectivePosition) {
           if (isAutoGrid) {
             warnings.push('Position ignored: current layout uses AutoGridLayout which auto-arranges panels.');
@@ -173,7 +179,13 @@ export const movePanelCommand: MutationCommand<MovePanelPayload> = {
           success: true,
           data: { element: elementData, layoutItem: resultLayoutItem },
           changes: effectivePosition
-            ? [{ path: `/elements/${elementName}/position`, previousValue: null, newValue: effectivePosition }]
+            ? [
+                {
+                  path: `/elements/${elementName}/position`,
+                  previousValue: previousPosition.spec,
+                  newValue: effectivePosition,
+                },
+              ]
             : [],
           warnings: warnings.length > 0 ? warnings : undefined,
         };
@@ -185,6 +197,8 @@ export const movePanelCommand: MutationCommand<MovePanelPayload> = {
       const isTargetDefaultGrid = targetLayout instanceof DefaultGridLayoutManager;
 
       emitLayoutItemKindWarnings(payload.layoutItem?.kind, isTargetAutoGrid, isTargetDefaultGrid, warnings);
+
+      const previousLayoutItem = serializeResultLayoutItem(vizPanel, elementName);
 
       const sourceGridItem = vizPanel.parent;
       const originalSize =
@@ -222,7 +236,7 @@ export const movePanelCommand: MutationCommand<MovePanelPayload> = {
         changes: [
           {
             path: `/elements/${elementName}`,
-            previousValue: null,
+            previousValue: previousLayoutItem,
             newValue: { parent: toParent },
           },
         ],

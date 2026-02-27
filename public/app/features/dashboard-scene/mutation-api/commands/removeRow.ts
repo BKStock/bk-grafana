@@ -24,6 +24,7 @@ export const removeRowCommand: MutationCommand<RemoveRowPayload> = {
 
   payloadSchema: payloads.removeRow,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;

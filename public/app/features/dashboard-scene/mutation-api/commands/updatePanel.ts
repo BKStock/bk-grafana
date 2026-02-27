@@ -69,6 +69,7 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
 
   payloadSchema: payloads.updatePanel,
   permission: requiresEdit,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;
@@ -91,6 +92,8 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
       if (!vizPanel) {
         throw new Error(`Panel for element "${elementName}" not found in the layout`);
       }
+
+      const previousElement = getElements(scene.state.body, scene)[elementName];
 
       if (spec.title !== undefined) {
         scene.updatePanelTitle(vizPanel, spec.title);
@@ -182,7 +185,7 @@ export const updatePanelCommand: MutationCommand<UpdatePanelPayload> = {
         changes: [
           {
             path: `/elements/${elementName}`,
-            previousValue: null,
+            previousValue: previousElement,
             newValue: updatedElement,
           },
         ],

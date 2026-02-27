@@ -23,6 +23,7 @@ export const moveRowCommand: MutationCommand<MoveRowPayload> = {
 
   payloadSchema: payloads.moveRow,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;

@@ -23,6 +23,7 @@ export const moveTabCommand: MutationCommand<MoveTabPayload> = {
 
   payloadSchema: payloads.moveTab,
   permission: requiresNewDashboardLayouts,
+  readOnly: false,
 
   handler: async (payload, context) => {
     const { scene } = context;
