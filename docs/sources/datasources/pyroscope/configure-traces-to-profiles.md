@@ -7,12 +7,12 @@ keywords:
   - continuous profiling
   - tracing
   - span profiles
-  - traces to profiles
+  - trace to profiles
 ---
 
-# Configure traces to profiles
+# Configure Trace to profiles
 
-Traces to profiles lets you navigate from a trace span directly to the profiling data for that span. You configure the integration in the Tempo data source, which connects your tracing data in Tempo with your profiling data in Pyroscope.
+Trace to profiles lets you navigate from a trace span directly to the profiling data for that span. You configure the integration in the Tempo data source, which connects your tracing data in Tempo with your profiling data in Pyroscope.
 
 {{< admonition type="note" >}}
 Your application must be instrumented for profiles and traces. For more information, refer to [Link traces to profiles](https://grafana.com/docs/pyroscope/<PYROSCOPE_VERSION>/configure-client/trace-span-profiles/).
@@ -33,9 +33,9 @@ After you configure the Tempo data source and instrument your application, verif
 
 If the span attribute `pyroscope.profile.id` isn't present on the span, the OTel bridge package isn't configured correctly. Refer to [Link tracing and profiling with span profiles](https://grafana.com/docs/pyroscope/<PYROSCOPE_VERSION>/configure-client/trace-span-profiles/) for per-language setup instructions.
 
-## Troubleshoot traces to profiles
+## Troubleshoot trace to profiles
 
-Use the following checklist to diagnose common issues with the Traces to profiles integration.
+Use the following checklist to diagnose common issues with the Trace to profiles integration.
 
 ### No "Profiles for this span" button appears
 

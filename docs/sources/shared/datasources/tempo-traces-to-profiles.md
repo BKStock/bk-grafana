@@ -38,10 +38,10 @@ There are two ways to configure the trace to profiles feature:
 
 ## Before you begin
 
-To use Traces to profiles, you need:
+To use Trace to profiles, you need:
 
 - A [Grafana Pyroscope data source](/docs/grafana/<GRAFANA_VERSION>/datasources/grafana-pyroscope/) connected to your Pyroscope instance.
-- A Tempo data source configured with the Traces to profiles settings described on this page.
+- A Tempo data source configured with the Trace to profiles settings described on this page.
 - Your application instrumented with all three of the following:
   1. **Profiling**: A Pyroscope SDK or Grafana Alloy sending profiling data to Pyroscope. Refer to [Configure the client to send profiles](/docs/pyroscope/<PYROSCOPE_VERSION>/configure-client/) for setup instructions.
   1. **Tracing**: An OpenTelemetry SDK sending trace data to Tempo. Refer to the [OpenTelemetry getting started documentation](https://opentelemetry.io/docs/getting-started/) for setup instructions.
