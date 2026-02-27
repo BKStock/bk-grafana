@@ -1,12 +1,13 @@
 import { css } from '@emotion/css';
 import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 
-import { GrafanaTheme2, VariableHide, type IconName } from '@grafana/data';
+import { GrafanaTheme2, VariableHide } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
 import { t, Trans } from '@grafana/i18n';
 import { SceneVariableSet, type SceneVariable } from '@grafana/scenes';
-import { Box, Button, Icon, Stack, Text, Tooltip, useStyles2 } from '@grafana/ui';
+import { Box, Button, Icon, Stack, Tooltip, useStyles2 } from '@grafana/ui';
+import { OptionsPaneCategory } from 'app/features/dashboard/components/PanelEditor/OptionsPaneCategory';
 
 import { openAddVariablePane } from '../../settings/variables/VariableAddEditableElement';
 import { isEditableVariableType } from '../../settings/variables/utils';
@@ -14,10 +15,23 @@ import { DashboardInteractions } from '../../utils/interactions';
 import { getDashboardSceneFor } from '../../utils/utils';
 import { dashboardEditActions } from '../shared';
 
-export function VariablesList({ set }: { set: SceneVariableSet }) {
+const ID_VISIBLE_LIST = 'variables-list-visible';
+const ID_CONTROLS_MENU_LIST = 'variables-list-controls-menu';
+const ID_HIDDEN_LIST = 'variables-list-hidden';
+
+const DROPPABLE_TO_HIDE: Record<string, VariableHide> = {
+  [ID_VISIBLE_LIST]: VariableHide.dontHide,
+  [ID_CONTROLS_MENU_LIST]: VariableHide.inControlsMenu,
+  [ID_HIDDEN_LIST]: VariableHide.hideVariable,
+};
+
+export function DashboardVariablesList({ set }: { set: SceneVariableSet }) {
   const { variables } = set.useState();
   const { editable, nonEditable } = useMemo(() => partitionVariablesByEditability(variables), [variables]);
   const { visible, controlsMenu, hidden } = useMemo(() => partitionVariablesByDisplay(editable), [editable]);
+  const aboveListId = useId();
+  const conrolsMenuListId = useId();
+  const hiddenListId = useId();
 
   const onDragEnd = useCallback(
     (result: DropResult) => {
@@ -33,9 +47,9 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
 
       const currentVariables = set.state.variables;
       const lists: Record<string, SceneVariable[]> = {
-        'variables-visible': [...visible],
-        'variables-controls-menu': [...controlsMenu],
-        'variables-hidden': [...hidden],
+        [ID_VISIBLE_LIST]: [...visible],
+        [ID_CONTROLS_MENU_LIST]: [...controlsMenu],
+        [ID_HIDDEN_LIST]: [...hidden],
       };
 
       const sourceList = lists[source.droppableId];
@@ -60,9 +74,9 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
           set.setState({
             variables: [
               ...nonEditable,
-              ...lists['variables-visible'],
-              ...lists['variables-controls-menu'],
-              ...lists['variables-hidden'],
+              ...lists[ID_VISIBLE_LIST],
+              ...lists[ID_CONTROLS_MENU_LIST],
+              ...lists[ID_HIDDEN_LIST],
             ],
           });
         },
@@ -90,26 +104,36 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
   return (
     <Stack direction="column" gap={1}>
       <DragDropContext onDragEnd={onDragEnd}>
-        <VariablesSection
-          title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard')}
-          variables={visible}
-          droppableId="variables-visible"
-          onClickVariable={onClickVariable}
-        />
-        <VariablesSection
-          title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu')}
-          variables={controlsMenu}
-          droppableId="variables-controls-menu"
-          onClickVariable={onClickVariable}
-        />
-        <VariablesSection
-          title={t('dashboard-scene.variables-list.title-hidden', 'Hidden')}
-          variables={hidden}
-          droppableId="variables-hidden"
-          onClickVariable={onClickVariable}
-        />
+        <OptionsPaneCategory
+          id={aboveListId}
+          title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard ({{count}})', {
+            count: visible.length,
+          })}
+        >
+          <VariablesSection variables={visible} droppableId={ID_VISIBLE_LIST} onClickVariable={onClickVariable} />
+        </OptionsPaneCategory>
+        <OptionsPaneCategory
+          id={conrolsMenuListId}
+          title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu ({{count}})', {
+            count: controlsMenu.length,
+          })}
+        >
+          <VariablesSection
+            variables={controlsMenu}
+            droppableId={ID_CONTROLS_MENU_LIST}
+            onClickVariable={onClickVariable}
+          />
+        </OptionsPaneCategory>
+        <OptionsPaneCategory
+          id={hiddenListId}
+          title={t('dashboard-scene.variables-list.title-hidden', 'Hidden ({{count}})', {
+            count: hidden.length,
+          })}
+        >
+          <VariablesSection variables={hidden} droppableId={ID_HIDDEN_LIST} onClickVariable={onClickVariable} />
+        </OptionsPaneCategory>
       </DragDropContext>
-      <Box display="flex" paddingTop={1} paddingBottom={2}>
+      <Box display="flex" paddingTop={0} paddingBottom={2}>
         <Button
           fullWidth
           icon="plus"
@@ -126,79 +150,79 @@ export function VariablesList({ set }: { set: SceneVariableSet }) {
 }
 
 function VariablesSection({
-  title,
   variables,
   droppableId,
   onClickVariable,
-  icon,
 }: {
-  title: string;
   variables: SceneVariable[];
   droppableId: string;
   onClickVariable: (variable: SceneVariable) => void;
-  icon?: IconName;
 }) {
   const styles = useStyles2(getStyles);
 
-  const onPointerDown = useCallback((event: React.PointerEvent) => {
+  const onClickDragHandle = useCallback((event: React.SyntheticEvent) => {
     event.stopPropagation();
   }, []);
 
+  const onClickVariableItem = useCallback(
+    (variable: SceneVariable) => {
+      onClickVariable(variable);
+    },
+    [onClickVariable]
+  );
+
   return (
-    <div className={styles.section}>
-      <div className={styles.title}>
-        {icon && <Icon name={icon} size="sm" className={styles.titleIcon} />}
-        <Text color="primary">
-          {title} ({variables.length})
-        </Text>
-      </div>
-      <Droppable droppableId={droppableId} direction="vertical">
-        {(provided) => (
-          <ul ref={provided.innerRef} {...provided.droppableProps} className={styles.list} data-testid={droppableId}>
-            {variables.map((variable, index) => (
-              <Draggable
-                key={variable.state.key ?? variable.state.name}
-                draggableId={variable.state.key ?? variable.state.name}
-                index={index}
-              >
-                {(draggableProvided) => (
-                  <li
-                    ref={draggableProvided.innerRef}
-                    {...draggableProvided.draggableProps}
-                    className={styles.listItem}
+    <Droppable droppableId={droppableId} direction="vertical">
+      {(provided) => (
+        <ul ref={provided.innerRef} {...provided.droppableProps} className={styles.list} data-testid={droppableId}>
+          {variables.map((variable, index) => (
+            <Draggable
+              key={variable.state.key ?? variable.state.name}
+              draggableId={variable.state.key ?? variable.state.name}
+              index={index}
+            >
+              {(draggableProvided) => (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+                <li
+                  ref={draggableProvided.innerRef}
+                  {...draggableProvided.draggableProps}
+                  className={styles.listItem}
+                  onClick={() => onClickVariableItem(variable)}
+                >
+                  {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                  <div
+                    {...draggableProvided.dragHandleProps}
+                    onPointerDown={onClickDragHandle}
+                    onClick={onClickDragHandle}
                   >
-                    <div {...draggableProvided.dragHandleProps} onPointerDown={onPointerDown}>
-                      <Tooltip
-                        content={t('dashboard-scene.variables-section.content-drag-to-reorder', 'Drag to reorder')}
-                        placement="top"
-                      >
-                        <Icon name="draggabledots" size="md" className={styles.dragHandle} />
-                      </Tooltip>
-                    </div>
-                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-                    <span className={styles.variableName} onClick={() => onClickVariable(variable)}>
-                      {variable.state.name}
-                    </span>
-                  </li>
-                )}
-              </Draggable>
-            ))}
-            {provided.placeholder}
-          </ul>
-        )}
-      </Droppable>
-    </div>
+                    <Tooltip
+                      content={t('dashboard-scene.variables-section.content-drag-to-reorder', 'Drag to reorder')}
+                      placement="top"
+                    >
+                      <Icon name="draggabledots" size="md" className={styles.dragHandle} />
+                    </Tooltip>
+                  </div>
+                  <div className={styles.variableName}>
+                    <div data-testid={`${droppableId}-variable-name`}>{variable.state.name}</div>
+                    <Stack direction="row" gap={1} alignItems="center">
+                      <Button variant="primary" size="sm" fill="outline">
+                        <Trans i18nKey="dashboard-scene.variables-section.select">Select</Trans>
+                      </Button>
+                    </Stack>
+                  </div>
+                </li>
+              )}
+            </Draggable>
+          ))}
+          {provided.placeholder}
+        </ul>
+      )}
+    </Droppable>
   );
 }
 
-const DROPPABLE_TO_HIDE: Record<string, VariableHide> = {
-  'variables-visible': VariableHide.dontHide,
-  'variables-controls-menu': VariableHide.inControlsMenu,
-  'variables-hidden': VariableHide.hideVariable,
-};
-
 function getTargetHide(droppableId: string, currentHide: VariableHide): VariableHide {
-  if (droppableId === 'variables-visible') {
+  if (droppableId === ID_VISIBLE_LIST) {
     return currentHide === VariableHide.dontHide || currentHide === VariableHide.hideLabel
       ? currentHide
       : VariableHide.dontHide;
@@ -254,9 +278,6 @@ export function partitionVariablesByDisplay(variables: SceneVariable[]) {
 
 function getStyles(theme: GrafanaTheme2) {
   return {
-    section: css({
-      marginLeft: theme.spacing(0.5),
-    }),
     title: css({
       display: 'flex',
       flexDirection: 'row',
@@ -270,24 +291,38 @@ function getStyles(theme: GrafanaTheme2) {
     }),
     list: css({
       listStyle: 'none',
-      margin: theme.spacing(0, 0, 1, 0.5),
+      margin: 0,
       padding: 0,
+      minHeight: theme.spacing(4), // leave space for droping variables on an empty list
     }),
     listItem: css({
       display: 'flex',
       flexDirection: 'row',
-      gap: theme.spacing(0.5),
       alignItems: 'center',
+      gap: theme.spacing(0.5),
+      padding: theme.spacing(0.5),
     }),
     variableName: css({
+      display: 'flex',
+      flexDirection: 'row',
+      gap: theme.spacing(0.5),
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
       cursor: 'pointer',
       [theme.transitions.handleMotion('no-preference', 'reduce')]: {
         transition: theme.transitions.create(['color'], {
           duration: theme.transitions.duration.short,
         }),
       },
+      button: {
+        visibility: 'hidden',
+      },
       '&:hover': {
         color: theme.colors.text.link,
+        button: {
+          visibility: 'visible',
+        },
       },
     }),
     dragHandle: css({

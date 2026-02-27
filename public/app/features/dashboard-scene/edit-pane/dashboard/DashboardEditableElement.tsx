@@ -12,7 +12,7 @@ import { EditableDashboardElement, EditableDashboardElementInfo } from '../../sc
 import { dashboardSceneGraph } from '../../utils/dashboardSceneGraph';
 
 import { DashboardDescriptionInput, DashboardTitleInput } from './DashboardBasicOptions';
-import { VariablesList } from './DashboardVariablesList';
+import { DashboardVariablesList } from './DashboardVariablesList';
 
 function useEditPaneOptions(
   this: DashboardEditableElement,
@@ -46,30 +46,6 @@ function useEditPaneOptions(
   const variablesCategory = useVariablesCategory($variables);
 
   return [dashboardOptions, ...layoutCategory, ...variablesCategory];
-}
-
-function useVariablesCategory(variableSet: SceneVariables | undefined): OptionsPaneCategoryDescriptor[] {
-  const variableListId = useId();
-
-  return useMemo(() => {
-    const category = new OptionsPaneCategoryDescriptor({
-      title: t('dashboard-scene.use-variables-category.category.title.variables', 'Variables'),
-      id: 'dashboard-variables',
-    });
-
-    if (variableSet instanceof SceneVariableSet) {
-      category.addItem(
-        new OptionsPaneItemDescriptor({
-          title: '',
-          id: variableListId,
-          skipField: true,
-          render: () => <VariablesList set={variableSet} />,
-        })
-      );
-    }
-
-    return [category];
-  }, [variableSet, variableListId]);
 }
 
 export class DashboardEditableElement implements EditableDashboardElement {
@@ -109,4 +85,30 @@ export class DashboardEditableElement implements EditableDashboardElement {
       </Button>
     );
   }
+}
+
+function useVariablesCategory(variableSet: SceneVariables | undefined): OptionsPaneCategoryDescriptor[] {
+  const variableListId = useId();
+
+  return useMemo(() => {
+    if (!(variableSet instanceof SceneVariableSet) || !variableSet?.state.variables.length) {
+      return [];
+    }
+
+    const category = new OptionsPaneCategoryDescriptor({
+      title: t('dashboard-scene.use-variables-category.category.title.variables', 'Variables'),
+      id: 'dashboard-variables',
+    });
+
+    category.addItem(
+      new OptionsPaneItemDescriptor({
+        title: '',
+        id: variableListId,
+        skipField: true,
+        render: () => <DashboardVariablesList set={variableSet} />,
+      })
+    );
+
+    return [category];
+  }, [variableSet, variableListId]);
 }

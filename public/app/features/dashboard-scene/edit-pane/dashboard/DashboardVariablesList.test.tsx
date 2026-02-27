@@ -10,7 +10,11 @@ import { openAddVariablePane } from '../../settings/variables/VariableAddEditabl
 import { DashboardInteractions } from '../../utils/interactions';
 import { activateFullSceneTree } from '../../utils/test-utils';
 
-import { partitionVariablesByDisplay, partitionVariablesByEditability, VariablesList } from './DashboardVariablesList';
+import {
+  partitionVariablesByDisplay,
+  partitionVariablesByEditability,
+  DashboardVariablesList,
+} from './DashboardVariablesList';
 
 jest.mock('../../settings/variables/VariableAddEditableElement', () => ({
   openAddVariablePane: jest.fn(),
@@ -20,6 +24,13 @@ jest.mock('../../utils/interactions', () => ({
   DashboardInteractions: {
     addVariableButtonClicked: jest.fn(),
   },
+}));
+
+jest.mock('app/core/hooks/useQueryParams', () => ({
+  useQueryParams: () => [{}, () => {}],
+}));
+jest.mock('react-use', () => ({
+  useLocalStorage: () => [{}, () => {}],
 }));
 
 function renderVariablesList(variables: SceneVariable[] = []) {
@@ -33,13 +44,16 @@ function renderVariablesList(variables: SceneVariable[] = []) {
   activateFullSceneTree(dashboardScene);
   jest.spyOn(dashboardScene.state.editPane, 'selectObject');
 
-  const renderResult = render(<VariablesList set={variableSet} />);
+  const renderResult = render(<DashboardVariablesList set={variableSet} />);
 
   return {
     ...renderResult,
     user,
     elements: {
       dashboardScene,
+      aboveListItems: () => renderResult.getAllByTestId('variables-list-visible-variable-name'),
+      controlsMenuListItems: () => renderResult.getAllByTestId('variables-list-controls-menu-variable-name'),
+      hiddenListItems: () => renderResult.getAllByTestId('variables-list-hidden-variable-name'),
       addVariableButton: () => renderResult.getByRole('button', { name: /add variable/i }),
     },
   };
@@ -58,38 +72,31 @@ function buildTestVariables() {
 describe('<DashboardVariablesList />', () => {
   test('renders 3 sections (one per variable display type) and an "Add variable" button', () => {
     const { visibleVar1, visibleVar2, controlsMenuVar1, hiddenVar1 } = buildTestVariables();
-    const { getByText, getByTestId, elements } = renderVariablesList([
-      hiddenVar1,
-      controlsMenuVar1,
-      visibleVar2,
-      visibleVar1,
-    ]);
+    const { getByRole, elements } = renderVariablesList([hiddenVar1, controlsMenuVar1, visibleVar2, visibleVar1]);
 
-    expect(getByText(/above dashboard/i)).toBeInTheDocument();
-    const aboveList = getByTestId('variables-visible');
-    const aboveItems = Array.from(aboveList.querySelectorAll('li')).map((item) => item.textContent);
-    expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']); // order is preserved
+    [/above dashboard/i, /controls menu/i, /hidden/i].forEach((name) => {
+      expect(getByRole('heading', { name })).toBeInTheDocument();
+    });
 
-    expect(getByText(/controls menu/i)).toBeInTheDocument();
-    const controlsMenuList = getByTestId('variables-controls-menu');
-    const controlsMenuItems = Array.from(controlsMenuList.querySelectorAll('li')).map((item) => item.textContent);
-    expect(controlsMenuItems).toEqual(['controlsMenuVar1']);
+    const aboveNames = Array.from(elements.aboveListItems()).map((item) => item.textContent);
+    expect(aboveNames).toEqual(['visibleVar2', 'visibleVar1']); // order is preserved
 
-    expect(getByText(/hidden/i)).toBeInTheDocument();
-    const hiddenMenuList = getByTestId('variables-hidden');
-    const hiddenMenuItems = Array.from(hiddenMenuList.querySelectorAll('li')).map((item) => item.textContent);
-    expect(hiddenMenuItems).toEqual(['ninjaVar1']);
+    const controlsMenuNames = Array.from(elements.controlsMenuListItems()).map((item) => item.textContent);
+    expect(controlsMenuNames).toEqual(['controlsMenuVar1']);
+
+    const hiddenNames = Array.from(elements.hiddenListItems()).map((item) => item.textContent);
+    expect(hiddenNames).toEqual(['ninjaVar1']);
 
     expect(elements.addVariableButton()).toBeInTheDocument();
   });
 
   test('always renders all 3 section titles even when some are empty', () => {
     const { hiddenVar1 } = buildTestVariables();
-    const { getByText } = renderVariablesList([hiddenVar1]);
+    const { getByRole } = renderVariablesList([hiddenVar1]);
 
-    expect(getByText(/above dashboard/i)).toBeInTheDocument();
-    expect(getByText(/controls menu/i)).toBeInTheDocument();
-    expect(getByText(/hidden/i)).toBeInTheDocument();
+    [/above dashboard/i, /controls menu/i, /hidden/i].forEach((name) => {
+      expect(getByRole('heading', { name })).toBeInTheDocument();
+    });
   });
 
   test('always renders an "Add variable" button', () => {
@@ -162,17 +169,12 @@ describe('<DashboardVariablesList />', () => {
 
       test('reorders visible variables when dragged down by one position', async () => {
         const { visibleVar1, visibleVar2, controlsMenuVar1 } = buildTestVariables();
-        const { container, findByText, getByTestId } = renderVariablesList([
-          visibleVar1,
-          visibleVar2,
-          controlsMenuVar1,
-        ]);
+        const { container, findByText, elements } = renderVariablesList([visibleVar1, visibleVar2, controlsMenuVar1]);
 
         await dragItem(container, findByText, 0, 'down');
 
-        const aboveList = getByTestId('variables-visible');
-        const aboveItems = Array.from(aboveList.querySelectorAll('li')).map((li) => li.textContent);
-        expect(aboveItems).toEqual(['visibleVar2', 'visibleVar1']);
+        const aboveNames = Array.from(elements.aboveListItems()).map((item) => item.textContent);
+        expect(aboveNames).toEqual(['visibleVar2', 'visibleVar1']);
       });
     });
   });

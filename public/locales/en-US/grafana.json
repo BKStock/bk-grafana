@@ -7227,12 +7227,16 @@
           "reorder-variables-list": "Reorder variables list"
         }
       },
-      "title-above-dashboard": "Above dashboard",
-      "title-controls-menu": "Controls menu",
-      "title-hidden": "Hidden"
+      "title-above-dashboard_one": "Above dashboard ({{count}})",
+      "title-above-dashboard_other": "Above dashboard ({{count}})",
+      "title-controls-menu_one": "Controls menu ({{count}})",
+      "title-controls-menu_other": "Controls menu ({{count}})",
+      "title-hidden_one": "Hidden ({{count}})",
+      "title-hidden_other": "Hidden ({{count}})"
     },
     "variables-section": {
-      "content-drag-to-reorder": "Drag to reorder"
+      "content-drag-to-reorder": "Drag to reorder",
+      "select": "Select"
     },
     "version-history": {
       "comparison": {
