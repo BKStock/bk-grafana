@@ -363,15 +363,33 @@ func (s *Service) processBatchCheckGroup(
 		return
 	}
 
+	tree := s.resolveTreeForGroup(ctx, ctxLogger, ns)
+
 	for i, item := range group.items {
 		checkReq := group.checkReqs[i]
-		allowed, err := s.checkPermission(ctx, permissions, checkReq)
+		allowed, err := s.checkPermissionWithTree(ctx, permissions, checkReq, tree)
 		if err != nil {
 			results[item.GetCorrelationId()] = &authzv1.BatchCheckResult{Allowed: false, Error: err.Error()}
 			continue
 		}
 		results[item.GetCorrelationId()] = &authzv1.BatchCheckResult{Allowed: allowed}
 	}
+}
+
+// resolveTreeForGroup fetches the folder tree once for all checks in a batch group.
+// Returns nil if the tree is not available, in which case checkInheritedPermissions
+// will fall back to per-item cache lookup.
+func (s *Service) resolveTreeForGroup(ctx context.Context, ctxLogger log.Logger, ns types.NamespaceInfo) *folderTree {
+	tree, ok := s.getCachedFolderTree(ctx, ns)
+	if ok {
+		return &tree
+	}
+	resolved, err := s.buildFolderTree(ctx, ns)
+	if err != nil {
+		ctxLogger.Error("could not pre-resolve folder tree for batch group", "error", err)
+		return nil
+	}
+	return &resolved
 }
 
 // getPermissionsForGroup fetches permissions for a batch check group,
@@ -810,6 +828,12 @@ func (s *Service) getUserBasicRole(ctx context.Context, ns types.NamespaceInfo, 
 }
 
 func (s *Service) checkPermission(ctx context.Context, scopeMap map[string]bool, req *checkRequest) (bool, error) {
+	return s.checkPermissionWithTree(ctx, scopeMap, req, nil)
+}
+
+// checkPermissionWithTree is like checkPermission but accepts a pre-resolved folder tree
+// to avoid repeated cache lookups in batch operations.
+func (s *Service) checkPermissionWithTree(ctx context.Context, scopeMap map[string]bool, req *checkRequest, tree *folderTree) (bool, error) {
 	ctx, span := s.tracer.Start(ctx, "authz_direct_db.service.checkPermission", trace.WithAttributes(
 		attribute.Int("scope_count", len(scopeMap))))
 	defer span.End()
@@ -854,7 +878,7 @@ func (s *Service) checkPermission(ctx context.Context, scopeMap map[string]bool,
 		return false, nil
 	}
 
-	return s.checkInheritedPermissions(ctx, scopeMap, req)
+	return s.checkInheritedPermissions(ctx, scopeMap, req, tree)
 }
 
 func (s *Service) getScopeMap(permissions []accesscontrol.Permission) map[string]bool {
@@ -875,7 +899,7 @@ func (s *Service) getScopeMap(permissions []accesscontrol.Permission) map[string
 	return permMap
 }
 
-func (s *Service) checkInheritedPermissions(ctx context.Context, scopeMap map[string]bool, req *checkRequest) (bool, error) {
+func (s *Service) checkInheritedPermissions(ctx context.Context, scopeMap map[string]bool, req *checkRequest, preResolved *folderTree) (bool, error) {
 	if req.ParentFolder == "" {
 		return false, nil
 	}
@@ -884,20 +908,23 @@ func (s *Service) checkInheritedPermissions(ctx context.Context, scopeMap map[st
 	defer span.End()
 	ctxLogger := s.logger.FromContext(ctx)
 
-	tree, ok := s.getCachedFolderTree(ctx, req.Namespace)
+	var tree folderTree
+	if preResolved != nil && s.isFolderInTree(*preResolved, req.ParentFolder) {
+		tree = *preResolved
+	} else {
+		var ok bool
+		tree, ok = s.getCachedFolderTree(ctx, req.Namespace)
 
-	// Check cached tree is up to date
-	if !ok || !s.isFolderInTree(tree, req.ParentFolder) {
-		var err error
-		tree, err = s.buildFolderTree(ctx, req.Namespace)
-		if err != nil {
-			ctxLogger.Error("could not build folder and dashboard tree", "error", err)
-			return false, err
-		}
-		if !s.isFolderInTree(tree, req.ParentFolder) {
-			// Not erroring here as the permission might exist but the folder wasn't synchronized yet
-			// Once in mode 5 we can deny access here
-			ctxLogger.Error("parent folder not found in folder tree", "folder", req.ParentFolder)
+		if !ok || !s.isFolderInTree(tree, req.ParentFolder) {
+			var err error
+			tree, err = s.buildFolderTree(ctx, req.Namespace)
+			if err != nil {
+				ctxLogger.Error("could not build folder and dashboard tree", "error", err)
+				return false, err
+			}
+			if !s.isFolderInTree(tree, req.ParentFolder) {
+				ctxLogger.Error("parent folder not found in folder tree", "folder", req.ParentFolder)
+			}
 		}
 	}
 
