@@ -180,11 +180,8 @@ func (h *gitTestHelper) createGitRepo(t *testing.T, repoName string, initialFile
 			"workflows": []string{"write"},
 		},
 		"secure": map[string]interface{}{
-			"username": map[string]interface{}{
-				"create": user.Username,
-			},
-			"password": map[string]interface{}{
-				"create": user.Password,
+			"token": map[string]interface{}{
+				"create": fmt.Sprintf("%s:%s", user.Username, user.Password),
 			},
 		},
 	}
