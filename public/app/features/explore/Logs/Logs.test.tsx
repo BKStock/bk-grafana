@@ -1,7 +1,10 @@
+import { OpenFeatureProvider } from '@openfeature/react-sdk';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentProps } from 'react';
 import { Provider } from 'react-redux';
+
+import { getTestFeatureFlagClient } from '@grafana/test-utils/unstable';
 
 import {
   DataFrame,
@@ -155,7 +158,9 @@ describe('Logs', () => {
 
     const rendered = render(
       <Provider store={fakeStore}>
-        {getComponent(partialProps, dataFrame ? dataFrame : getMockLokiFrame(), logs)}
+        <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+          {getComponent(partialProps, dataFrame ? dataFrame : getMockLokiFrame(), logs)}
+        </OpenFeatureProvider>
       </Provider>
     );
     return { ...rendered, store: fakeStore };
@@ -190,17 +195,18 @@ describe('Logs', () => {
     });
     render(
       <Provider store={store}>
-        <Logs
-          exploreId={'left'}
-          splitOpen={() => undefined}
-          logsVolumeEnabled={true}
-          onSetLogsVolumeEnabled={() => null}
-          onClickFilterLabel={() => null}
-          onClickFilterOutLabel={() => null}
-          logsVolumeData={undefined}
-          loadLogsVolumeData={() => undefined}
-          logRows={[]}
-          onStartScanning={scanningStarted}
+        <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+          <Logs
+            exploreId={'left'}
+            splitOpen={() => undefined}
+            logsVolumeEnabled={true}
+            onSetLogsVolumeEnabled={() => null}
+            onClickFilterLabel={() => null}
+            onClickFilterOutLabel={() => null}
+            logsVolumeData={undefined}
+            loadLogsVolumeData={() => undefined}
+            logRows={[]}
+            onStartScanning={scanningStarted}
           timeZone={'utc'}
           width={50}
           loading={false}
@@ -221,6 +227,7 @@ describe('Logs', () => {
           eventBus={new EventBusSrv()}
           isFilterLabelActive={jest.fn()}
         />
+        </OpenFeatureProvider>
       </Provider>
     );
     const button = screen.getByRole('button', {
@@ -238,18 +245,19 @@ describe('Logs', () => {
     });
     render(
       <Provider store={store}>
-        <Logs
-          exploreId={'left'}
-          splitOpen={() => undefined}
-          logsVolumeEnabled={true}
-          onSetLogsVolumeEnabled={() => null}
-          onClickFilterLabel={() => null}
-          onClickFilterOutLabel={() => null}
-          logsVolumeData={undefined}
-          loadLogsVolumeData={() => undefined}
-          logRows={[]}
-          scanning={true}
-          timeZone={'utc'}
+        <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+          <Logs
+            exploreId={'left'}
+            splitOpen={() => undefined}
+            logsVolumeEnabled={true}
+            onSetLogsVolumeEnabled={() => null}
+            onClickFilterLabel={() => null}
+            onClickFilterOutLabel={() => null}
+            logsVolumeData={undefined}
+            loadLogsVolumeData={() => undefined}
+            logRows={[]}
+            scanning={true}
+            timeZone={'utc'}
           width={50}
           loading={false}
           loadingState={LoadingState.Done}
@@ -269,6 +277,7 @@ describe('Logs', () => {
           eventBus={new EventBusSrv()}
           isFilterLabelActive={jest.fn()}
         />
+        </OpenFeatureProvider>
       </Provider>
     );
 
@@ -288,18 +297,19 @@ describe('Logs', () => {
     });
     render(
       <Provider store={store}>
-        <Logs
-          exploreId={'left'}
-          splitOpen={() => undefined}
-          logsVolumeEnabled={true}
-          onSetLogsVolumeEnabled={() => null}
-          onClickFilterLabel={() => null}
-          onClickFilterOutLabel={() => null}
-          logsVolumeData={undefined}
-          loadLogsVolumeData={() => undefined}
-          logRows={[]}
-          scanning={true}
-          onStopScanning={scanningStopped}
+        <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+          <Logs
+            exploreId={'left'}
+            splitOpen={() => undefined}
+            logsVolumeEnabled={true}
+            onSetLogsVolumeEnabled={() => null}
+            onClickFilterLabel={() => null}
+            onClickFilterOutLabel={() => null}
+            logsVolumeData={undefined}
+            loadLogsVolumeData={() => undefined}
+            logRows={[]}
+            scanning={true}
+            onStopScanning={scanningStopped}
           timeZone={'utc'}
           width={50}
           loading={false}
@@ -320,6 +330,7 @@ describe('Logs', () => {
           eventBus={new EventBusSrv()}
           isFilterLabelActive={jest.fn()}
         />
+        </OpenFeatureProvider>
       </Provider>
     );
 
@@ -368,8 +379,20 @@ describe('Logs', () => {
       const panelState = { logs: { id: '1' } };
       const { rerender, store } = setup({ loading: false, panelState });
 
-      rerender(<Provider store={store}>{getComponent({ loading: true, exploreId: 'right', panelState })}</Provider>);
-      rerender(<Provider store={store}>{getComponent({ loading: false, exploreId: 'right', panelState })}</Provider>);
+      rerender(
+        <Provider store={store}>
+          <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+            {getComponent({ loading: true, exploreId: 'right', panelState })}
+          </OpenFeatureProvider>
+        </Provider>
+      );
+      rerender(
+        <Provider store={store}>
+          <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+            {getComponent({ loading: false, exploreId: 'right', panelState })}
+          </OpenFeatureProvider>
+        </Provider>
+      );
 
       expect(fakeChangePanelState).toHaveBeenCalledWith('right', 'logs', { logs: {} });
     });
