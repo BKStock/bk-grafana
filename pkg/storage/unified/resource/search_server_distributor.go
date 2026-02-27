@@ -36,7 +36,7 @@ var (
 	_ grpcserver.HealthProbe    = (*distributorServer)(nil)
 )
 
-func ProvideSearchDistributorServer(tracer trace.Tracer, cfg *setting.Cfg, ring *ring.Ring, ringClientPool *ringclient.Pool, grpcService *grpcserver.DSKitService) (UnifiedStorageGrpcService, error) {
+func ProvideSearchDistributorServer(tracer trace.Tracer, cfg *setting.Cfg, ring *ring.Ring, ringClientPool *ringclient.Pool, provider grpcserver.Provider) (UnifiedStorageGrpcService, error) {
 	s := &distributorServer{
 		log:        log.New("index-server-distributor"),
 		ring:       ring,
@@ -44,15 +44,12 @@ func ProvideSearchDistributorServer(tracer trace.Tracer, cfg *setting.Cfg, ring 
 		tracing:    tracer,
 	}
 
-	srv := grpcService.GetServer()
+	srv := provider.GetServer()
 	resourcepb.RegisterResourceIndexServer(srv, s)
 	resourcepb.RegisterManagedObjectIndexServer(srv, s)
-	_, _ = grpcserver.ProvideReflectionService(cfg, grpcService)
+	_, _ = grpcserver.ProvideReflectionService(cfg, provider)
 
-	s.BasicService = services.NewBasicService(nil, func(ctx context.Context) error {
-		<-ctx.Done()
-		return nil
-	}, nil).WithName(modules.SearchServerDistributor)
+	s.BasicService = services.NewIdleService(nil, nil).WithName(modules.SearchServerDistributor)
 	return s, nil
 }
 
