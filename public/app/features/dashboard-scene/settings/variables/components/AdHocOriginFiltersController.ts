@@ -71,7 +71,7 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
   }
 
   handleComboboxBackspace(filter: AdHocFilterWithLabels): void {
-    // TODO: everify this is correct
+    // TODO: verify this is correct
     const index = this.filters.indexOf(filter);
     if (index > 0) {
       this.setFilters(
@@ -90,7 +90,7 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
   }
 
   restoreOriginalFilter(filter: AdHocFilterWithLabels): void {
-    // Not applicable for this simple demo
+    // Not applicable
   }
 
   clearAll(): void {

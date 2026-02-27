@@ -210,14 +210,19 @@ export function applyVariableChangesV2(
     } else if (
       variable.kind === 'AdhocVariable' &&
       original.kind === 'AdhocVariable' &&
-      !adHocVariableFiltersEqual(variable.spec.filters, original.spec.filters)
+      !adHocVariableFiltersEqual(
+        variable.spec.filters.filter((f) => !f.origin),
+        (original.spec as AdhocVariableSpec).filters.filter((f) => !f.origin)
+      )
     ) {
       hasVariableValueChanges = true;
     }
 
     if (!saveVariables) {
       if (variable.kind === 'AdhocVariable') {
-        variable.spec.filters = (original.spec as AdhocVariableSpec).filters;
+        const originFilters = variable.spec.filters.filter((f) => f.origin);
+        const originalRuntimeFilters = (original.spec as AdhocVariableSpec).filters.filter((f) => !f.origin);
+        variable.spec.filters = [...originFilters, ...originalRuntimeFilters];
       } else if (variable.kind === 'TextVariable') {
         variable.spec.query = (original.spec as TextVariableSpec).query;
       }
@@ -258,8 +263,8 @@ export function applyVariableChanges(saveModel: Dashboard, originalSaveModel: Da
     } else if (
       variable.type === 'adhoc' &&
       !adHocVariableFiltersEqual(
-        validateFiltersOrigin((variable as AdHocVariableModel | undefined)?.filters),
-        validateFiltersOrigin((original as AdHocVariableModel | undefined)?.filters)
+        validateFiltersOrigin((variable as AdHocVariableModel | undefined)?.filters)?.filter((f) => !f.origin),
+        validateFiltersOrigin((original as AdHocVariableModel | undefined)?.filters)?.filter((f) => !f.origin)
       )
     ) {
       hasVariableValueChanges = true;
@@ -269,7 +274,9 @@ export function applyVariableChanges(saveModel: Dashboard, originalSaveModel: Da
       const typed = variable as TypedVariableModel;
 
       if (typed.type === 'adhoc') {
-        typed.filters = (original as AdHocVariableModel).filters;
+        const originFilters = (typed.filters ?? []).filter((f) => f.origin);
+        const originalRuntimeFilters = ((original as AdHocVariableModel).filters ?? []).filter((f) => !f.origin);
+        typed.filters = [...originFilters, ...originalRuntimeFilters];
       } else if (typed.type === 'textbox') {
         typed.query = (original as TextBoxVariableModel).query;
       }
