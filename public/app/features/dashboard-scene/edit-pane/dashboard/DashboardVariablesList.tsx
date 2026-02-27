@@ -1,6 +1,6 @@
 import { css } from '@emotion/css';
 import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { GrafanaTheme2, VariableHide } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
@@ -29,9 +29,6 @@ export function DashboardVariablesList({ set }: { set: SceneVariableSet }) {
   const { variables } = set.useState();
   const { editable, nonEditable } = useMemo(() => partitionVariablesByEditability(variables), [variables]);
   const { visible, controlsMenu, hidden } = useMemo(() => partitionVariablesByDisplay(editable), [editable]);
-  const aboveListId = useId();
-  const conrolsMenuListId = useId();
-  const hiddenListId = useId();
 
   const onDragEnd = useCallback(
     (result: DropResult) => {
@@ -105,7 +102,7 @@ export function DashboardVariablesList({ set }: { set: SceneVariableSet }) {
     <Stack direction="column" gap={1}>
       <DragDropContext onDragEnd={onDragEnd}>
         <OptionsPaneCategory
-          id={aboveListId}
+          id={ID_VISIBLE_LIST}
           title={t('dashboard-scene.variables-list.title-above-dashboard', 'Above dashboard ({{count}})', {
             count: visible.length,
           })}
@@ -113,7 +110,7 @@ export function DashboardVariablesList({ set }: { set: SceneVariableSet }) {
           <VariablesSection variables={visible} droppableId={ID_VISIBLE_LIST} onClickVariable={onClickVariable} />
         </OptionsPaneCategory>
         <OptionsPaneCategory
-          id={conrolsMenuListId}
+          id={ID_CONTROLS_MENU_LIST}
           title={t('dashboard-scene.variables-list.title-controls-menu', 'Controls menu ({{count}})', {
             count: controlsMenu.length,
           })}
@@ -125,7 +122,7 @@ export function DashboardVariablesList({ set }: { set: SceneVariableSet }) {
           />
         </OptionsPaneCategory>
         <OptionsPaneCategory
-          id={hiddenListId}
+          id={ID_HIDDEN_LIST}
           title={t('dashboard-scene.variables-list.title-hidden', 'Hidden ({{count}})', {
             count: hidden.length,
           })}
