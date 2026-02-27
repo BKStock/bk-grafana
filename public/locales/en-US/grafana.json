@@ -5332,6 +5332,7 @@
         "annotation-set": "Annotations & Alerts",
         "dashboard": "Dashboard",
         "element": "Element",
+        "link-set": "Links",
         "local-variable": "Local variable",
         "multiple-elements": "Multiple elements",
         "multiple-elements-delete-text": "Are you sure you want to delete these elements?",
@@ -5346,6 +5347,12 @@
         "tabs": "Tabs",
         "variable": "{{type}} variable",
         "variable-set": "Variables"
+      },
+      "links": {
+        "add-link": "Add link",
+        "reorder": "Drag to reorder",
+        "select-link": "Select",
+        "untitled": "Untitled link"
       },
       "row": {
         "header": {
@@ -6525,9 +6532,7 @@
       "title-feedback-dashboard-editing-experience": "Give feedback on the new dashboard editing experience"
     },
     "dashboard-link-form": {
-      "add-link": "Add link",
       "back-to-list": "Back to list",
-      "cancel": "Cancel",
       "label-icon": "Icon",
       "label-include-current-template-variable-values": "Include current template variable values",
       "label-include-current-time-range": "Include current time range",
@@ -6805,6 +6810,16 @@
       "change-url": "Change link URL",
       "remove-link": "Remove link",
       "update-link": "Update link"
+    },
+    "link-list": {
+      "create-drag-end-handler": {
+        "description": {
+          "reorder-links-list": "Reorder links list"
+        }
+      },
+      "render-list": {
+        "aria-label-link": "Link"
+      }
     },
     "link-options": {
       "icon": "Icon",
