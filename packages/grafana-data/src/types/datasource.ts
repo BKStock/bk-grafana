@@ -694,11 +694,12 @@ export interface DrilldownRecommendation {
 export interface DrilldownsApplicability {
   key: string;
   applicable: boolean;
-  // message explaining why the filter is not applicable
   reason?: string;
-  // needed to differentiate between filters with same key
-  // but different origin
   origin?: string;
+  // position of the entry in the input filters/groupByKeys array. Together with
+  // key and origin forms a unique composite key so consumers can match results back
+  // when multiple entries share the same key (e.g. cluster=dev1, cluster=dev2).
+  index?: number;
 }
 
 export interface DataSourceJsonData {

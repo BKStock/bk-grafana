@@ -35,14 +35,19 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
 
     const items: Array<{ label: string; reason?: string }> = [];
 
+    const applicabilityMap = new Map<string, DrilldownsApplicability>();
+    applicability.forEach((entry) => {
+      applicabilityMap.set(`${entry.key}${entry.origin ? `-${entry.origin}` : ''}-${entry.index ?? ''}`, entry);
+    });
+
     const filters = filtersState?.filters ?? [];
     const originFilters = filtersState?.originFilters ?? [];
     const filterValues = [...filters, ...originFilters];
 
     if (filterValues.length) {
       const nonApplicableFilters = filterValues
-        .map((filter) => {
-          const result = applicability.find((entry) => entry.key === filter.key && entry.origin === filter.origin);
+        .map((filter, i) => {
+          const result = applicabilityMap.get(`${filter.key}${filter.origin ? `-${filter.origin}` : ''}-${i}`);
           if (result && !result.applicable) {
             return { filter, reason: result.reason };
           }
@@ -63,9 +68,11 @@ export function PanelNonApplicableDrilldownsSubHeader({ filtersVar, groupByVar, 
 
     if (groupByValues.length) {
       const groupByApplicability = groupByState?.keysApplicability;
+      const groupByIndexOffset = filterValues.length;
 
-      for (const groupByKey of groupByValues) {
-        const apiResult = applicability.find((entry) => entry.key === groupByKey);
+      for (let gi = 0; gi < groupByValues.length; gi++) {
+        const groupByKey = groupByValues[gi];
+        const apiResult = applicabilityMap.get(`${groupByKey}-${groupByIndexOffset + gi}`);
         if (apiResult && !apiResult.applicable) {
           items.push({ label: String(groupByKey), reason: apiResult.reason });
           continue;
