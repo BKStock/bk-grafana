@@ -13,7 +13,6 @@ import {
   allAnnotationRegions,
   allAnnotations,
   mockAnnotationFrame,
-  mockAnnotationRegionFrame,
   mockIRMAnnotation,
   mockIRMAnnotationRegion,
 } from './mocks/mockAnnotationFrames';
@@ -124,10 +123,13 @@ describe('AnnotationsPlugin2', () => {
 
   describe('all', () => {
     afterEach(() => {
-      jest.clearAllMocks();
+      jest.restoreAllMocks();
     });
+    describe.each([mockIRMAnnotation, mockIRMAnnotationRegion])('Tooltips', (frame) => {
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
 
-    describe.each([mockIRMAnnotation, mockIRMAnnotationRegion])('Tooltips - common', (frame) => {
       it.each([userEvent.hover, userEvent.click])('avatar', async (event) => {
         setUp({ annotations: [frame] });
         const firstMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[0];
@@ -137,7 +139,6 @@ describe('AnnotationsPlugin2', () => {
         expect(screen.queryByTestId('mock-annotation-text')).toBeVisible();
         expect(screen.queryByTestId('mock-annotation-text')?.querySelector('img')).toBeVisible();
       });
-
       it.each([userEvent.hover, userEvent.click])('text', async (event) => {
         setUp({ annotations: [frame] });
         const firstMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[0];
@@ -148,7 +149,6 @@ describe('AnnotationsPlugin2', () => {
           'A very large label value payload (>16MB) triggered a panic in the code. We disabled the gateway as a temporary mitigation. Declared by your mom'
         );
       });
-
       it.each([userEvent.hover, userEvent.click])('title', async (event) => {
         setUp({ annotations: [frame] });
         const firstMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[0];
@@ -157,7 +157,6 @@ describe('AnnotationsPlugin2', () => {
         expect(screen.queryByTestId('mock-annotation-title')).toBeVisible();
         expect(screen.queryByTestId('mock-annotation-title')).toHaveTextContent('prod-000-writes-error');
       });
-
       it.each([userEvent.hover, userEvent.click])('inline links', async (event) => {
         setUp({ annotations: [frame] });
         const thirdMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[2];
@@ -169,7 +168,6 @@ describe('AnnotationsPlugin2', () => {
         expect(titleLink).toHaveAttribute('target', '_blank');
         expect(titleLink).toHaveTextContent('Vendor BYOC cell Failed to get annotations');
       });
-
       it.each([userEvent.hover, userEvent.click])('tags', async (event) => {
         const expectedTags = [
           'service:dashboard-service',
@@ -191,21 +189,30 @@ describe('AnnotationsPlugin2', () => {
         });
       });
 
-      it.each([userEvent.hover, userEvent.click])(
-        'actions not visible if can execute actions is not set',
-        async (event) => {
-          setUp({ annotations: [frame] });
-          const thirdMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[2];
-          expect(thirdMarker).toBeVisible();
-          await event(thirdMarker);
-          const editButton = screen.queryByLabelText('Edit');
-          expect(editButton).not.toBeInTheDocument();
-          const deleteButton = screen.queryByLabelText('Delete');
-          expect(deleteButton).not.toBeInTheDocument();
-        }
-      );
-
       describe('editing & deleting', () => {
+        afterEach(() => {
+          jest.restoreAllMocks();
+        });
+
+        it.each([userEvent.hover, userEvent.click])(
+          'actions not visible if can execute actions is not set',
+          async (event) => {
+            mockUsePanelContext.mockReturnValue({
+              canExecuteActions: () => false,
+              canEditAnnotations: () => false,
+              canDeleteAnnotations: () => false,
+            } as PanelContext);
+            setUp({ annotations: [frame] });
+            const thirdMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[2];
+            expect(thirdMarker).toBeVisible();
+            await event(thirdMarker);
+            const editButton = screen.queryByLabelText('Edit');
+            expect(editButton).not.toBeInTheDocument();
+            const deleteButton = screen.queryByLabelText('Delete');
+            expect(deleteButton).not.toBeInTheDocument();
+          }
+        );
+
         it.each([userEvent.hover, userEvent.click])('edit', async (event) => {
           mockUsePanelContext.mockReturnValue({
             canExecuteActions: () => true,
@@ -290,7 +297,7 @@ describe('AnnotationsPlugin2', () => {
       expect(screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker).length).toEqual(4);
     });
 
-    describe('markers', () => {
+    describe('region markers', () => {
       it.each([allAnnotationRegions])('all annotation regions should render', (frame) => {
         setUp({ annotations: [frame] });
         expect(screen.getAllByTestId(selectors.pages.Dashboard.Annotations.marker).length).toEqual(frame.length);
@@ -307,7 +314,7 @@ describe('AnnotationsPlugin2', () => {
       });
     });
 
-    describe('Tooltips', () => {
+    describe('tooltips', () => {
       it.each([userEvent.hover, userEvent.click])('time', async (event) => {
         setUp({ annotations: [mockIRMAnnotation] });
         const firstMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[0];
