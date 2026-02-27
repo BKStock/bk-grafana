@@ -32,10 +32,19 @@ type StatusPatcher interface {
 type RepositoryHealthCheckerInterface interface {
 	ShouldCheckHealth(repo *provisioning.Repository) bool
 	RefreshHealth(ctx context.Context, repo repository.Repository) (*provisioning.TestResults, provisioning.HealthStatus, error)
-	RefreshHealthWithPatchOps(ctx context.Context, repo repository.Repository) (*provisioning.TestResults, provisioning.HealthStatus, []map[string]interface{}, error)
+	RefreshHealthWithPatchOps(ctx context.Context, repo repository.Repository) (HealthResultWithPatchOps, error)
 	RefreshTimestamp(ctx context.Context, repo *provisioning.Repository) error
 	RecordFailure(ctx context.Context, failureType provisioning.HealthFailureType, err error, repo *provisioning.Repository) error
 	HasRecentFailure(healthStatus provisioning.HealthStatus, failureType provisioning.HealthFailureType) bool
+}
+
+// HealthResultWithPatchOps contains health-check results and patch operations
+// to be applied in a single status patch request.
+type HealthResultWithPatchOps struct {
+	TestResults    *provisioning.TestResults
+	HealthStatus   provisioning.HealthStatus
+	ReadyCondition metav1.Condition
+	PatchOps       []map[string]interface{}
 }
 
 // RepositoryHealthChecker provides unified health checking for repositories
@@ -178,37 +187,34 @@ func (hc *RepositoryHealthChecker) RefreshHealth(ctx context.Context, repo repos
 }
 
 // RefreshHealthWithPatchOps performs a health check on an existing repository
-// and returns the test results, health status, and patch operations to apply.
+// and returns the health result and patch operations to apply.
 // This method does NOT apply the patch itself, allowing the caller to batch
 // multiple status updates together to avoid race conditions.
-//
-// NOTE: This intentionally does NOT include condition patches (e.g. Ready).
-func (hc *RepositoryHealthChecker) RefreshHealthWithPatchOps(ctx context.Context, repo repository.Repository) (*provisioning.TestResults, provisioning.HealthStatus, []map[string]interface{}, error) {
+func (hc *RepositoryHealthChecker) RefreshHealthWithPatchOps(ctx context.Context, repo repository.Repository) (HealthResultWithPatchOps, error) {
 	cfg := repo.Config()
 
 	// Use health checker to perform comprehensive health check with existing status
 	testResults, newHealthStatus, err := hc.refreshHealth(ctx, repo, cfg.Status.Health)
 	if err != nil {
-		return nil, provisioning.HealthStatus{}, nil, fmt.Errorf("health check failed: %w", err)
+		return HealthResultWithPatchOps{}, fmt.Errorf("health check failed: %w", err)
 	}
 
-	var patchOps []map[string]interface{}
+	result := HealthResultWithPatchOps{
+		TestResults:    testResults,
+		HealthStatus:   newHealthStatus,
+		ReadyCondition: buildReadyConditionWithReason(newHealthStatus, provisioning.ReasonInvalidSpec),
+	}
 
 	// Only return patch operation if health status actually changed
 	if hc.hasHealthStatusChanged(cfg.Status.Health, newHealthStatus) {
-		patchOps = append(patchOps, map[string]interface{}{
+		result.PatchOps = append(result.PatchOps, map[string]interface{}{
 			"op":    "replace",
 			"path":  "/status/health",
 			"value": newHealthStatus,
 		})
 	}
 
-	return testResults, newHealthStatus, patchOps, nil
-}
-
-// BuildReadyCondition returns the Ready condition derived from the given health status.
-func (hc *RepositoryHealthChecker) BuildReadyCondition(healthStatus provisioning.HealthStatus) metav1.Condition {
-	return buildReadyConditionWithReason(healthStatus, provisioning.ReasonInvalidSpec)
+	return result, nil
 }
 
 // RefreshTimestamp updates the health status timestamp without changing other fields

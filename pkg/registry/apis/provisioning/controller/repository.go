@@ -734,20 +734,21 @@ func (rc *RepositoryController) process(item *queueItem) error {
 	}
 
 	// Handle health checks using the health checker
-	testResults, healthStatus, healthPatchOps, err := rc.healthChecker.RefreshHealthWithPatchOps(ctx, repo)
+	healthResult, err := rc.healthChecker.RefreshHealthWithPatchOps(ctx, repo)
 	if err != nil {
 		return fmt.Errorf("update health status: %w", err)
 	}
+	testResults := healthResult.TestResults
+	healthStatus := healthResult.HealthStatus
 
 	// Add health patch operations
-	if len(healthPatchOps) > 0 {
-		patchOperations = append(patchOperations, healthPatchOps...)
+	if len(healthResult.PatchOps) > 0 {
+		patchOperations = append(patchOperations, healthResult.PatchOps...)
 	}
 
 	// Build ALL condition patches together to avoid one overwriting another.
-	readyCondition := rc.healthChecker.BuildReadyCondition(healthStatus)
 	if conditionPatchOps := BuildConditionPatchOpsFromExisting(
-		obj.Status.Conditions, obj.GetGeneration(), quotaCondition, readyCondition,
+		obj.Status.Conditions, obj.GetGeneration(), quotaCondition, healthResult.ReadyCondition,
 	); conditionPatchOps != nil {
 		patchOperations = append(patchOperations, conditionPatchOps...)
 	}

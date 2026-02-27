@@ -671,21 +671,24 @@ func TestRefreshHealthWithPatchOps(t *testing.T) {
 			hc := NewRepositoryHealthChecker(nil, repository.NewTester(validator), mockMetricsRecorder)
 
 			// Call RefreshHealthWithPatchOps
-			testResults, healthStatus, patchOps, err := hc.RefreshHealthWithPatchOps(context.Background(), mockRepo)
+			result, err := hc.RefreshHealthWithPatchOps(context.Background(), mockRepo)
 
 			// Verify error
 			if tt.expectError {
 				assert.Error(t, err)
-				assert.Nil(t, testResults)
+				assert.Nil(t, result.TestResults)
 				return
 			}
 			assert.NoError(t, err)
+			testResults := result.TestResults
+			healthStatus := result.HealthStatus
+			patchOps := result.PatchOps
 
 			// Verify health status
 			assert.Equal(t, tt.expectedHealth, healthStatus.Healthy)
 
 			// Verify patch operations — RefreshHealthWithPatchOps only returns /status/health patches;
-			// condition patches are built separately by the caller via BuildReadyCondition.
+			// condition patches are built separately by the caller.
 			if tt.expectPatchOps {
 				assert.NotEmpty(t, patchOps, "expected patch operations to be returned")
 				assert.Len(t, patchOps, 1, "should have exactly one patch (health)")
@@ -705,7 +708,7 @@ func TestRefreshHealthWithPatchOps(t *testing.T) {
 	}
 }
 
-func TestBuildReadyCondition(t *testing.T) {
+func TestBuildReadyConditionWithReasonFromHealth(t *testing.T) {
 	tests := []struct {
 		name            string
 		healthStatus    provisioning.HealthStatus
@@ -769,14 +772,7 @@ func TestBuildReadyCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockPatcher := mocks.NewStatusPatcher(t)
-			mockFactory := repository.NewMockFactory(t)
-			mockFactory.EXPECT().Validate(mock.Anything, mock.Anything).Return(field.ErrorList{}).Maybe()
-			validator := repository.NewValidator(true, mockFactory)
-			mockMetricsRecorder := NewMockHealthMetricsRecorder(t)
-			hc := NewRepositoryHealthChecker(mockPatcher, repository.NewTester(validator), mockMetricsRecorder)
-
-			condition := hc.BuildReadyCondition(tt.healthStatus)
+			condition := buildReadyConditionWithReason(tt.healthStatus, provisioning.ReasonInvalidSpec)
 
 			assert.Equal(t, provisioning.ConditionTypeReady, condition.Type)
 			assert.Equal(t, tt.expectedStatus, condition.Status)
