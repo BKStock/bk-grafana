@@ -3,7 +3,7 @@ import { debounce } from 'lodash';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useMedia, useSessionStorage } from 'react-use';
 
-import { GrafanaTheme2, PanelData } from '@grafana/data';
+import { GrafanaTheme2, PanelData, PanelPluginVisualizationSuggestion } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
 import { t, Trans } from '@grafana/i18n';
 import { config, reportInteraction } from '@grafana/runtime';
@@ -22,6 +22,7 @@ import {
 } from '@grafana/ui';
 import { LS_VISUALIZATION_SELECT_TAB_KEY } from 'app/core/constants';
 import { VisualizationSelectPaneTab } from 'app/features/dashboard/components/PanelEditor/types';
+import { VisualizationPresets } from 'app/features/panel/components/VizTypePicker/VisualizationPresets';
 import { VisualizationSuggestions } from 'app/features/panel/components/VizTypePicker/VisualizationSuggestions';
 import { VizTypePicker } from 'app/features/panel/components/VizTypePicker/VizTypePicker';
 import { VizTypeChangeDetails } from 'app/features/panel/components/VizTypePicker/types';
@@ -69,6 +70,36 @@ export function PanelVizTypePicker({
   const filterId = useId();
 
   const isMobile = useMedia(`(max-width: ${theme.breakpoints.values.sm}px)`);
+
+  const [presetsState, setPresetsState] = useState<{
+    suggestion: PanelPluginVisualizationSuggestion;
+    presets: PanelPluginVisualizationSuggestion[];
+  } | null>(null);
+
+  const handleShowPresets = useCallback(
+    (suggestion: PanelPluginVisualizationSuggestion, presets: PanelPluginVisualizationSuggestion[]) => {
+      setPresetsState({ suggestion, presets });
+    },
+    []
+  );
+
+  const handlePresetApply = useCallback(
+    (preset: PanelPluginVisualizationSuggestion) => {
+      onChange({
+        pluginId: preset.pluginId,
+        options: presetsState?.suggestion.options,
+        fieldConfig: preset.fieldConfig,
+        withModKey: false,
+        fromSuggestions: true,
+      });
+      setPresetsState(null);
+    },
+    [onChange, presetsState]
+  );
+
+  const handlePresetsBack = useCallback(() => {
+    setPresetsState(null);
+  }, []);
 
   /** SEARCH */
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,22 +203,35 @@ export function PanelVizTypePicker({
       <ScrollContainer>
         <TabContent className={styles.tabContent}>
           <Stack gap={1} direction="column">
-            {listMode === VisualizationSelectPaneTab.Suggestions && (
-              <VisualizationSuggestions
-                onChange={onChange}
-                panel={panelModel}
+            {presetsState && data ? (
+              <VisualizationPresets
+                presets={presetsState.presets}
                 data={data}
-                searchQuery={searchQuery}
-                isNewPanel={isNewPanel}
+                onApply={handlePresetApply}
+                onBack={handlePresetsBack}
+                onSkip={onClose}
               />
-            )}
-            {listMode === VisualizationSelectPaneTab.Visualizations && (
-              <VizTypePicker
-                pluginId={panel.state.pluginId}
-                searchQuery={searchQuery}
-                trackSearch={trackSearch}
-                onChange={onChange}
-              />
+            ) : (
+              <>
+                {listMode === VisualizationSelectPaneTab.Suggestions && (
+                  <VisualizationSuggestions
+                    onChange={onChange}
+                    onShowPresets={config.featureToggles.vizPresets ? handleShowPresets : undefined}
+                    panel={panelModel}
+                    data={data}
+                    searchQuery={searchQuery}
+                    isNewPanel={isNewPanel}
+                  />
+                )}
+                {listMode === VisualizationSelectPaneTab.Visualizations && (
+                  <VizTypePicker
+                    pluginId={panel.state.pluginId}
+                    searchQuery={searchQuery}
+                    trackSearch={trackSearch}
+                    onChange={onChange}
+                  />
+                )}
+              </>
             )}
           </Stack>
         </TabContent>

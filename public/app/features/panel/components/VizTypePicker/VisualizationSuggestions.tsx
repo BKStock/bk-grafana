@@ -19,6 +19,7 @@ import { useStructureRev } from '../../../explore/Graph/useStructureRev';
 import { getAllPanelPluginMeta, filterPluginList } from '../../state/util';
 import { panelsWithoutData } from '../../suggestions/consts';
 import { getAllSuggestions } from '../../suggestions/getAllSuggestions';
+import { getPresetsForPanel } from '../../suggestions/getPresetsForPanel';
 import { hasData } from '../../suggestions/utils';
 
 import { VisualizationCardGrid, VisualizationCardGridGroup } from './VisualizationCardGrid';
@@ -28,6 +29,10 @@ import { VizTypeChangeDetails } from './types';
 
 export interface Props {
   onChange: (options: VizTypeChangeDetails, panel?: VizPanel) => void;
+  onShowPresets?: (
+    suggestion: PanelPluginVisualizationSuggestion,
+    presets: PanelPluginVisualizationSuggestion[]
+  ) => void;
   data?: PanelData;
   panel?: PanelModel;
   searchQuery?: string;
@@ -66,7 +71,7 @@ const useSuggestions = (data: PanelData | undefined, searchQuery: string | undef
   return { value: filteredValue, loading, error, retry };
 };
 
-export function VisualizationSuggestions({ onChange, data, panel, searchQuery, isNewPanel }: Props) {
+export function VisualizationSuggestions({ onChange, onShowPresets, data, panel, searchQuery, isNewPanel }: Props) {
   const styles = useStyles2(getStyles);
 
   const { value: result, loading, error, retry } = useSuggestions(data, searchQuery);
@@ -116,13 +121,33 @@ export function VisualizationSuggestions({ onChange, data, panel, searchQuery, i
   }, [suggestions]);
 
   const handleSuggestionClick = useCallback(
-    (suggestion: PanelPluginVisualizationSuggestion, suggestionIndex: number) => {
+    async (suggestion: PanelPluginVisualizationSuggestion, suggestionIndex: number) => {
       VizSuggestionsInteractions.suggestionAccepted({
         pluginId: suggestion.pluginId,
         suggestionName: suggestion.name,
         panelState,
         suggestionIndex: suggestionIndex + 1,
       });
+
+      if (config.featureToggles.vizPresets && onShowPresets) {
+        try {
+          const presets = await getPresetsForPanel(suggestion.pluginId, suggestion.fieldConfig);
+          if (presets && presets.length > 0) {
+            // apply suggestion and keep picker open
+            onChange({
+              pluginId: suggestion.pluginId,
+              options: suggestion.options,
+              fieldConfig: suggestion.fieldConfig,
+              withModKey: true,
+              fromSuggestions: true,
+            });
+            onShowPresets(suggestion, presets);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to load presets for plugin', suggestion.pluginId, e);
+        }
+      }
 
       onChange({
         pluginId: suggestion.pluginId,
@@ -132,7 +157,7 @@ export function VisualizationSuggestions({ onChange, data, panel, searchQuery, i
         fromSuggestions: true,
       });
     },
-    [onChange, panelState]
+    [onChange, onShowPresets, panelState]
   );
 
   useEffect(() => {

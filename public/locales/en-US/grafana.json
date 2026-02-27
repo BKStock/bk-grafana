@@ -11925,6 +11925,12 @@
       "title-click-to-close": "Click again to close this section",
       "tooltip-delete": "Delete"
     },
+    "presets": {
+      "back-button": "Back",
+      "back-button-tooltip": "Go back",
+      "skip-button": "Skip",
+      "title": "Select style"
+    },
     "visualization-suggestions": {
       "error-loading-some-suggestions": {
         "message": "Some suggestions could not be loaded"
@@ -14596,6 +14602,13 @@
     "outside-range-plugin": {
       "data-outside-time-range": "Data outside time range",
       "zoom-to-data": "Zoom to data"
+    },
+    "presets": {
+      "area": "Area",
+      "smooth": "Smooth",
+      "step": "Step",
+      "step-filled": "Step filled",
+      "step-hue": "Step hue"
     },
     "span-nulls-editor": {
       "gaps-options": {
