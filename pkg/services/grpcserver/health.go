@@ -116,6 +116,7 @@ func (s *HealthService) AddHealthListener(svc services.NamedService) {
 	runningFn := func() {}
 	if ok {
 		runningFn = func() {
+			s.logger.Debug("Service entered running state, checking health", "service", name)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if hc.CheckHealth(ctx) {
@@ -125,7 +126,8 @@ func (s *HealthService) AddHealthListener(svc services.NamedService) {
 			}
 		}
 	}
-	notServingFn := func(services.State) {
+	notServingFn := func(from services.State) {
+		s.logger.Debug("Service is no longer running, NOT_SERVING", "service", name, "fromState", from)
 		s.SetServingStatus(name, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 	}
 	svc.AddListener(services.NewListener(
@@ -133,7 +135,10 @@ func (s *HealthService) AddHealthListener(svc services.NamedService) {
 		runningFn,
 		notServingFn, // Stopping
 		notServingFn, // Terminated
-		func(services.State, error) { notServingFn(services.Failed) },
+		func(from services.State, err error) {
+			s.logger.Debug("Service failed, NOT_SERVING", "service", name, "fromState", from, "error", err)
+			notServingFn(from)
+		},
 	))
 	if hc != nil {
 		s.probeServices = append(s.probeServices, probeService{service: svc, probe: hc})
@@ -147,6 +152,7 @@ func (s *HealthService) Healthy() {
 	if len(s.probeServices) == 0 {
 		return
 	}
+	s.logger.Debug("Service manager healthy, starting health check loop on services", "probeServices", len(s.probeServices))
 	s.pollServices(context.Background())
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
@@ -155,6 +161,7 @@ func (s *HealthService) Healthy() {
 
 // Stopped implements services.ManagerListener.
 func (s *HealthService) Stopped() {
+	s.logger.Debug("Service manager stopped, shutting down health server")
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -169,6 +176,7 @@ func (s *HealthService) Failure(svc services.Service) {
 	}
 	svcName := namedSvc.ServiceName()
 	if s.serviceNames[svcName] {
+		s.logger.Info("Service failed, NOT_SERVING and cancelling loop", "service", svcName)
 		if s.cancel != nil {
 			s.cancel()
 		}
