@@ -1,22 +1,35 @@
 import { render, waitFor, screen, within, Matcher } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { openMenu } from 'react-select-event';
 import { TestProvider } from 'test/helpers/TestProvider';
 import { MockDataSourceApi } from 'test/mocks/datasource_srv';
 import { getGrafanaContextMock } from 'test/mocks/getGrafanaContextMock';
 
 import { DataSourceInstanceSettings } from '@grafana/data';
-import { DataSourceSrv, reportInteraction, setAppEvents, setDataSourceSrv, config } from '@grafana/runtime';
+import {
+  DataSourceSrv,
+  reportInteraction,
+  setAppEvents,
+  setDataSourceSrv,
+  config,
+  setBackendSrv,
+} from '@grafana/runtime';
 import { DataSourceRef } from '@grafana/schema';
+import { setupMockServer } from '@grafana/test-utils/server';
 import { appEvents } from 'app/core/app_events';
+import { backendSrv } from 'app/core/services/backend_srv';
 import { contextSrv } from 'app/core/services/context_srv';
 import { configureStore } from 'app/store/configureStore';
 
 import { mockDataSource } from '../alerting/unified/mocks';
 
 import { CorrelationsPageAppPlatform } from './CorrelationsPageWrapper';
-import { setupCorrelationsMswServer } from './mocks/server';
+import { emptyCorrelationsScenario } from './mocks/server/Correlations.test.scenario';
 import { MockDataSourceSrv } from './mocks/useCorrelations.mocks';
 
-setupCorrelationsMswServer();
+//setupCorrelationsMswServer();
+setBackendSrv(backendSrv);
+const server = setupMockServer();
 
 const originalFeatureToggles = config.featureToggles;
 
@@ -37,7 +50,9 @@ const renderWithContext = async (datasources: ConstructorParameters<typeof MockD
   };
 
   dsServer.getInstanceSettings = (ref: DataSourceRef | string) => {
-    if (typeof ref === 'string') {
+    if (ref === undefined) {
+      return undefined;
+    } else if (typeof ref === 'string') {
       const type = ref === 'lokiUID' ? 'loki' : 'prometheus';
       return {
         uid: ref,
@@ -163,6 +178,106 @@ afterAll(() => {
 });
 
 describe('CorrelationsPage - App Platform', () => {
+  describe('With no correlations', () => {
+    beforeEach(async () => {
+      server.use(...emptyCorrelationsScenario);
+
+      await renderWithContext({
+        loki: mockDataSource(
+          {
+            uid: 'loki',
+            name: 'loki',
+            readOnly: false,
+            jsonData: {},
+            type: 'datasource',
+          },
+          { logs: true }
+        ),
+        prometheus: mockDataSource(
+          {
+            uid: 'prometheus',
+            name: 'prometheus',
+            readOnly: false,
+            jsonData: {},
+            type: 'datasource',
+          },
+          { metrics: true, module: 'core:plugin/prometheus' }
+        ),
+      });
+    });
+
+    afterEach(() => {
+      mocks.reportInteraction.mockClear();
+    });
+
+    it('shows the first page of the wizard', async () => {
+      const CTAButton = await screen.findByRole('button', { name: /add correlation/i });
+      expect(CTAButton).toBeInTheDocument();
+
+      // insert form should not be present
+      expect(screen.queryByRole('button', { name: /next$/i })).not.toBeInTheDocument();
+
+      // "add new" button is the button on the top of the page, not visible when the CTA is rendered
+      expect(screen.queryByRole('button', { name: /add new$/i })).not.toBeInTheDocument();
+
+      // there's no table in the page
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+      await userEvent.click(CTAButton);
+
+      // form's next button
+      expect(await screen.findByRole('button', { name: /next$/i })).toBeInTheDocument();
+    });
+
+    it.only('correctly adds first correlation', async () => {
+      const CTAButton = await screen.findByRole('button', { name: /add correlation/i });
+      expect(CTAButton).toBeInTheDocument();
+
+      // there's no table in the page, as we are adding the first correlation
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+      await userEvent.click(CTAButton);
+
+      // step 1: label and description
+      await userEvent.clear(screen.getByRole('textbox', { name: /label/i }));
+      await userEvent.type(screen.getByRole('textbox', { name: /label/i }), 'A Label');
+      await userEvent.clear(screen.getByRole('textbox', { name: /description/i }));
+      await userEvent.type(screen.getByRole('textbox', { name: /description/i }), 'A Description');
+      await userEvent.click(await screen.findByRole('button', { name: /next$/i }));
+
+      // step 2:
+      // set target datasource picker value
+      await userEvent.click(screen.getByLabelText(/^target/i));
+      await userEvent.click(screen.getByText('prometheus'));
+      await userEvent.click(await screen.findByRole('button', { name: /next$/i }));
+
+      // step 3:
+      // set source datasource picker value
+      await userEvent.click(screen.getByLabelText(/^source/i));
+      await userEvent.click(screen.getByText('loki'));
+      await userEvent.click(await screen.findByRole('button', { name: /add$/i }));
+
+      await userEvent.clear(screen.getByRole('textbox', { name: /results field/i }));
+      await userEvent.type(screen.getByRole('textbox', { name: /results field/i }), 'Line');
+
+      // add transformation
+      await userEvent.click(screen.getByRole('button', { name: /add transformation/i }));
+      const typeFilterSelect = screen.getAllByLabelText('Type');
+      openMenu(typeFilterSelect[0]);
+      await userEvent.click(screen.getByText('Regular expression'));
+      await userEvent.type(screen.getByLabelText(/expression/i), 'test expression');
+
+      await userEvent.click(await screen.findByRole('button', { name: /add$/i }));
+
+      await waitFor(() => {
+        expect(mocks.reportInteraction).toHaveBeenCalledWith('grafana_correlations_added');
+      });
+
+      // the table showing correlations should have appeared
+      expect(await screen.findByRole('table')).toBeInTheDocument();
+    });
+  });
+
   describe('With correlations', () => {
     beforeEach(async () => {
       await renderWithContext({
