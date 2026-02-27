@@ -96,7 +96,6 @@ export const AnnotationsPlugin2 = ({
   annotationsOptions,
 }: AnnotationsPluginProps) => {
   const [plot, setPlot] = useState<uPlot>();
-
   const [portalRoot] = useState(() => getPortalContainer());
   const [annoIdx, setAnnoIdx] = useState<string | undefined>();
   const styles = useStyles2(getStyles);
@@ -129,7 +128,12 @@ export const AnnotationsPlugin2 = ({
     };
   }, [annotations, newRange]);
 
-  const clusteredAnnos = useAnnotationClustering({ annotations: xAnnos, clusteringMode });
+  const clusteredAnnos = useAnnotationClustering({
+    annotations: xAnnos,
+    clusteringMode,
+    plotBox: plot?.bbox,
+    timeRange: { from: plot?.scales.x.min ?? -1, to: plot?.scales.x.max ?? -1 },
+  });
   const exitWipEdit = useCallback(() => {
     setNewRange(null);
   }, [setNewRange]);
@@ -315,6 +319,7 @@ export const AnnotationsPlugin2 = ({
 
           markers.push(
             <AnnotationMarker2
+              plotBox={plot?.bbox}
               pinAnnotation={setAnnotation}
               isPinned={annoIdx === `${frameIdx}:${i}`}
               showOnHover={!annoIdx}

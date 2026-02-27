@@ -1,10 +1,14 @@
 import { useMemo } from 'react';
+import { BBox } from 'uplot';
 
 import { DataFrame, FieldType } from '@grafana/data';
+import { TimeRange2 } from '@grafana/ui/internal';
 
 interface Props {
   annotations: DataFrame[];
   clusteringMode: ClusteringMode | null;
+  plotBox?: BBox;
+  timeRange: TimeRange2;
 }
 
 enum ClusteringMode {
@@ -12,7 +16,7 @@ enum ClusteringMode {
   Render = 'render',
 }
 
-const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
+const buildAnnotationClusters = (frame: DataFrame, timeVals: number[], plotBox: BBox, timeRange: TimeRange2) => {
   const isRegionVals: boolean[] =
     frame.fields.find((f) => f.name === 'isRegion')?.values ?? Array(timeVals.length).fill(false);
   const clusterIdx: Array<number | null> = Array(timeVals.length).fill(null);
@@ -23,7 +27,15 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
 
   // 15min in millis
   // todo: compute this from pixel space, to make dynamic, like 10px -> millis
-  const mergeThreshold = (3600 / 4) * 1e3;
+
+  // 10% of box width
+  // annotations are 10x, but we want to leave 24px of space between annos so everything is clickable
+  // @todo need pixel device ratio
+  const pixelThreshold = 24 * devicePixelRatio;
+  const dt = timeRange.to - timeRange.from;
+  const plotWidth = plotBox?.width;
+  const thresholdRatio = pixelThreshold / plotWidth;
+  const mergeThreshold = thresholdRatio * dt;
 
   for (let j = 0; j < timeVals.length; j++) {
     let time = timeVals[j];
@@ -63,7 +75,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[]) => {
 
   return { clusterIdx, clusters };
 };
-export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) => {
+export const useAnnotationClustering = ({ annotations, clusteringMode, plotBox, timeRange }: Props) => {
   const { outAnnos } = useMemo(() => {
     const clusteredAnnotations: DataFrame[] = [];
 
@@ -76,8 +88,8 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
         const timeVals: number[] = frame.fields.find((f) => f.name === 'time')?.values ?? [];
         const colorVals: string[] = frame.fields.find((f) => f.name === 'color')?.values ?? [];
 
-        if (timeVals.length > 1) {
-          let { clusterIdx, clusters } = buildAnnotationClusters(frame, timeVals);
+        if (timeVals.length > 1 && plotBox) {
+          let { clusterIdx, clusters } = buildAnnotationClusters(frame, timeVals, plotBox, timeRange);
 
           const timeEndFrame: DataFrame = {
             ...frame,
@@ -166,7 +178,7 @@ export const useAnnotationClustering = ({ annotations, clusteringMode }: Props) 
     }
 
     return { outAnnos: clusteredAnnotations.length > 0 ? clusteredAnnotations : annotations };
-  }, [annotations, clusteringMode]);
+  }, [annotations, clusteringMode, plotBox, timeRange]);
 
   return outAnnos;
 };
