@@ -9,6 +9,7 @@ import {
   getDefaultTimeRange,
   toDataFrame,
 } from '@grafana/data';
+import { config } from '@grafana/runtime';
 
 import { VisualizationCardGrid, VisualizationCardGridGroup } from './VisualizationCardGrid';
 
@@ -193,6 +194,48 @@ describe('VisualizationCardGrid', () => {
       );
 
       expect(screen.getByText('Unknown visualization type')).toBeInTheDocument();
+    });
+
+    it('should render a logo img when the group meta has info with logos', () => {
+      const groupWithLogo: VisualizationCardGridGroup[] = [
+        {
+          meta: {
+            id: 'timeseries',
+            name: 'Time series',
+            info: { logos: { small: 'https://test.com/logo-small.png' } },
+          } as never,
+          items: [mockItem[0]],
+        },
+      ];
+
+      render(
+        <VisualizationCardGrid
+          groups={groupWithLogo}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      expect(document.querySelector('img[src="https://test.com/logo-small.png"]')).toBeInTheDocument();
+    });
+
+    it('should not render group headers when newVizSuggestions feature toggle is disabled', () => {
+      config.featureToggles.newVizSuggestions = false;
+
+      render(
+        <VisualizationCardGrid
+          groups={groups}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      expect(screen.queryByText('Time series')).not.toBeInTheDocument();
+      expect(screen.queryByText('Table')).not.toBeInTheDocument();
+
+      config.featureToggles.newVizSuggestions = true;
     });
   });
 });
