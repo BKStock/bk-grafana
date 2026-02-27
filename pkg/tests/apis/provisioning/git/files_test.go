@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
+	"time"
 
+	dashboardV1 "github.com/grafana/grafana/apps/dashboard/pkg/apis/dashboard/v1beta1"
 	provisioning "github.com/grafana/grafana/apps/provisioning/pkg/apis/provisioning/v0alpha1"
+	grafanarest "github.com/grafana/grafana/pkg/apiserver/rest"
 	"github.com/grafana/grafana/pkg/apimachinery/utils"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/setting"
@@ -16,19 +18,19 @@ import (
 	"github.com/grafana/grafana/pkg/tests/testinfra"
 	"github.com/grafana/grafana/pkg/tests/testsuite"
 	"github.com/grafana/grafana/pkg/util/testutil"
-	"github.com/grafana/nanogit"
 	"github.com/grafana/nanogit/gittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	waitTimeoutDefault  = 60 * testing.Second
-	waitIntervalDefault = 100 * testing.Millisecond
+	waitTimeoutDefault  = 60 * time.Second
+	waitIntervalDefault = 100 * time.Millisecond
 )
 
 func TestMain(m *testing.M) {
@@ -61,33 +63,53 @@ func runGrafanaWithGitServer(t *testing.T) *gitTestHelper {
 	})
 
 	// Start Grafana with provisioning enabled
-	grafEnv := testinfra.StartGrafanaEnv(t, testinfra.GrafanaOpts{
-		AppModeProduction:       true,
-		DisableAnonymous:        true,
-		EnableFeatureToggles:    []string{featuremgmt.FlagGrafanaAPIServerWithExperimentalAPIs, featuremgmt.FlagOnPremToCloudMigrations},
-		GrafanaAPIServerAddress: setting.DefaultGrafanaAPIServerAddress,
+	opts := testinfra.GrafanaOpts{
+		EnableFeatureToggles: []string{
+			featuremgmt.FlagProvisioning,
+			featuremgmt.FlagProvisioningExport,
+		},
+		UnifiedStorageConfig: map[string]setting.UnifiedStorageConfig{
+			"dashboards.dashboard.grafana.app": {
+				DualWriterMode:  grafanarest.Mode5,
+				EnableMigration: true,
+			},
+			"folders.folder.grafana.app": {
+				DualWriterMode:  grafanarest.Mode5,
+				EnableMigration: true,
+			},
+		},
+		ProvisioningAllowedTargets: []string{"folder", "instance"},
+	}
+
+	k8s := apis.NewK8sTestHelper(t, opts)
+
+	// Set up K8s resource clients
+	repositories := k8s.GetResourceClient(apis.ResourceClientArgs{
+		User:      k8s.Org1.Admin,
+		Namespace: "default",
+		GVR:       provisioning.RepositoryResourceInfo.GroupVersionResource(),
 	})
 
-	k8s := apis.NewK8sTestHelper(t, grafEnv)
+	dashboardsV1 := k8s.GetResourceClient(apis.ResourceClientArgs{
+		User:      k8s.Org1.Admin,
+		Namespace: "default",
+		GVR:       dashboardV1.DashboardResourceInfo.GroupVersionResource(),
+	})
 
-	// Set up K8s clients
-	repoGVR := provisioning.RepositoryResourceInfo.GroupVersionResource()
-	dashboardGVR := utils.GroupVersionResource("dashboard.grafana.app", "v1beta1", "dashboards")
+	// Get REST clients for different roles
+	gv := &schema.GroupVersion{Group: "provisioning.grafana.app", Version: "v0alpha1"}
+	adminClient := k8s.Org1.Admin.RESTClient(t, gv)
+	editorClient := k8s.Org1.Editor.RESTClient(t, gv)
+	viewerClient := k8s.Org1.Viewer.RESTClient(t, gv)
 
 	helper := &gitTestHelper{
 		K8sTestHelper: k8s,
 		gitServer:     gitServer,
-		Repositories: &apis.K8sResourceClient{
-			Resource:        k8s.GetResourceClient(repoGVR),
-			GroupVersionKind: repoGVR.GroupVersion().WithKind("Repository"),
-		},
-		AdminREST:  k8s.Org1.Admin.RESTClient,
-		EditorREST: k8s.Org1.Editor.RESTClient,
-		ViewerREST: k8s.Org1.Viewer.RESTClient,
-		DashboardsV1: &apis.K8sResourceClient{
-			Resource:        k8s.GetResourceClient(dashboardGVR),
-			GroupVersionKind: dashboardGVR.GroupVersion().WithKind("Dashboard"),
-		},
+		Repositories:  repositories,
+		DashboardsV1:  dashboardsV1,
+		AdminREST:     adminClient,
+		EditorREST:    editorClient,
+		ViewerREST:    viewerClient,
 	}
 
 	return helper
@@ -236,11 +258,14 @@ func (h *gitTestHelper) syncAndWait(t *testing.T, repoName string) {
 func (h *gitTestHelper) waitForJobsComplete(t *testing.T, repoName string) {
 	t.Helper()
 
-	jobsGVR := provisioning.JobResourceInfo.GroupVersionResource()
-	jobsClient := h.GetResourceClient(jobsGVR)
+	jobsClient := h.GetResourceClient(apis.ResourceClientArgs{
+		User:      h.Org1.Admin,
+		Namespace: "default",
+		GVR:       provisioning.JobResourceInfo.GroupVersionResource(),
+	})
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		jobs, err := jobsClient.List(context.Background(), metav1.ListOptions{})
+		jobs, err := jobsClient.Resource.List(context.Background(), metav1.ListOptions{})
 		if !assert.NoError(collect, err, "failed to list jobs") {
 			return
 		}
@@ -570,11 +595,11 @@ func TestIntegrationGitFiles_ListFiles(t *testing.T) {
 
 		require.NoError(t, result.Error(), "should list files")
 
-		var fileList map[string]interface{}
-		err := result.Into(&fileList)
+		fileListObj := &unstructured.Unstructured{}
+		err := result.Into(fileListObj)
 		require.NoError(t, err)
 
-		items, found, err := unstructured.NestedSlice(fileList, "items")
+		items, found, err := unstructured.NestedSlice(fileListObj.Object, "items")
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Len(t, items, 3, "should list all files")
@@ -590,11 +615,11 @@ func TestIntegrationGitFiles_ListFiles(t *testing.T) {
 
 		require.NoError(t, result.Error(), "should list files in subdirectory")
 
-		var fileList map[string]interface{}
-		err := result.Into(&fileList)
+		fileListObj := &unstructured.Unstructured{}
+		err := result.Into(fileListObj)
 		require.NoError(t, err)
 
-		items, found, err := unstructured.NestedSlice(fileList, "items")
+		items, found, err := unstructured.NestedSlice(fileListObj.Object, "items")
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Len(t, items, 1, "should list files in subdirectory")
