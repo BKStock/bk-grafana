@@ -7,8 +7,15 @@ import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene
 import * as getAllSuggestionsModule from '../../suggestions/getAllSuggestions';
 
 import { VisualizationSuggestions } from './VisualizationSuggestions';
+import { PANEL_STATES, VizSuggestionsInteractions } from './interactions';
 
 jest.mock('../../suggestions/getAllSuggestions');
+jest.mock('./interactions', () => ({
+  ...jest.requireActual('./interactions'),
+  VizSuggestionsInteractions: {
+    suggestionAccepted: jest.fn(),
+  },
+}));
 jest.mock('./VisualizationSuggestionCard', () => ({
   VisualizationSuggestionCard: ({
     suggestion,
@@ -466,6 +473,44 @@ describe('VisualizationSuggestions', () => {
     await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
 
     expect(mockOnChange).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'timeseries', withModKey: false }));
+  });
+
+  it('should report panelState as new_panel when isNewPanel is true and panel is not unconfigured', async () => {
+    const mockOnChange = jest.fn();
+    const existingPanel = { type: 'timeseries' } as PanelModel;
+    const dataWithSeries: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    render(
+      <VisualizationSuggestions
+        onChange={mockOnChange}
+        data={dataWithSeries}
+        panel={existingPanel}
+        searchQuery=""
+        isNewPanel={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+    expect(VizSuggestionsInteractions.suggestionAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({ panelState: PANEL_STATES.NEW_PANEL })
+    );
   });
 
   describe('no-data panel list', () => {
