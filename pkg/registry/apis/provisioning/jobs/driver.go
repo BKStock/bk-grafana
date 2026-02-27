@@ -231,6 +231,26 @@ func (d *jobDriver) claimAndProcessOneJob(ctx context.Context) error {
 		span.RecordError(err)
 	}
 
+	// Enrich error with job context for better user-facing messages
+	if err != nil {
+		action := string(d.currentJob.Spec.Action)
+		repo := d.currentJob.Spec.Repository
+		duration := end.Sub(recorder.Started())
+
+		// Classify the error and add context
+		if errors.Is(err, context.DeadlineExceeded) || (jobctx.Err() != nil && errors.Is(jobctx.Err(), context.DeadlineExceeded)) {
+			// Job timeout - provide duration and context
+			err = apifmt.Errorf("job timed out after %s (action: %s, repository: %s): %w",
+				duration.Round(time.Second), action, repo, err)
+		} else if strings.Contains(err.Error(), "lease expiry") {
+			// Lease expiry - add job context to existing message
+			err = apifmt.Errorf("%s (action: %s, repository: %s)", err.Error(), action, repo)
+		} else {
+			// Worker errors - wrap with full context
+			err = apifmt.Errorf("%s job for repository '%s' failed: %w", action, repo, err)
+		}
+	}
+
 	// Complete the job
 	d.mu.Lock()
 	d.currentJob.Status = recorder.Complete(ctx, err)
