@@ -1,7 +1,9 @@
+import { OpenFeatureProvider } from '@openfeature/react-sdk';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { DataQueryResponse, LoadingState, EventBusSrv, LogRowModel, arrayToDataFrame, DataTopic } from '@grafana/data';
+import { getTestFeatureFlagClient } from '@grafana/test-utils/unstable';
 import { createLogLine } from 'app/features/logs/components/mocks/logRow';
 
 import * as logUtils from '../../logs/utils';
@@ -17,7 +19,8 @@ jest.mock('../Graph/ExploreGraph', () => {
 
 function renderPanel(logsVolumeData?: DataQueryResponse, onLoadLogsVolume = () => {}, logs: LogRowModel[] = []) {
   render(
-    <LogsVolumePanelList
+    <OpenFeatureProvider client={getTestFeatureFlagClient()}>
+      <LogsVolumePanelList
       absoluteRange={{ from: 0, to: 1 }}
       timeZone="timeZone"
       splitOpen={() => {}}
@@ -29,6 +32,7 @@ function renderPanel(logsVolumeData?: DataQueryResponse, onLoadLogsVolume = () =
       eventBus={new EventBusSrv()}
       logs={logs}
     />
+    </OpenFeatureProvider>
   );
 }
 
