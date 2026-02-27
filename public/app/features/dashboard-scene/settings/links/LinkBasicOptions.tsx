@@ -206,8 +206,6 @@ export function LinkIconSelect({ linkEdit }: { linkEdit: LinkEdit }) {
   );
 }
 
-// ──────────────────────────── Option switches ────────────────────────────
-
 export function LinkAsDropdownSwitch({ linkEdit, id }: { linkEdit: LinkEdit; id?: string }) {
   const { dashboard, link, linkIndex } = useLinkState(linkEdit);
   if (!link) {
