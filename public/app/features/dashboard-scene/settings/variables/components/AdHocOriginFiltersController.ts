@@ -39,6 +39,12 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
     return this._getOperators();
   }
 
+  private findFilterIndex(filter: AdHocFilterWithLabels): number {
+    return this.filters.findIndex(
+      (f) => f.key === filter.key && f.operator === filter.operator && f.value === filter.value
+    );
+  }
+
   updateFilter(filter: AdHocFilterWithLabels, update: Partial<AdHocFilterWithLabels>): void {
     if (filter === this.wip) {
       const merged = { ...this.wip, ...update };
@@ -51,16 +57,9 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
       return;
     }
 
-    const index = this.filters.findIndex((item) => {
-      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
-    });
-
+    const index = this.findFilterIndex(filter);
     if (index !== -1) {
-      this.setFilters(
-        this.filters.map((item, i) => {
-          return i === index ? { ...item, ...update, origin: 'dashboard' } : item;
-        })
-      );
+      this.setFilters(this.filters.map((f, i) => (i === index ? { ...f, ...update, origin: 'dashboard' } : f)));
     }
   }
 
@@ -69,10 +68,7 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
   }
 
   removeFilter(filter: AdHocFilterWithLabels): void {
-    const index = this.filters.findIndex((item) => {
-      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
-    });
-
+    const index = this.findFilterIndex(filter);
     if (index !== -1) {
       this.setFilters(this.filters.filter((_, i) => i !== index));
     }
@@ -80,21 +76,15 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
 
   removeLastFilter(): void {
     if (this.filters.length > 0) {
-      const updatedFilters = this.filters.slice(0, -1);
-      this.setFilters(updatedFilters);
+      this.setFilters(this.filters.slice(0, -1));
     }
   }
 
   handleComboboxBackspace(filter: AdHocFilterWithLabels): void {
-    const index = this.filters.findIndex((item) => {
-      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
-    });
-
+    const index = this.findFilterIndex(filter);
     if (index > 0) {
       this.setFilters(
-        this.filters.map((item, i) => {
-          return i === index - 1 ? { ...item, forceEdit: true } : { ...item, forceEdit: false };
-        })
+        this.filters.map((f, i) => (i === index - 1 ? { ...f, forceEdit: true } : { ...f, forceEdit: false }))
       );
     }
   }
