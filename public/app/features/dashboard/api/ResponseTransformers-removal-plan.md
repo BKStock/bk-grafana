@@ -13,17 +13,17 @@ The Scene-based pipeline is already validated to produce equivalent output via `
 
 ## What `ResponseTransformers.ts` exports
 
-| Export | Purpose |
-|---|---|
-| `ensureV2Response` | Wraps a v1 `DashboardDTO` (or v0 K8s resource) into `DashboardWithAccessInfo<V2Spec>`, converting spec + metadata + access |
-| `ensureV1Response` | Converts `DashboardWithAccessInfo<V2Spec>` back to `DashboardDTO` |
-| `ResponseTransformers` | Object containing `{ ensureV2Response, ensureV1Response }` |
-| `transformDashboardV2SpecToV1` | Core v2 spec → v1 `DashboardDataDTO` conversion |
-| `buildPanelKind` | Converts a single v1 `Panel` to v2 `PanelKind` |
-| `getDefaultDatasource` | Gets default `DataSourceRef` with `apiVersion` (wraps `getDefaultDataSourceRef`) |
-| `getPanelQueries` | Converts `DataQuery[]` targets to `PanelQueryKind[]` |
-| `transformMappingsToV1` | Converts v2 field config mappings/thresholds/colors to v1 enums |
-| `transformAnnotationMappingsV1ToV2` | Converts v1 annotation mappings to v2 format |
+| Export                              | Purpose                                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `ensureV2Response`                  | Wraps a v1 `DashboardDTO` (or v0 K8s resource) into `DashboardWithAccessInfo<V2Spec>`, converting spec + metadata + access |
+| `ensureV1Response`                  | Converts `DashboardWithAccessInfo<V2Spec>` back to `DashboardDTO`                                                          |
+| `ResponseTransformers`              | Object containing `{ ensureV2Response, ensureV1Response }`                                                                 |
+| `transformDashboardV2SpecToV1`      | Core v2 spec → v1 `DashboardDataDTO` conversion                                                                            |
+| `buildPanelKind`                    | Converts a single v1 `Panel` to v2 `PanelKind`                                                                             |
+| `getDefaultDatasource`              | Gets default `DataSourceRef` with `apiVersion` (wraps `getDefaultDataSourceRef`)                                           |
+| `getPanelQueries`                   | Converts `DataQuery[]` targets to `PanelQueryKind[]`                                                                       |
+| `transformMappingsToV1`             | Converts v2 field config mappings/thresholds/colors to v1 enums                                                            |
+| `transformAnnotationMappingsV1ToV2` | Converts v1 annotation mappings to v2 format                                                                               |
 
 ---
 
@@ -42,15 +42,19 @@ The Scene-based pipeline is already validated to produce equivalent output via `
 **Context**: These responses arrive as `DashboardDTO` (v1 format). The loader converts them to v2 so `DashboardScenePageStateManagerV2` can pass them to `transformSaveModelSchemaV2ToScene`.
 
 **Replacement strategy**: Restructure to avoid the intermediate v2 conversion. Instead of:
+
 ```
 DashboardDTO → ensureV2Response → DashboardWithAccessInfo<V2Spec> → transformSaveModelSchemaV2ToScene → DashboardScene
 ```
+
 Go directly:
+
 ```
 DashboardDTO → transformSaveModelToScene → DashboardScene
 ```
 
 This requires changing `DashboardLoaderSrvV2` to either:
+
 - **(A) Return `DashboardDTO` directly** for scripted/public/snapshot dashboards and have the caller use the v1 → Scene path.
 - **(B) Build the Scene directly** in the loader for these cases.
 - **(C) Return a union type** (`DashboardDTO | DashboardWithAccessInfo<V2Spec>`) and let callers handle both.
@@ -66,14 +70,17 @@ This requires changing `DashboardLoaderSrvV2` to either:
 **Imports**: `ensureV2Response`, `transformDashboardV2SpecToV1`
 
 **Usage A** — `transformDashboardV2SpecToV1` (line 176):
+
 ```ts
 if (isDashboardV2Spec(rsp.dashboard)) {
   rsp.dashboard = transformDashboardV2SpecToV1(rsp.dashboard, { name: '', ... });
 }
 ```
+
 Converts home dashboard v2 spec to v1 because there's no v2 API for home dashboards. The result is then passed to `transformSaveModelToScene`.
 
 **Replacement**: Convert through Scene:
+
 ```ts
 if (isDashboardV2Spec(rsp.dashboard)) {
   const wrappedV2: DashboardWithAccessInfo<DashboardV2Spec> = {
@@ -86,6 +93,7 @@ if (isDashboardV2Spec(rsp.dashboard)) {
   return transformSaveModelSchemaV2ToScene(wrappedV2);
 }
 ```
+
 Since the goal is to build a `DashboardScene`, go directly v2 → Scene using `transformSaveModelSchemaV2ToScene` instead of v2 → v1 → Scene.
 
 **Complexity**: Low. Local change in `fetchHomeDashboard` / `loadHomeDashboard`.
@@ -93,10 +101,12 @@ Since the goal is to build a `DashboardScene`, go directly v2 → Scene using `t
 ---
 
 **Usage B** — `ensureV2Response` (line 889):
+
 ```ts
 const v2Response = ensureV2Response(rsp);
 const scene = transformSaveModelSchemaV2ToScene(v2Response);
 ```
+
 Used in `DashboardScenePageStateManagerV2.loadSnapshotScene`. The `rsp` comes from `DashboardLoaderSrvV2.loadSnapshot` which already calls `ensureV2Response` internally, so by the time it reaches this line, the response is already v2. The second `ensureV2Response` is likely a safety no-op.
 
 **Replacement**: Once the loader is changed (see #1), this can be handled by checking the format and dispatching to the right Scene transform. Alternatively, if the snapshot response is already guaranteed v2 from the loader, this call can be removed.
@@ -110,6 +120,7 @@ Used in `DashboardScenePageStateManagerV2.loadSnapshotScene`. The `rsp` comes fr
 **Imports**: `ResponseTransformers` (uses `.ensureV2Response`)
 
 **Usage** (line 94):
+
 ```ts
 function convertToV2SpecIfNeeded(initial: DashboardV2Spec | Dashboard): DashboardV2Spec {
   if (isDashboardV2Spec(initial)) {
@@ -119,9 +130,11 @@ function convertToV2SpecIfNeeded(initial: DashboardV2Spec | Dashboard): Dashboar
   return ResponseTransformers.ensureV2Response(dto).spec;
 }
 ```
+
 Normalizes the initial (pre-edit) dashboard to v2 for diffing against the current v2 spec.
 
 **Replacement**: Use Scene pipeline:
+
 ```ts
 function convertToV2SpecIfNeeded(initial: DashboardV2Spec | Dashboard): DashboardV2Spec {
   if (isDashboardV2Spec(initial)) {
@@ -144,14 +157,17 @@ function convertToV2SpecIfNeeded(initial: DashboardV2Spec | Dashboard): Dashboar
 **Imports**: `buildPanelKind`
 
 **Usage** (line 368):
+
 ```ts
 const fullLibraryPanel = await getLibraryPanel(libraryPanel.uid, true);
 const panelModel: Panel = fullLibraryPanel.model;
 const inlinePanel = buildPanelKind(panelModel);
 ```
+
 Converts a library panel's raw `Panel` model to `PanelKind` during dashboard export (inlining library panels).
 
 **Replacement options**:
+
 - **(A) Move `buildPanelKind` to a shared utility** (e.g., `transformToV2TypesUtils.ts` or a new panel conversion utility). This function is purely a Panel → PanelKind mapper and doesn't depend on the rest of ResponseTransformers.
 - **(B) Use `vizPanelToSchemaV2`** from `transformSceneToSaveModelSchemaV2.ts`, but this requires a `VizPanel` Scene object, which would mean wrapping the raw Panel in a Scene construct first — more complex than necessary.
 
@@ -178,15 +194,16 @@ Used as a fallback when `variable.state.pluginId` or `variable.state.datasource?
 
 ## Files to delete
 
-| File | Reason |
-|---|---|
-| `public/app/features/dashboard/api/ResponseTransformers.ts` | Primary target |
-| `public/app/features/dashboard/api/ResponseTransformers.test.ts` | Tests for the removed file |
+| File                                                                      | Reason                                                                                              |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `public/app/features/dashboard/api/ResponseTransformers.ts`               | Primary target                                                                                      |
+| `public/app/features/dashboard/api/ResponseTransformers.test.ts`          | Tests for the removed file                                                                          |
 | `public/app/features/dashboard/api/ResponseTransformersToBackend.test.ts` | Compares ResponseTransformers vs Scene pipeline — no longer needed since we only use Scene pipeline |
 
 ### Note on `ResponseTransformersToBackend.test.ts`
 
 This test already validates that the Scene pipeline produces equivalent results to ResponseTransformers. Once ResponseTransformers is removed, this test becomes redundant because the Scene pipeline is the only path. However, the **value of the test** (comparing frontend Scene pipeline output with backend conversion output) should be preserved. Consider:
+
 - Renaming it to something like `frontendBackendConversionParity.test.ts`
 - Removing the ResponseTransformers references (it doesn't actually import ResponseTransformers — it already uses the Scene pipeline)
 - Keeping it as a parity test between frontend and backend conversion
@@ -199,14 +216,14 @@ This test already validates that the Scene pipeline produces equivalent results 
 
 Some exported functions from `ResponseTransformers.ts` are independently useful and should be moved rather than deleted:
 
-| Function | Move to | Used by |
-|---|---|---|
-| `getDefaultDatasource` | Can be removed — callers should use `getDefaultDataSourceRef` from `transformSceneToSaveModelSchemaV2.ts` | `sceneVariablesSetToVariables.ts` |
-| `buildPanelKind` | New utility file or `transformToV2TypesUtils.ts` | `exporters.ts` |
-| `getPanelQueries` | Move with `buildPanelKind` (dependency) | `buildPanelKind` internally |
-| `transformMappingsToV1` | Already duplicated in `transformToV1TypesUtils.ts` — consolidate there | Internal to ResponseTransformers |
-| `transformAnnotationMappingsV1ToV2` | Already has counterpart in `annotations.ts` — consolidate | Internal to ResponseTransformers |
-| `transformDashboardV2SpecToV1` | Not needed after all callers are updated | `DashboardScenePageStateManager.ts` |
+| Function                            | Move to                                                                                                   | Used by                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `getDefaultDatasource`              | Can be removed — callers should use `getDefaultDataSourceRef` from `transformSceneToSaveModelSchemaV2.ts` | `sceneVariablesSetToVariables.ts`   |
+| `buildPanelKind`                    | New utility file or `transformToV2TypesUtils.ts`                                                          | `exporters.ts`                      |
+| `getPanelQueries`                   | Move with `buildPanelKind` (dependency)                                                                   | `buildPanelKind` internally         |
+| `transformMappingsToV1`             | Already duplicated in `transformToV1TypesUtils.ts` — consolidate there                                    | Internal to ResponseTransformers    |
+| `transformAnnotationMappingsV1ToV2` | Already has counterpart in `annotations.ts` — consolidate                                                 | Internal to ResponseTransformers    |
+| `transformDashboardV2SpecToV1`      | Not needed after all callers are updated                                                                  | `DashboardScenePageStateManager.ts` |
 
 ---
 
