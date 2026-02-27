@@ -94,7 +94,6 @@ describe('AnnotationsPlugin2', () => {
       <div>
         <AnnotationsPlugin2
           annotations={[mockAnnotationFrame]}
-          annotationsOptions={{}}
           config={config}
           timeZone={'browser'}
           newRange={null}
