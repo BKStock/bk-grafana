@@ -35,7 +35,15 @@ GroupHeader.displayName = 'GroupHeader';
 
 const OPERATOR_MENU_MIN_WIDTH = 200;
 
-const WideMenu = ({ children, innerRef, innerProps }: { children: React.ReactNode; innerRef: React.Ref<HTMLDivElement>; innerProps: React.HTMLAttributes<HTMLDivElement> & { style?: React.CSSProperties } }) => (
+const WideMenu = ({
+  children,
+  innerRef,
+  innerProps,
+}: {
+  children: React.ReactNode;
+  innerRef: React.Ref<HTMLDivElement>;
+  innerProps: React.HTMLAttributes<HTMLDivElement> & { style?: React.CSSProperties };
+}) => (
   <div ref={innerRef} {...innerProps} style={{ ...innerProps.style, minWidth: OPERATOR_MENU_MIN_WIDTH }}>
     {children}
   </div>
@@ -269,7 +277,7 @@ const getRowStyles = (theme: GrafanaTheme2) => {
       ...cellLayering,
       flex: '0 0 25%',
       maxWidth: '25%',
-      minWidth: 0,
+      minWidth: '25%',
     }),
     operatorCell: css({
       ...cellLayering,
@@ -309,10 +317,7 @@ const getRowStyles = (theme: GrafanaTheme2) => {
         borderBottomLeftRadius: 'unset',
       },
     }),
-    indicators: cx(
-      getInputStyles({ theme, invalid: false }).suffix,
-      css({ position: 'relative' })
-    ),
+    indicators: cx(getInputStyles({ theme, invalid: false }).suffix, css({ position: 'relative' })),
     restoreButton: css({
       display: 'flex',
       alignItems: 'center',
