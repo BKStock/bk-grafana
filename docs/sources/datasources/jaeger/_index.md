@@ -122,7 +122,7 @@ The following table describes the ways in which you can configure your trace to 
 
 ### Trace to metrics
 
-The **Trace to metrics** setting configures the [trace to metrics feature](/blog/2022/08/18/new-in-grafana-9.1-trace-to-metrics-allows-users-to-navigate-from-a-trace-span-to-a-selected-data-source/) available when integrating Grafana with Jaeger.
+The **Trace to metrics** setting configures the [trace to metrics feature](https://grafana.com/oss/grafana/) available when integrating Grafana with Jaeger.
 
 To configure trace to metrics:
 
@@ -324,7 +324,7 @@ To only show the spans you have matched, you can press the `Show matches only` t
 
 You can link to Jaeger traces from logs in Loki, Elasticsearch, Splunk, and other logs data sources by configuring an internal link.
 
-To configure this feature, see the [Derived fields](../loki/#configure-derived-fields) section of the Loki data source docs or the [Data links](../elasticsearch/#data-links) section of the Elasticsearch or Splunk data source docs.
+To configure this feature, see the [Derived fields](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/datasources/loki/configure-loki-data-source/#derived-fields) section of the Loki data source docs or the [Data links](https://grafana.com/docs/grafana/<GRAFANA_VERSION>/datasources/elasticsearch/configure/#data-links) section of the Elasticsearch or Splunk data source docs.
 
 ## Link to a trace ID from metrics
 
