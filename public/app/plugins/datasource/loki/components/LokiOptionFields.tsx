@@ -3,6 +3,7 @@ import * as React from 'react';
 
 import { SelectableValue } from '@grafana/data';
 import { config, reportInteraction } from '@grafana/runtime';
+import { getFeatureFlagClient } from '@grafana/runtime/internal';
 import { InlineField, Input, Stack } from '@grafana/ui';
 
 import { LokiQueryType, LokiQueryDirection } from '../dataquery.gen';
@@ -34,7 +35,7 @@ export const queryDirections: Array<SelectableValue<LokiQueryDirection>> = [
   },
 ];
 
-if (config.featureToggles.lokiShardSplitting) {
+if (getFeatureFlagClient().getBooleanValue('lokiShardSplitting', false)) {
   queryDirections.push({
     value: LokiQueryDirection.Scan,
     label: 'Scan',

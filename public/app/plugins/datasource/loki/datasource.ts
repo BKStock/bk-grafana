@@ -47,6 +47,7 @@ import {
 import { t } from '@grafana/i18n';
 import { Duration } from '@grafana/lezer-logql';
 import { BackendSrvRequest, config, DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
+import { getFeatureFlagClient } from '@grafana/runtime/internal';
 import { DataQuery } from '@grafana/schema';
 
 import LanguageProvider from './LanguageProvider';
@@ -362,7 +363,7 @@ export class LokiDatasource
       return this.runLiveQueryThroughBackend(fixedRequest);
     }
 
-    if (config.featureToggles.lokiShardSplitting && requestSupportsSharding(fixedRequest.targets)) {
+    if (getFeatureFlagClient().getBooleanValue('lokiShardSplitting', false) && requestSupportsSharding(fixedRequest.targets)) {
       return runShardSplitQuery(this, fixedRequest);
     } else if (config.featureToggles.lokiQuerySplitting && requestSupportsSplitting(fixedRequest.targets)) {
       return runSplitQuery(this, fixedRequest);

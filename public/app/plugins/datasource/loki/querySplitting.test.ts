@@ -2,6 +2,7 @@ import { of } from 'rxjs';
 
 import { DataQueryError, DataQueryRequest, DataQueryResponse, dateTime, LoadingState } from '@grafana/data';
 import { config } from '@grafana/runtime';
+import { setTestFlags } from '@grafana/test-utils/unstable';
 
 import { LokiQueryType, LokiQueryDirection } from './dataquery.gen';
 import { LokiDatasource } from './datasource';
@@ -17,7 +18,6 @@ jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('uuid'),
 }));
 
-const originalShardingFlagState = config.featureToggles.lokiShardSplitting;
 const originalLokiQueryLimitsContextState = config.featureToggles.lokiQueryLimitsContext;
 const originalErr = console.error;
 beforeEach(() => {
@@ -28,12 +28,11 @@ beforeAll(() => {
   jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
     callback();
   });
-  config.featureToggles.lokiShardSplitting = false;
+  setTestFlags({ lokiShardSplitting: false });
   config.featureToggles.lokiQueryLimitsContext = true;
 });
 afterAll(() => {
   jest.mocked(global.setTimeout).mockReset();
-  config.featureToggles.lokiShardSplitting = originalShardingFlagState;
   config.featureToggles.lokiQueryLimitsContext = originalLokiQueryLimitsContextState;
   console.error = originalErr;
 });
