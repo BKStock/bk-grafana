@@ -77,9 +77,9 @@ func RegisterAPIService(
 	roleApiInstaller RoleApiInstaller,
 	globalRoleApiInstaller GlobalRoleApiInstaller,
 	teamLBACApiInstaller TeamLBACApiInstaller,
+	externalGroupMappingApiInstaller ExternalGroupMappingApiInstaller,
 	tracing *tracing.TracingService,
 	roleBindingsStorage RoleBindingStorageBackend,
-	externalGroupMappingStorageBackend ExternalGroupMappingStorageBackend,
 	teamGroupsHandlerImpl externalgroupmapping.TeamGroupsHandler,
 	externalGroupMappingSearchHandler externalgroupmapping.SearchHandler,
 	dual dualwrite.Service,
@@ -92,7 +92,7 @@ func RegisterAPIService(
 	dbProvider := legacysql.NewDatabaseProvider(sql)
 	store := legacy.NewLegacySQLStores(dbProvider)
 	legacyAccessClient := newLegacyAccessClient(ac, store)
-	authorizer := newIAMAuthorizer(accessClient, legacyAccessClient, roleApiInstaller, globalRoleApiInstaller, teamLBACApiInstaller)
+	authorizer := newIAMAuthorizer(accessClient, legacyAccessClient, roleApiInstaller, globalRoleApiInstaller, teamLBACApiInstaller, externalGroupMappingApiInstaller)
 	registerMetrics(reg)
 
 	//nolint:staticcheck // not yet migrated to OpenFeature
@@ -105,7 +105,7 @@ func RegisterAPIService(
 
 	builder := &IdentityAccessManagementAPIBuilder{
 		store:                             store,
-		userLegacyStore:                   user.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
+		userLegacyStore:                   user.NewLegacyStore(store, accessClient, tracing),
 		saLegacyStore:                     serviceaccount.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
 		legacyTeamStore:                   team.NewLegacyStore(store, accessClient, enableAuthnMutation, tracing),
 		teamBindingLegacyStore:            teambinding.NewLegacyBindingStore(store, enableAuthnMutation, tracing),
@@ -114,9 +114,9 @@ func RegisterAPIService(
 		roleApiInstaller:                  roleApiInstaller,
 		globalRoleApiInstaller:            globalRoleApiInstaller,
 		teamLBACApiInstaller:              teamLBACApiInstaller,
+		externalGroupMappingApiInstaller:  externalGroupMappingApiInstaller,
 		resourcePermissionsStorage:        resourcepermission.ProvideStorageBackend(dbProvider),
 		roleBindingsStorage:               roleBindingsStorage,
-		externalGroupMappingStorage:       externalGroupMappingStorageBackend,
 		teamGroupsHandler:                 teamGroupsHandlerImpl,
 		externalGroupMappingSearchHandler: externalGroupMappingSearchHandler,
 		sso:                               ssoService,
@@ -137,7 +137,7 @@ func RegisterAPIService(
 		teamSearch: NewTeamSearchHandler(tracing, dual, team.NewLegacyTeamSearchClient(teamService, tracing), unified, features),
 		tracing:    tracing,
 	}
-	builder.userSearchHandler = user.NewSearchHandler(tracing, builder.userSearchClient, features, cfg)
+	builder.userSearchHandler = user.NewSearchHandler(tracing, builder.userSearchClient, features, cfg, accessClient)
 
 	apiregistration.RegisterAPI(builder)
 
@@ -314,6 +314,8 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *ge
 	enableRoleBindingsApi := client.Boolean(ctx, featuremgmt.FlagKubernetesAuthzRoleBindingsApi, false, openfeature.TransactionContext(ctx))
 	enableGlobalRolesApi := client.Boolean(ctx, featuremgmt.FlagKubernetesAuthzGlobalRolesApi, false, openfeature.TransactionContext(ctx))
 	enableTeamLBACRuleApi := client.Boolean(ctx, featuremgmt.FlagKubernetesAuthzTeamLBACRuleApi, false, openfeature.TransactionContext(ctx))
+	enableUserApi := client.Boolean(ctx, featuremgmt.FlagKubernetesUsersApi, false, openfeature.TransactionContext(ctx))
+	enableExternalGroupMappingsApi := client.Boolean(ctx, featuremgmt.FlagKubernetesExternalGroupMappingsApi, false, openfeature.TransactionContext(ctx))
 
 	// teams + users must have shorter names because they are often used as part of another name
 	opts.StorageOptsRegister(iamv0.TeamResourceInfo.GroupResource(), apistore.StorageOptions{
@@ -331,8 +333,10 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *ge
 		return err
 	}
 
-	if err := b.UpdateUsersAPIGroup(opts, storage, enableZanzanaSync); err != nil {
-		return err
+	if enableUserApi {
+		if err := b.UpdateUsersAPIGroup(opts, storage, enableZanzanaSync); err != nil {
+			return err
+		}
 	}
 
 	if err := b.UpdateServiceAccountsAPIGroup(opts, storage); err != nil {
@@ -345,8 +349,10 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *ge
 		storage[ssoResource.StoragePath()] = b.ssoLegacyStore
 	}
 
-	if err := b.UpdateExternalGroupMappingAPIGroup(apiGroupInfo, opts, storage); err != nil {
-		return err
+	if enableExternalGroupMappingsApi {
+		if err := b.externalGroupMappingApiInstaller.RegisterStorage(apiGroupInfo, &opts, storage); err != nil {
+			return err
+		}
 	}
 
 	if enableCoreRolesApi {
@@ -531,43 +537,6 @@ func (b *IdentityAccessManagementAPIBuilder) UpdateServiceAccountsAPIGroup(opts 
 
 	storage[saResource.StoragePath("tokens")] = serviceaccount.NewLegacyTokenREST(b.store)
 
-	return nil
-}
-
-func (b *IdentityAccessManagementAPIBuilder) UpdateExternalGroupMappingAPIGroup(apiGroupInfo *genericapiserver.APIGroupInfo, opts builder.APIGroupOptions, storage map[string]rest.Storage) error {
-	extGroupMappingResource := iamv0.ExternalGroupMappingResourceInfo
-
-	selectableFieldsOpts := grafanaregistry.SelectableFieldsOptions{
-		GetAttrs: fieldselectors.BuildGetAttrsFn(iamv0.ExternalGroupMappingKind()),
-	}
-	extGroupMappingUniStore, err := grafanaregistry.NewRegistryStoreWithSelectableFields(opts.Scheme,
-		extGroupMappingResource, opts.OptsGetter, selectableFieldsOpts)
-	if err != nil {
-		return err
-	}
-
-	var extGroupMappingStore storewrapper.K8sStorage = extGroupMappingUniStore
-
-	if b.externalGroupMappingStorage != nil {
-		extGroupMappingLegacyStore, err := NewLocalStore(extGroupMappingResource, apiGroupInfo.Scheme, opts.OptsGetter, b.reg, b.accessClient, b.externalGroupMappingStorage, selectableFieldsOpts)
-		if err != nil {
-			return err
-		}
-
-		dw, err := opts.DualWriteBuilder(extGroupMappingResource.GroupResource(), extGroupMappingLegacyStore, extGroupMappingUniStore)
-		if err != nil {
-			return err
-		}
-
-		var ok bool
-		extGroupMappingStore, ok = dw.(storewrapper.K8sStorage)
-		if !ok {
-			return fmt.Errorf("expected storewrapper.K8sStorage, got %T", dw)
-		}
-	}
-
-	authzWrapper := storewrapper.New(extGroupMappingStore, iamauthorizer.NewExternalGroupMappingAuthorizer(b.accessClient))
-	storage[extGroupMappingResource.StoragePath()] = authzWrapper
 	return nil
 }
 
@@ -815,8 +784,14 @@ func (b *IdentityAccessManagementAPIBuilder) PostProcessOpenAPI(oas *spec3.OpenA
 func (b *IdentityAccessManagementAPIBuilder) GetAPIRoutes(gv schema.GroupVersion) *builder.APIRoutes {
 	defs := b.GetOpenAPIDefinitions()(func(path string) spec.Ref { return spec.Ref{} })
 
+	client := openfeature.NewDefaultClient()
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancelFn()
+
+	enableUserApi := client.Boolean(ctx, featuremgmt.FlagKubernetesUsersApi, false, openfeature.TransactionContext(ctx))
+
 	searchRoutes := make([]*builder.APIRoutes, 0, 3)
-	if b.userSearchHandler != nil {
+	if enableUserApi && b.userSearchHandler != nil {
 		searchRoutes = append(searchRoutes, b.userSearchHandler.GetAPIRoutes(defs))
 	}
 
@@ -868,7 +843,7 @@ func (b *IdentityAccessManagementAPIBuilder) validateCreate(ctx context.Context,
 	case *iamv0.ResourcePermission:
 		return resourcepermission.ValidateCreateAndUpdateInput(ctx, typedObj)
 	case *iamv0.ExternalGroupMapping:
-		return externalgroupmapping.ValidateOnCreate(typedObj)
+		return b.externalGroupMappingApiInstaller.ValidateOnCreate(ctx, typedObj)
 	case *iamv0.Role:
 		return b.roleApiInstaller.ValidateOnCreate(ctx, typedObj)
 	case *iamv0.GlobalRole:
