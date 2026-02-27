@@ -1,6 +1,6 @@
 import { css } from '@emotion/css';
 import { uniqueId } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, FormProvider, RegisterOptions, useForm, useFormContext } from 'react-hook-form';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
@@ -39,7 +39,7 @@ import {
   isGrafanaRecordingRuleByType,
   isProvisionedRuleGroup,
 } from '../../utils/rules';
-import { parsePrometheusDuration } from '../../utils/time';
+import { parsePrometheusDuration, safeParsePrometheusDuration } from '../../utils/time';
 import { CollapseToggle } from '../CollapseToggle';
 import { ProvisioningBadge } from '../Provisioning';
 
@@ -71,11 +71,12 @@ const namespaceToGroupOptions = (rulerNamespace: RulerRulesConfigDTO, enableProv
     .sort(sortByLabel);
 };
 
+const collator = new Intl.Collator();
 const sortByLabel = (a: SelectableValue<string>, b: SelectableValue<string>) => {
-  return a.label?.localeCompare(b.label ?? '') || 0;
+  return collator.compare(a.label ?? '', b.label ?? '');
 };
 
-const forValidationOptions = (evaluateEvery: string): RegisterOptions<{ evaluateFor: string }> => ({
+const forValidationOptions = (getEvaluateEvery: () => string): RegisterOptions<{ evaluateFor: string }> => ({
   required: {
     value: true,
     message: t('alerting.for-validation-options.message.required', 'Required.'),
@@ -95,7 +96,7 @@ const forValidationOptions = (evaluateEvery: string): RegisterOptions<{ evaluate
       }
 
       try {
-        const millisEvery = parsePrometheusDuration(evaluateEvery);
+        const millisEvery = parsePrometheusDuration(getEvaluateEvery());
         return millisFor >= millisEvery
           ? true
           : t(
@@ -167,6 +168,14 @@ export function GrafanaEvaluationBehaviorStep({
   const handleEvalGroupCreation = (groupName: string, evaluationInterval: string) => {
     setValue('group', groupName);
     setValue('evaluateEvery', evaluationInterval);
+
+    const currentFor = getValues('evaluateFor');
+    const millisFor = safeParsePrometheusDuration(currentFor);
+    const millisEvery = safeParsePrometheusDuration(evaluationInterval);
+    if (millisFor !== 0 && millisFor < millisEvery) {
+      setValue('evaluateFor', evaluationInterval);
+    }
+
     setIsCreatingEvaluationGroup(false);
   };
 
@@ -198,6 +207,7 @@ export function GrafanaEvaluationBehaviorStep({
         <Stack alignItems="center">
           <div style={{ width: 420 }}>
             <Field
+              noMargin
               label={label}
               data-testid="group-picker"
               className={styles.formInput}
@@ -302,7 +312,7 @@ export function GrafanaEvaluationBehaviorStep({
         {isGrafanaAlertingRule && <KeepFiringFor evaluateEvery={evaluateEvery} />}
 
         {existing && (
-          <Field htmlFor="pause-alert-switch">
+          <Field noMargin htmlFor="pause-alert-switch">
             <Controller
               render={() => (
                 <Stack gap={1} direction="row" alignItems="center">
@@ -340,6 +350,7 @@ export function GrafanaEvaluationBehaviorStep({
             <>
               <NeedHelpInfoForConfigureNoDataError />
               <Field
+                noMargin
                 htmlFor="no-data-state-input"
                 label={t('alerting.alert.state-no-data', 'Alert state if no data or all values are null')}
               >
@@ -358,6 +369,7 @@ export function GrafanaEvaluationBehaviorStep({
                 />
               </Field>
               <Field
+                noMargin
                 htmlFor="exec-err-state-input"
                 label={t('alerting.alert.state-error-timeout', 'Alert state if execution error or timeout')}
               >
@@ -376,6 +388,7 @@ export function GrafanaEvaluationBehaviorStep({
                 />
               </Field>
               <Field
+                noMargin
                 label={t('alerting.alert.missing-series-resolve', 'Missing series evaluations to resolve')}
                 description={t(
                   'alerting.alert.description-missing-series-evaluations',
@@ -456,7 +469,7 @@ function EvaluationGroupCreationModal({
 
   const evaluateEveryId = 'eval-every-input';
   const evaluationGroupNameId = 'new-eval-group-name';
-  const [groupName, folderName, type] = watch(['group', 'folder.title', 'type']);
+  const [folderName, type] = watch(['folder.title', 'type']);
   const isGrafanaRecordingRule = type ? isGrafanaRecordingRuleByType(type) : false;
 
   const formAPI = useForm({
@@ -467,9 +480,10 @@ function EvaluationGroupCreationModal({
 
   const { register, handleSubmit, formState, setValue, getValues, watch: watchGroupFormValues } = formAPI;
   const evaluationInterval = watchGroupFormValues('evaluateEvery');
+  const newGroupName = watchGroupFormValues('group');
 
   const groupRules =
-    (groupfoldersForGrafana && groupfoldersForGrafana[folderName]?.find((g) => g.name === groupName)?.rules) ?? [];
+    (groupfoldersForGrafana && groupfoldersForGrafana[folderName]?.find((g) => g.name === newGroupName)?.rules) ?? [];
 
   const onSubmit = () => {
     onCreate(getValues('group'), getValues('evaluateEvery'));
@@ -506,6 +520,7 @@ function EvaluationGroupCreationModal({
       <FormProvider {...formAPI}>
         <form onSubmit={handleSubmit(() => onSubmit())}>
           <Field
+            noMargin
             label={
               <Label
                 htmlFor={evaluationGroupNameId}
@@ -536,6 +551,7 @@ function EvaluationGroupCreationModal({
           </Field>
 
           <Field
+            noMargin
             error={formState.errors.evaluateEvery?.message}
             label={
               <Label
@@ -588,11 +604,22 @@ export function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
     register,
     formState: { errors },
     setValue,
+    getValues,
     watch,
+    trigger,
   } = useFormContext<RuleFormValues>();
 
   const evaluateForId = 'eval-for-input';
   const currentPendingPeriod = watch('evaluateFor');
+
+  const isInitialRender = useRef(true);
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    trigger('evaluateFor');
+  }, [evaluateEvery, currentPendingPeriod, trigger]);
 
   const setPendingPeriod = (pendingPeriod: string) => {
     setValue('evaluateFor', pendingPeriod);
@@ -601,6 +628,7 @@ export function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
   return (
     <Stack direction="column" justify-content="flex-start" align-items="flex-start">
       <Field
+        noMargin
         label={
           <Label
             htmlFor={evaluateForId}
@@ -617,7 +645,14 @@ export function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
         invalid={Boolean(errors.evaluateFor?.message) ? true : undefined}
         validationMessageHorizontalOverflow={true}
       >
-        <Input id={evaluateForId} width={8} {...register('evaluateFor', forValidationOptions(evaluateEvery))} />
+        <Input
+          id={evaluateForId}
+          width={8}
+          {...register(
+            'evaluateFor',
+            forValidationOptions(() => getValues('evaluateEvery'))
+          )}
+        />
       </Field>
       <DurationQuickPick
         selectedDuration={currentPendingPeriod}
@@ -647,6 +682,7 @@ function KeepFiringFor({ evaluateEvery }: { evaluateEvery: string }) {
   return (
     <Stack direction="column" justify-content="flex-start" align-items="flex-start">
       <Field
+        noMargin
         label={
           <Label
             htmlFor={keepFiringForId}
