@@ -52,6 +52,8 @@ These minimums support evaluation and single-user development only. For any shar
 
 ### Sizing your deployment
 
+This sizing guidance covers the Grafana server process only, meaning the UI, data source proxy, alert engine, and image renderer. It does not account for the resources required by your data sources. Metric stores such as Prometheus or Grafana Mimir, log stores such as Grafana Loki, and trace backends such as Grafana Tempo each have their own hardware and capacity requirements. For guidance, refer to [Planning Grafana Mimir capacity](https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity), [Size the Loki cluster](https://grafana.com/docs/loki/latest/setup/size), and [Plan your Tempo deployment](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/plan/).
+
 Four factors most directly drive Grafana's resource needs:
 
 - **Concurrent users:** active, concurrent browser sessions issuing queries or causing panels to refresh. This is the primary driver of CPU and memory load. Users who have Grafana open but are not actively viewing dashboards contribute little load, unless those dashboards have auto-refresh enabled.
