@@ -2,21 +2,17 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo } from 'react';
 
 import {
-  CreateTeamApiArg,
-  CreateTeamCommand,
   UpdateTeamCommand,
-  useCreateTeamMutation,
   useDeleteTeamByIdMutation,
   useGetTeamByIdQuery,
   useSearchTeamsQuery as useLegacySearchTeamsQuery,
   useListTeamsRolesQuery,
-  useSetTeamRolesMutation,
   useUpdateTeamMutation,
 } from 'app/api/clients/legacy';
 import { updateNavIndex } from 'app/core/reducers/navModel';
 import { contextSrv } from 'app/core/services/context_srv';
 import { addFilteredDisplayName } from 'app/core/utils/roles';
-import { AccessControlAction, Role } from 'app/types/accessControl';
+import { AccessControlAction } from 'app/types/accessControl';
 import { useDispatch } from 'app/types/store';
 
 import { buildNavModel } from './state/navModel';
@@ -24,7 +20,7 @@ import { buildNavModel } from './state/navModel';
 const rolesEnabled =
   contextSrv.licensedAccessControlEnabled() && contextSrv.hasPermission(AccessControlAction.ActionTeamsRolesList);
 
-const canUpdateRoles = () =>
+export const canUpdateRoles = () =>
   contextSrv.hasPermission(AccessControlAction.ActionUserRolesAdd) &&
   contextSrv.hasPermission(AccessControlAction.ActionUserRolesRemove);
 
@@ -120,45 +116,4 @@ export const useDeleteTeam = () => {
   const [deleteTeam, response] = useDeleteTeamByIdMutation();
 
   return [({ uid }: { uid: string }) => deleteTeam({ teamId: uid }), response] as const;
-};
-
-/**
- * Create a new team, and link any pending roles
- */
-export const useCreateTeam = () => {
-  const [createTeam, response] = useCreateTeamMutation();
-  const [setTeamRoles] = useSetTeamRolesMutation();
-
-  const trigger = async (
-    team: CreateTeamCommand,
-    pendingRoles?: Role[],
-    options?: {
-      showSuccessAlert?: boolean;
-    }
-  ) => {
-    const mutationArg: CreateTeamApiArg & { showSuccessAlert?: boolean } = {
-      createTeamCommand: team,
-      showSuccessAlert: options?.showSuccessAlert,
-    };
-    const mutationResult = await createTeam(mutationArg);
-
-    const { data } = mutationResult;
-
-    // Add any pending roles to the team
-    if (data && data.teamId && pendingRoles && pendingRoles.length) {
-      await contextSrv.fetchUserPermissions();
-      if (contextSrv.licensedAccessControlEnabled() && canUpdateRoles()) {
-        await setTeamRoles({
-          teamId: data.teamId,
-          setTeamRolesCommand: {
-            roleUids: pendingRoles.map((role) => role.uid),
-          },
-        });
-      }
-    }
-
-    return mutationResult;
-  };
-
-  return [trigger, response] as const;
 };
