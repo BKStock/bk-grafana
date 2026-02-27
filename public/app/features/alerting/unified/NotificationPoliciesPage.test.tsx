@@ -146,14 +146,14 @@ const ui = {
   /** (deeply) Nested rows of policies under the default/root policy */
   row: byTestId('am-route-container'),
 
-  newChildPolicyButton: byRole('button', { name: /New child policy/ }),
-  newSiblingPolicyButton: byRole('button', { name: /Add new policy/ }),
+  newChildPolicyButton: byRole('button', { name: /Add route/ }),
+  newSiblingPolicyButton: byRole('button', { name: /Add route/ }),
 
   moreActionsDefaultPolicy: byLabelText(/more actions for default policy/i),
   moreActions: byLabelText(/more actions for policy/i),
   editButton: byRole('menuitem', { name: 'Edit' }),
 
-  saveButton: byRole('button', { name: /update (default )?policy/i }),
+  saveButton: byRole('button', { name: /update (policy|route)/i }),
   deleteRouteButton: byRole('menuitem', { name: 'Delete' }),
 
   receiverSelect: byTestId('am-receiver-select'),
@@ -260,7 +260,8 @@ describe.each([
     const { user } = renderPage();
     let rootRoute = await getRootRoute();
 
-    expect(rootRoute).toHaveTextContent('default policy');
+    const expectedPolicyName = routeName === ROOT_ROUTE_NAME ? /default policy/i : routeName;
+    expect(rootRoute).toHaveTextContent(expectedPolicyName);
     expect(rootRoute).toHaveTextContent(/delivered to grafana-default-email/i);
     expect(rootRoute).toHaveTextContent(/grouped by alertname/i);
 
@@ -282,7 +283,7 @@ describe.each([
     await updateTiming(ui.groupRepeatContainer.get(), '5h');
 
     //save
-    await user.click(await screen.findByRole('button', { name: /update default policy/i }));
+    await user.click(await screen.findByRole('button', { name: /update policy/i }));
 
     // wait for it to go out of edit mode
     expect(await screen.findByText(/updated notification policies/i)).toBeInTheDocument();
@@ -318,7 +319,7 @@ describe.each([
     await user.type(byRole('combobox').get(groupSelect), 'severity{enter}');
     await user.type(byRole('combobox').get(groupSelect), 'namespace{enter}');
     //save
-    await user.click(await screen.findByRole('button', { name: /update default policy/i }));
+    await user.click(await screen.findByRole('button', { name: /update policy/i }));
 
     expect(await screen.findByText(/updated notification policies/i)).toBeInTheDocument();
 
@@ -368,7 +369,7 @@ describe.each([
     setRoutingTree(routeName, modifiedConfig);
 
     await openDefaultPolicyEditModal();
-    await user.click(await screen.findByRole('button', { name: /update default policy/i }));
+    await user.click(await screen.findByRole('button', { name: /update policy/i }));
 
     expect(
       (await screen.findAllByText(/the notification policy tree has been updated by another user/i))[0]
