@@ -2,9 +2,12 @@ import { useMemo } from 'react';
 
 import { DataSourceInstanceSettings, getDataSourceRef } from '@grafana/data';
 import { SceneQueryRunner, VizPanel } from '@grafana/scenes';
+import { DataQuery } from '@grafana/schema';
 import { QueryGroupOptions } from 'app/types/query';
 
 import { PanelTimeRange } from '../../../../scene/panel-timerange/PanelTimeRange';
+
+import { useCacheOptionsInfo } from './useCacheOptionsInfo';
 
 interface UseQueryOptionsParams {
   panel: VizPanel;
@@ -35,11 +38,11 @@ function extractTimeRange(timeRangeObj: unknown): QueryGroupOptions['timeRange']
 export function useQueryOptions({ panel, queryRunner, dsSettings }: UseQueryOptionsParams): QueryGroupOptions {
   const panelState = panel.useState();
   const queryRunnerState = queryRunner?.useState();
+  const queries: DataQuery[] = queryRunnerState?.queries ?? [];
+
+  const { showCacheTimeout, showCacheTTL } = useCacheOptionsInfo(dsSettings, queries);
 
   const queryOptions: QueryGroupOptions = useMemo(() => {
-    const showCacheTimeout = dsSettings?.meta.queryOptions?.cacheTimeout;
-    const showCacheTTL = dsSettings?.cachingConfig?.enabled;
-
     const dataSource = dsSettings
       ? { default: dsSettings.isDefault, ...getDataSourceRef(dsSettings) }
       : { default: undefined, type: undefined, uid: undefined };
@@ -62,6 +65,8 @@ export function useQueryOptions({ panel, queryRunner, dsSettings }: UseQueryOpti
     queryRunnerState?.cacheTimeout,
     queryRunnerState?.queryCachingTTL,
     dsSettings,
+    showCacheTimeout,
+    showCacheTTL,
   ]);
 
   return queryOptions;

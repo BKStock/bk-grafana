@@ -7,6 +7,7 @@ import { Button, useStyles2 } from '@grafana/ui';
 
 import { QUERY_EDITOR_COLORS, TIME_OPTION_PLACEHOLDER } from '../../constants';
 import { useDatasourceContext, useQueryEditorUIContext, useQueryRunnerContext } from '../QueryEditorContext';
+import { useCacheOptionsInfo } from '../hooks/useCacheOptionsInfo';
 import { QueryOptionField } from '../types';
 
 interface FooterLabelValue {
@@ -21,11 +22,10 @@ export function QueryEditorFooter() {
 
   const { queryOptions } = useQueryEditorUIContext();
   const { options, openSidebar } = queryOptions;
-  const { data } = useQueryRunnerContext();
+  const { data, queries } = useQueryRunnerContext();
   const { datasource, dsSettings } = useDatasourceContext();
 
-  const showCacheTimeout = dsSettings?.meta.queryOptions?.cacheTimeout;
-  const showCacheTTL = dsSettings?.cachingConfig?.enabled;
+  const { showCacheTimeout, showCacheTTL, cacheTTLPlaceholder } = useCacheOptionsInfo(dsSettings, queries);
 
   const items: FooterLabelValue[] = useMemo(() => {
     const realMaxDataPoints = data?.request?.maxDataPoints;
@@ -78,18 +78,13 @@ export function QueryEditorFooter() {
       result.push({
         id: QueryOptionField.queryCachingTTL,
         label: t('query-editor-next.footer.label.cache-ttl', 'Cache TTL'),
-        value:
-          options.queryCachingTTL != null
-            ? String(options.queryCachingTTL)
-            : dsSettings?.cachingConfig?.TTLMs != null
-              ? String(dsSettings.cachingConfig.TTLMs)
-              : '-',
+        value: options.queryCachingTTL != null ? String(options.queryCachingTTL) : (cacheTTLPlaceholder ?? '-'),
         isActive: options.queryCachingTTL != null,
       });
     }
 
     return result;
-  }, [options, data, datasource, showCacheTimeout, showCacheTTL, dsSettings?.cachingConfig?.TTLMs]);
+  }, [options, data, datasource, showCacheTimeout, showCacheTTL, cacheTTLPlaceholder]);
 
   const handleItemClick = (event: React.MouseEvent, fieldId?: QueryOptionField) => {
     // Stop propagation to prevent ClickOutsideWrapper from immediately closing

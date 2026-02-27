@@ -12,6 +12,7 @@ import {
   useQueryEditorUIContext,
   useQueryRunnerContext,
 } from '../QueryEditorContext';
+import { useCacheOptionsInfo } from '../hooks/useCacheOptionsInfo';
 import { QueryOptionField } from '../types';
 
 import { OptionField } from './OptionField';
@@ -28,7 +29,7 @@ export function QueryEditorDetailsSidebar() {
   const styles = useStyles2(getStyles);
 
   const { datasource, dsSettings } = useDatasourceContext();
-  const { data } = useQueryRunnerContext();
+  const { data, queries } = useQueryRunnerContext();
   const { queryOptions } = useQueryEditorUIContext();
   const { onQueryOptionsChange } = useActionsContext();
   const { options, closeSidebar, focusedField } = queryOptions;
@@ -38,8 +39,7 @@ export function QueryEditorDetailsSidebar() {
   const realMaxDataPoints = data?.request?.maxDataPoints;
   const realInterval = data?.request?.interval;
   const minIntervalOnDs = datasource?.interval ?? t('query-editor-next.details-sidebar.no-limit', 'No limit');
-  const showCacheTimeout = dsSettings?.meta.queryOptions?.cacheTimeout;
-  const showCacheTTL = dsSettings?.cachingConfig?.enabled;
+  const { showCacheTimeout, showCacheTTL, cacheTTLPlaceholder } = useCacheOptionsInfo(dsSettings, queries);
 
   const handleCloseSidebar = useCallback(() => {
     // Blur any focused input to trigger its blur handler before closing
@@ -182,7 +182,7 @@ export function QueryEditorDetailsSidebar() {
                 field={QueryOptionField.queryCachingTTL}
                 {...inputProps}
                 defaultValue={options.queryCachingTTL ?? ''}
-                placeholder={dsSettings?.cachingConfig?.TTLMs ? String(dsSettings.cachingConfig.TTLMs) : undefined}
+                placeholder={cacheTTLPlaceholder}
               />
             )}
           </Stack>

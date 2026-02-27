@@ -1,16 +1,38 @@
 import { fireEvent, screen } from '@testing-library/react';
 
 import { DataSourceInstanceSettings, PanelData } from '@grafana/data';
+import { getDataSourceSrv } from '@grafana/runtime';
+import { DataQuery } from '@grafana/schema';
+import { MIXED_DATASOURCE_NAME } from 'app/plugins/datasource/mixed/MixedDataSource';
 import { QueryGroupOptions } from 'app/types/query';
 
 import { renderWithQueryEditorProvider, mockOptions, mockActions, ds1SettingsMock } from '../testUtils';
 
 import { QueryEditorDetailsSidebar } from './QueryEditorDetailsSidebar';
 
+jest.mock('@grafana/runtime', () => ({
+  ...jest.requireActual('@grafana/runtime'),
+  getDataSourceSrv: jest.fn(),
+  isExpressionReference: jest.fn((ref) => ref?.uid === '__expr__' || ref?.type === '__expr__'),
+}));
+
+const mixedDsSettings: DataSourceInstanceSettings = {
+  ...ds1SettingsMock,
+  uid: MIXED_DATASOURCE_NAME,
+  name: 'Mixed',
+  type: 'mixed',
+};
+
+function mockGetInstanceSettings(settingsMap: Record<string, Partial<DataSourceInstanceSettings>>) {
+  (getDataSourceSrv as jest.Mock).mockReturnValue({
+    getInstanceSettings: (uid: string) => settingsMap[uid] ?? null,
+  });
+}
+
 describe('QueryEditorDetailsSidebar', () => {
   const mockCloseSidebar = jest.fn();
 
-  const defaultQrState: { queries: never[]; data: PanelData | undefined; isLoading: boolean } = {
+  const defaultQrState: { queries: DataQuery[]; data: PanelData | undefined; isLoading: boolean } = {
     queries: [],
     data: {
       request: {
@@ -27,7 +49,7 @@ describe('QueryEditorDetailsSidebar', () => {
 
   const renderSidebar = (
     options: QueryGroupOptions = mockOptions,
-    qrState: { queries: never[]; data: PanelData | undefined; isLoading: boolean } = defaultQrState,
+    qrState: { queries: DataQuery[]; data: PanelData | undefined; isLoading: boolean } = defaultQrState,
     dsSettings?: DataSourceInstanceSettings
   ) => {
     return renderWithQueryEditorProvider(<QueryEditorDetailsSidebar />, {
@@ -284,6 +306,68 @@ describe('QueryEditorDetailsSidebar', () => {
       renderSidebar();
 
       expect(screen.queryByLabelText('Cache TTL')).not.toBeInTheDocument();
+    });
+
+    describe('Mixed mode', () => {
+      it('should show cache timeout when any query DS supports it', () => {
+        mockGetInstanceSettings({
+          'ds-prom': {
+            ...ds1SettingsMock,
+            uid: 'ds-prom',
+            meta: { ...ds1SettingsMock.meta, queryOptions: { cacheTimeout: true } },
+          },
+          'ds-loki': { ...ds1SettingsMock, uid: 'ds-loki' },
+        });
+
+        const queries: DataQuery[] = [
+          { refId: 'A', datasource: { uid: 'ds-prom', type: 'prometheus' } },
+          { refId: 'B', datasource: { uid: 'ds-loki', type: 'loki' } },
+        ];
+        const qrState = { ...defaultQrState, queries };
+
+        renderSidebar(mockOptions, qrState, mixedDsSettings);
+
+        expect(screen.getByLabelText('Cache timeout')).toBeInTheDocument();
+      });
+
+      it('should show cache TTL when any query DS has caching enabled', () => {
+        mockGetInstanceSettings({
+          'ds-prom': {
+            ...ds1SettingsMock,
+            uid: 'ds-prom',
+            cachingConfig: { enabled: true, TTLMs: 60000 },
+          },
+          'ds-loki': { ...ds1SettingsMock, uid: 'ds-loki' },
+        });
+
+        const queries: DataQuery[] = [
+          { refId: 'A', datasource: { uid: 'ds-prom', type: 'prometheus' } },
+          { refId: 'B', datasource: { uid: 'ds-loki', type: 'loki' } },
+        ];
+        const qrState = { ...defaultQrState, queries };
+
+        renderSidebar(mockOptions, qrState, mixedDsSettings);
+
+        expect(screen.getByLabelText('Cache TTL')).toBeInTheDocument();
+      });
+
+      it('should hide cache options when no query DS supports them', () => {
+        mockGetInstanceSettings({
+          'ds-prom': { ...ds1SettingsMock, uid: 'ds-prom' },
+          'ds-loki': { ...ds1SettingsMock, uid: 'ds-loki' },
+        });
+
+        const queries: DataQuery[] = [
+          { refId: 'A', datasource: { uid: 'ds-prom', type: 'prometheus' } },
+          { refId: 'B', datasource: { uid: 'ds-loki', type: 'loki' } },
+        ];
+        const qrState = { ...defaultQrState, queries };
+
+        renderSidebar(mockOptions, qrState, mixedDsSettings);
+
+        expect(screen.queryByLabelText('Cache timeout')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Cache TTL')).not.toBeInTheDocument();
+      });
     });
   });
 
