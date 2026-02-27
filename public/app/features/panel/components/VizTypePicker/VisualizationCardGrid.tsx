@@ -4,7 +4,6 @@ import { useMeasure } from 'react-use';
 
 import { GrafanaTheme2, PanelData, PanelPluginMeta, PanelPluginVisualizationSuggestion } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { config } from '@grafana/runtime';
 import { Text, useStyles2 } from '@grafana/ui';
 import { MIN_MULTI_COLUMN_SIZE } from 'app/features/panel/suggestions/constants';
 
@@ -26,13 +25,12 @@ export interface Props {
 export function VisualizationCardGrid({ items, groups, data, onItemClick, getItemKey }: Props) {
   const styles = useStyles2(getStyles);
   const [firstCardRef, { width }] = useMeasure<HTMLDivElement>();
-  const isNewVizSuggestionsEnabled = config.featureToggles.newVizSuggestions;
 
   const itemIndexMap = useMemo(() => {
     const map = new Map<string, number>();
-    let index = 0;
 
     if (groups) {
+      let index = 0;
       groups.forEach((group) => {
         group.items.forEach((item) => {
           map.set(getItemKey(item), index++);
@@ -75,7 +73,7 @@ export function VisualizationCardGrid({ items, groups, data, onItemClick, getIte
     );
   };
 
-  if (groups && isNewVizSuggestionsEnabled) {
+  if (groups) {
     return (
       <div className={styles.grid}>
         {groups.map((group, groupIndex) => (
