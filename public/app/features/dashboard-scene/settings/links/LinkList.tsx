@@ -177,9 +177,6 @@ function getStyles(theme: GrafanaTheme2) {
           duration: theme.transitions.duration.short,
         }),
       },
-      '&:last-child': {
-        marginBottom: theme.spacing(2),
-      },
       button: {
         visibility: 'hidden',
       },
