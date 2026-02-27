@@ -205,6 +205,7 @@ func TestGRPCStore_CreateAndGet(t *testing.T) {
 			Tags: []string{"tag1", "tag2"},
 		},
 	}
+	anno.SetCreatedBy("user:test-user-123")
 
 	created, err := store.Create(ctx, anno)
 	require.NoError(t, err)
@@ -213,6 +214,7 @@ func TestGRPCStore_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "Test annotation", created.Spec.Text)
 	assert.Equal(t, int64(1000), created.Spec.Time)
 	assert.Equal(t, []string{"tag1", "tag2"}, created.Spec.Tags)
+	assert.Equal(t, "user:test-user-123", created.GetCreatedBy())
 
 	// Get annotation
 	retrieved, err := store.Get(ctx, namespace, "test-1")
@@ -220,6 +222,7 @@ func TestGRPCStore_CreateAndGet(t *testing.T) {
 	assert.Equal(t, created.Name, retrieved.Name)
 	assert.Equal(t, created.Spec.Text, retrieved.Spec.Text)
 	assert.Equal(t, created.Spec.Time, retrieved.Spec.Time)
+	assert.Equal(t, "user:test-user-123", retrieved.GetCreatedBy())
 }
 
 func TestGRPCStore_Update(t *testing.T) {
@@ -304,15 +307,15 @@ func TestGRPCStore_List(t *testing.T) {
 	panelID := int64(5)
 	annotations := []*annotationV0.Annotation{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anno-1", Namespace: namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "anno-1", Namespace: namespace, Annotations: map[string]string{"grafana.com/createdBy": "user:alice"}},
 			Spec:       annotationV0.AnnotationSpec{Text: "First", Time: 1000, DashboardUID: &dashUID, PanelID: &panelID, Tags: []string{"tag1", "tag2"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anno-2", Namespace: namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "anno-2", Namespace: namespace, Annotations: map[string]string{"grafana.com/createdBy": "user:bob"}},
 			Spec:       annotationV0.AnnotationSpec{Text: "Second", Time: 2000, Tags: []string{"tag2", "tag3"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anno-3", Namespace: namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "anno-3", Namespace: namespace, Annotations: map[string]string{"grafana.com/createdBy": "user:alice"}},
 			Spec:       annotationV0.AnnotationSpec{Text: "Third", Time: 3000, Tags: []string{"tag1"}},
 		},
 	}
@@ -370,6 +373,16 @@ func TestGRPCStore_List(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Len(t, result.Items, 2)
+	})
+
+	t.Run("list with created_by filter", func(t *testing.T) {
+		result, err := store.List(ctx, namespace, ListOptions{
+			CreatedBy: "user:alice",
+		})
+		require.NoError(t, err)
+		assert.Len(t, result.Items, 2)
+		assert.Equal(t, "user:alice", result.Items[0].GetCreatedBy())
+		assert.Equal(t, "user:alice", result.Items[1].GetCreatedBy())
 	})
 }
 

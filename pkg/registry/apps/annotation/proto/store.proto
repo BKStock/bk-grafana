@@ -31,12 +31,10 @@ service AnnotationStore {
 
 // Annotation represents a simplified annotation for CRUD operations
 message Annotation {
-  // Minimal k8s metadata
   string name = 1;
   string namespace = 2;
-
-  // Annotation specification
-  AnnotationSpec spec = 3;
+  string created_by = 3;
+  AnnotationSpec spec = 4;
 }
 
 // AnnotationSpec contains the annotation specification fields
@@ -77,6 +75,7 @@ message ListOptions {
   bool tags_match_any = 8;
   repeated string scopes = 9;
   bool scopes_match_any = 10;
+  string created_by = 11;
 }
 
 message ListResponse {

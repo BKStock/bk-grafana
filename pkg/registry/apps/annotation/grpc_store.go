@@ -153,6 +153,7 @@ func toProtoListOptions(opts ListOptions) *storev1.ListOptions {
 		TagsMatchAny:   opts.TagsMatchAny,
 		Scopes:         opts.Scopes,
 		ScopesMatchAny: opts.ScopesMatchAny,
+		CreatedBy:      opts.CreatedBy,
 	}
 }
 
@@ -173,6 +174,7 @@ func fromProtoListOptions(opts *storev1.ListOptions) ListOptions {
 		TagsMatchAny:   opts.TagsMatchAny,
 		Scopes:         opts.Scopes,
 		ScopesMatchAny: opts.ScopesMatchAny,
+		CreatedBy:      opts.CreatedBy,
 	}
 }
 
@@ -249,6 +251,7 @@ func toProtoAnnotation(anno *annotationV0.Annotation) *storev1.Annotation {
 	protoAnno := &storev1.Annotation{
 		Name:      anno.Name,
 		Namespace: anno.Namespace,
+		CreatedBy: anno.GetCreatedBy(),
 		Spec: &storev1.AnnotationSpec{
 			Text:   anno.Spec.Text,
 			Time:   anno.Spec.Time,
@@ -282,6 +285,10 @@ func fromProtoAnnotation(protoAnno *storev1.Annotation) *annotationV0.Annotation
 			Name:      protoAnno.Name,
 			Namespace: protoAnno.Namespace,
 		},
+	}
+
+	if protoAnno.CreatedBy != "" {
+		anno.SetCreatedBy(protoAnno.CreatedBy)
 	}
 
 	if protoAnno.Spec != nil {
