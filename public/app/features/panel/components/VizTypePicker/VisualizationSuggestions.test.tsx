@@ -29,15 +29,7 @@ jest.mock('./VizTypePickerPlugin', () => ({
     </button>
   ),
 }));
-jest.mock('../../state/util', () => ({
-  ...jest.requireActual('../../state/util'),
-  getAllPanelPluginMeta: () => [
-    { id: 'timeseries', name: 'Time series', sort: 0, hideFromList: false },
-    { id: 'text', name: 'Text', sort: 1, hideFromList: false },
-    { id: 'dashlist', name: 'Dashboard list', sort: 2, hideFromList: false },
-    { id: 'alertlist', name: 'Alert list', sort: 3, hideFromList: false },
-  ],
-}));
+
 jest.mock('@grafana/runtime', () => ({
   ...jest.requireActual('@grafana/runtime'),
   config: {
@@ -46,6 +38,20 @@ jest.mock('@grafana/runtime', () => ({
       newVizSuggestions: true,
     },
   },
+}));
+
+jest.mock('@grafana/runtime/internal', () => ({
+  ...jest.requireActual('@grafana/runtime/internal'),
+  useListedPanelPluginMetas: jest.fn().mockReturnValue({
+    loading: false,
+    error: undefined,
+    value: [
+      { id: 'timeseries', name: 'Time series', sort: 0, hideFromList: false },
+      { id: 'text', name: 'Text', sort: 1, hideFromList: false },
+      { id: 'dashlist', name: 'Dashboard list', sort: 2, hideFromList: false },
+      { id: 'alertlist', name: 'Alert list', sort: 3, hideFromList: false },
+    ],
+  }),
 }));
 
 describe('VisualizationSuggestions', () => {

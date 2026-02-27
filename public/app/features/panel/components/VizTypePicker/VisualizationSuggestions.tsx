@@ -11,12 +11,13 @@ import {
 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
+import { useListedPanelPluginMetas } from '@grafana/runtime/internal';
 import { VizPanel } from '@grafana/scenes';
 import { Alert, Button, Icon, Spinner, Text, useStyles2 } from '@grafana/ui';
 import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene/UnconfiguredPanel';
 
 import { useStructureRev } from '../../../explore/Graph/useStructureRev';
-import { getAllPanelPluginMeta, filterPluginList } from '../../state/util';
+import { filterPluginList } from '../../state/util';
 import { panelsWithoutData } from '../../suggestions/consts';
 import { getAllSuggestions } from '../../suggestions/getAllSuggestions';
 import { hasData } from '../../suggestions/utils';
@@ -87,8 +88,8 @@ export function VisualizationSuggestions({ onChange, data, panel, searchQuery, i
     return PANEL_STATES.EXISTING_PANEL;
   }, [isUnconfiguredPanel, isNewPanel]);
 
-  const suggestionsByVizType = useMemo((): VisualizationCardGridGroup[] => {
-    const meta = getAllPanelPluginMeta();
+  const { value: meta = [] } = useListedPanelPluginMetas();
+  const suggestionsByVizType = useMemo(() => {
     const record: Record<string, PanelPluginMeta> = {};
     for (const m of meta) {
       record[m.id] = m;
@@ -105,7 +106,7 @@ export function VisualizationSuggestions({ onChange, data, panel, searchQuery, i
       result[result.length - 1].items.push(suggestion);
     }
     return result;
-  }, [suggestions]);
+  }, [suggestions, meta]);
 
   const suggestionIndexMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -228,10 +229,11 @@ interface NoDataPanelListProps {
 
 function NoDataPanelList({ searchQuery, panel, onChange }: NoDataPanelListProps) {
   const styles = useStyles2(getStyles);
+  const { value: meta = [] } = useListedPanelPluginMetas();
   const noDataPanels = useMemo(() => {
-    const panels = getAllPanelPluginMeta().filter((p) => panelsWithoutData.has(p.id));
+    const panels = meta.filter((p) => panelsWithoutData.has(p.id));
     return filterPluginList(panels, searchQuery ?? '', panel?.type);
-  }, [searchQuery, panel?.type]);
+  }, [searchQuery, panel?.type, meta]);
 
   return (
     <>
