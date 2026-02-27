@@ -5,10 +5,10 @@ import { importPanelPlugin } from 'app/features/plugins/importPanelPlugin';
  * Returns presets for a panel
  * @TODO: error handling?
  */
-export async function getPresetsForPanel(
+export async function getPresets(
   pluginId: string,
   fieldConfig?: FieldConfigSource
-): Promise<PanelPluginVisualizationSuggestion[] | undefined> {
+): Promise<PanelPluginVisualizationSuggestion[]> {
   const plugin = await importPanelPlugin(pluginId);
-  return plugin.getPresets({ fieldConfig }) ?? undefined;
+  return plugin.getPresets({ fieldConfig }) ?? [];
 }

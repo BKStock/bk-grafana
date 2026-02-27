@@ -19,7 +19,7 @@ import { useStructureRev } from '../../../explore/Graph/useStructureRev';
 import { getAllPanelPluginMeta, filterPluginList } from '../../state/util';
 import { panelsWithoutData } from '../../suggestions/consts';
 import { getAllSuggestions } from '../../suggestions/getAllSuggestions';
-import { getPresetsForPanel } from '../../suggestions/getPresetsForPanel';
+import { getPresets } from '../../suggestions/getPresets';
 import { hasData } from '../../suggestions/utils';
 
 import { VisualizationCardGrid, VisualizationCardGridGroup } from './VisualizationCardGrid';
@@ -131,7 +131,7 @@ export function VisualizationSuggestions({ onChange, onShowPresets, data, panel,
 
       if (config.featureToggles.vizPresets && onShowPresets) {
         try {
-          const presets = await getPresetsForPanel(suggestion.pluginId, suggestion.fieldConfig);
+          const presets = await getPresets(suggestion.pluginId, suggestion.fieldConfig);
           if (presets && presets.length > 0) {
             // apply suggestion and keep picker open
             onChange({
