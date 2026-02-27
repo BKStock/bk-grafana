@@ -171,10 +171,6 @@ export class DashboardModelCompatibilityWrapper {
   }
 
   public canEditAnnotations(dashboardUID?: string) {
-    if (!this._scene.canEditDashboard()) {
-      return false;
-    }
-
     return Boolean(this._scene.state.meta.annotationsPermissions?.dashboard.canEdit);
   }
 
