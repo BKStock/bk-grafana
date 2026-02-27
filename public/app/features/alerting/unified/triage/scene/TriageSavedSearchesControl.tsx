@@ -10,7 +10,7 @@ import {
 import { useTimeRange, useVariableValues } from '@grafana/scenes-react';
 
 import { SavedSearches } from '../../components/saved-searches/SavedSearches';
-import { SavedSearch } from '../../components/saved-searches/savedSearchesSchema';
+import { SavedSearch, validateSearchName } from '../../components/saved-searches/savedSearchesSchema';
 import { shouldUseTriageSavedSearches } from '../../featureToggles';
 import { VARIABLES } from '../constants';
 import { useTriagePredefinedOverrides } from '../hooks/useTriagePredefinedOverrides';
@@ -137,15 +137,30 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
     return [defaultItem, ...merged.slice(0, defaultIndex), ...merged.slice(defaultIndex + 1)];
   }, [predefinedList, savedSearchesWithDefault, effectiveDefaultId]);
 
+  const handleSave = useCallback(
+    async (name: string, query: string) => {
+      const error = validateSearchName(name, mergedSavedSearches);
+      if (error) {
+        throw { field: 'name' as const, message: error };
+      }
+      await saveSearch(name, query);
+    },
+    [mergedSavedSearches, saveSearch]
+  );
+
   const handleRename = useCallback(
     async (id: string, newName: string) => {
+      const error = validateSearchName(newName, mergedSavedSearches, id);
+      if (error) {
+        throw { field: 'name' as const, message: error };
+      }
       if (isTriagePredefinedSearchId(id)) {
         await setNameOverride(id, newName);
       } else {
         await renameSearch(id, newName);
       }
     },
-    [setNameOverride, renameSearch]
+    [mergedSavedSearches, setNameOverride, renameSearch]
   );
 
   const handleDelete = useCallback(
@@ -178,7 +193,7 @@ function TriageSavedSearchesControlRenderer({ model }: SceneComponentProps<Triag
     <SavedSearches
       savedSearches={mergedSavedSearches}
       currentSearchQuery={currentSearchQuery}
-      onSave={saveSearch}
+      onSave={handleSave}
       onRename={handleRename}
       onDelete={handleDelete}
       onApply={handleApplySearch}
