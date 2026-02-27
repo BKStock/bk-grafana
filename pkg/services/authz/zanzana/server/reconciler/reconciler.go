@@ -30,12 +30,10 @@ type Reconciler struct {
 
 	workQueue chan string
 
-	globalRoleTuplesMu sync.RWMutex
-	globalRoleTuples   []*openfgav1.TupleKey
-
+	globalRoleMu     sync.RWMutex
+	globalRoleTuples []*openfgav1.TupleKey
 	// resolved effective permissions per GlobalRole name (for Role composition)
-	globalRolePermsMu sync.RWMutex
-	globalRolePerms   map[string][]*authzextv1.RolePermission
+	globalRolePerms map[string][]*authzextv1.RolePermission
 }
 
 // Config holds the reconciler configuration.
@@ -82,28 +80,17 @@ func NewReconciler(
 	}
 }
 
-func (r *Reconciler) setGlobalRoleTuples(tuples []*openfgav1.TupleKey) {
-	r.globalRoleTuplesMu.Lock()
-	defer r.globalRoleTuplesMu.Unlock()
+func (r *Reconciler) setGlobalRoleData(tuples []*openfgav1.TupleKey, perms map[string][]*authzextv1.RolePermission) {
+	r.globalRoleMu.Lock()
+	defer r.globalRoleMu.Unlock()
 	r.globalRoleTuples = tuples
-}
-
-func (r *Reconciler) getGlobalRoleTuples() []*openfgav1.TupleKey {
-	r.globalRoleTuplesMu.RLock()
-	defer r.globalRoleTuplesMu.RUnlock()
-	return r.globalRoleTuples
-}
-
-func (r *Reconciler) setGlobalRolePerms(perms map[string][]*authzextv1.RolePermission) {
-	r.globalRolePermsMu.Lock()
-	defer r.globalRolePermsMu.Unlock()
 	r.globalRolePerms = perms
 }
 
-func (r *Reconciler) getGlobalRolePerms() map[string][]*authzextv1.RolePermission {
-	r.globalRolePermsMu.RLock()
-	defer r.globalRolePermsMu.RUnlock()
-	return r.globalRolePerms
+func (r *Reconciler) getGlobalRoleData() ([]*openfgav1.TupleKey, map[string][]*authzextv1.RolePermission) {
+	r.globalRoleMu.RLock()
+	defer r.globalRoleMu.RUnlock()
+	return r.globalRoleTuples, r.globalRolePerms
 }
 
 // Run starts the reconciler's main loop and worker goroutines.
@@ -152,8 +139,7 @@ func (r *Reconciler) queueAllNamespaces(ctx context.Context) {
 		globalTuples, globalPerms = nil, nil
 	}
 
-	r.setGlobalRoleTuples(globalTuples)
-	r.setGlobalRolePerms(globalPerms)
+	r.setGlobalRoleData(globalTuples, globalPerms)
 
 	stores, err := r.server.ListAllStores(ctx)
 	if err != nil {

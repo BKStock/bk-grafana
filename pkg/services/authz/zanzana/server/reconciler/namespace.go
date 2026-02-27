@@ -163,12 +163,10 @@ func resolveAllGlobalRolePermissions(
 // This streaming approach avoids keeping all CRDs in memory.
 func (r *Reconciler) fetchAndTranslateTuples(ctx context.Context, namespace string) ([]*openfgav1.TupleKey, error) {
 	// Seed with pre-fetched global role tuples (cluster-scoped, shared across all namespaces).
-	cachedTuples := r.getGlobalRoleTuples()
+	// Both fields are read under a single lock so readers always see a consistent snapshot.
+	cachedTuples, globalRolePerms := r.getGlobalRoleData()
 	allTuples := make([]*openfgav1.TupleKey, 0, len(cachedTuples))
 	allTuples = append(allTuples, cachedTuples...)
-
-	// Snapshot the resolved GlobalRole permissions map (immutable between ticks).
-	globalRolePerms := r.getGlobalRolePerms()
 
 	// Map resource types to their translation functions
 	translators := map[string]func(*unstructured.Unstructured) ([]*openfgav1.TupleKey, error){
