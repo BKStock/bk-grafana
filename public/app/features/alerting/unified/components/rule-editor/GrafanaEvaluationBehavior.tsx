@@ -169,6 +169,7 @@ export function GrafanaEvaluationBehaviorStep({
     setValue('group', groupName);
     setValue('evaluateEvery', evaluationInterval);
 
+    // Auto-adjust pending period so it's never shorter than the new evaluation interval
     const currentFor = getValues('evaluateFor');
     const millisFor = safeParsePrometheusDuration(currentFor);
     const millisEvery = safeParsePrometheusDuration(evaluationInterval);
@@ -285,7 +286,6 @@ export function GrafanaEvaluationBehaviorStep({
             <EvaluationGroupCreationModal
               onCreate={handleEvalGroupCreation}
               onClose={() => setIsCreatingEvaluationGroup(false)}
-              groupfoldersForGrafana={rulerNamespace}
             />
           )}
         </Stack>
@@ -347,7 +347,7 @@ export function GrafanaEvaluationBehaviorStep({
             )}
           />
           {showErrorHandling && (
-            <>
+            <Stack direction="column" gap={2}>
               <NeedHelpInfoForConfigureNoDataError />
               <Field
                 noMargin
@@ -447,7 +447,7 @@ export function GrafanaEvaluationBehaviorStep({
                   />
                 </Stack>
               </Field>
-            </>
+            </Stack>
           )}
         </>
       )}
@@ -458,18 +458,16 @@ export function GrafanaEvaluationBehaviorStep({
 function EvaluationGroupCreationModal({
   onClose,
   onCreate,
-  groupfoldersForGrafana,
 }: {
   onClose: () => void;
   onCreate: (group: string, evaluationInterval: string) => void;
-  groupfoldersForGrafana?: RulerRulesConfigDTO | null;
 }): React.ReactElement {
   const styles = useStyles2(getStyles);
   const { watch } = useFormContext<RuleFormValues>();
 
   const evaluateEveryId = 'eval-every-input';
   const evaluationGroupNameId = 'new-eval-group-name';
-  const [folderName, type] = watch(['folder.title', 'type']);
+  const type = watch('type');
   const isGrafanaRecordingRule = type ? isGrafanaRecordingRuleByType(type) : false;
 
   const formAPI = useForm({
@@ -480,10 +478,6 @@ function EvaluationGroupCreationModal({
 
   const { register, handleSubmit, formState, setValue, getValues, watch: watchGroupFormValues } = formAPI;
   const evaluationInterval = watchGroupFormValues('evaluateEvery');
-  const newGroupName = watchGroupFormValues('group');
-
-  const groupRules =
-    (groupfoldersForGrafana && groupfoldersForGrafana[folderName]?.find((g) => g.name === newGroupName)?.rules) ?? [];
 
   const onSubmit = () => {
     onCreate(getValues('group'), getValues('evaluateEvery'));
@@ -519,66 +513,68 @@ function EvaluationGroupCreationModal({
 
       <FormProvider {...formAPI}>
         <form onSubmit={handleSubmit(() => onSubmit())}>
-          <Field
-            noMargin
-            label={
-              <Label
-                htmlFor={evaluationGroupNameId}
-                description={t(
-                  'alerting.evaluation-group-creation-modal.description-group-name',
-                  'A group evaluates all its rules over the same evaluation interval.'
-                )}
-              >
-                <Trans i18nKey="alerting.rule-form.evaluation.group-name">Evaluation group name</Trans>
-              </Label>
-            }
-            error={formState.errors.group?.message}
-            invalid={Boolean(formState.errors.group)}
-          >
-            <Input
-              data-testid={selectors.components.AlertRules.newEvaluationGroupName}
-              className={styles.formInput}
-              autoFocus={true}
-              id={evaluationGroupNameId}
-              placeholder={t('alerting.evaluation-group-creation-modal.placeholder-enter-a-name', 'Enter a name')}
-              {...register('group', {
-                required: {
-                  value: true,
-                  message: t('alerting.evaluation-group-creation-modal.message.required', 'Required.'),
-                },
-              })}
-            />
-          </Field>
+          <Stack direction="column" gap={2}>
+            <Field
+              noMargin
+              label={
+                <Label
+                  htmlFor={evaluationGroupNameId}
+                  description={t(
+                    'alerting.evaluation-group-creation-modal.description-group-name',
+                    'A group evaluates all its rules over the same evaluation interval.'
+                  )}
+                >
+                  <Trans i18nKey="alerting.rule-form.evaluation.group-name">Evaluation group name</Trans>
+                </Label>
+              }
+              error={formState.errors.group?.message}
+              invalid={Boolean(formState.errors.group)}
+            >
+              <Input
+                data-testid={selectors.components.AlertRules.newEvaluationGroupName}
+                className={styles.formInput}
+                autoFocus={true}
+                id={evaluationGroupNameId}
+                placeholder={t('alerting.evaluation-group-creation-modal.placeholder-enter-a-name', 'Enter a name')}
+                {...register('group', {
+                  required: {
+                    value: true,
+                    message: t('alerting.evaluation-group-creation-modal.message.required', 'Required.'),
+                  },
+                })}
+              />
+            </Field>
 
-          <Field
-            noMargin
-            error={formState.errors.evaluateEvery?.message}
-            label={
-              <Label
-                htmlFor={evaluateEveryId}
-                description={t(
-                  'alerting.evaluation-group-creation-modal.description-often-rules-group-evaluated',
-                  'How often all rules in the group are evaluated.'
+            <Field
+              noMargin
+              error={formState.errors.evaluateEvery?.message}
+              label={
+                <Label
+                  htmlFor={evaluateEveryId}
+                  description={t(
+                    'alerting.evaluation-group-creation-modal.description-often-rules-group-evaluated',
+                    'How often all rules in the group are evaluated.'
+                  )}
+                >
+                  <Trans i18nKey="alerting.rule-form.evaluation.group.interval">Evaluation interval</Trans>
+                </Label>
+              }
+              invalid={Boolean(formState.errors.evaluateEvery)}
+            >
+              <Input
+                data-testid={selectors.components.AlertRules.newEvaluationGroupInterval}
+                className={styles.formInput}
+                id={evaluateEveryId}
+                placeholder={DEFAULT_GROUP_EVALUATION_INTERVAL}
+                {...register(
+                  'evaluateEvery',
+                  evaluateEveryValidationOptions<{ group: string; evaluateEvery: string }>([])
                 )}
-              >
-                <Trans i18nKey="alerting.rule-form.evaluation.group.interval">Evaluation interval</Trans>
-              </Label>
-            }
-            invalid={Boolean(formState.errors.evaluateEvery)}
-          >
-            <Input
-              data-testid={selectors.components.AlertRules.newEvaluationGroupInterval}
-              className={styles.formInput}
-              id={evaluateEveryId}
-              placeholder={DEFAULT_GROUP_EVALUATION_INTERVAL}
-              {...register(
-                'evaluateEvery',
-                evaluateEveryValidationOptions<{ group: string; evaluateEvery: string }>(groupRules)
-              )}
-            />
-          </Field>
+              />
+            </Field>
 
-          <EvaluationGroupQuickPick currentInterval={evaluationInterval} onSelect={setEvaluationInterval} />
+            <EvaluationGroupQuickPick currentInterval={evaluationInterval} onSelect={setEvaluationInterval} />
+          </Stack>
 
           <Modal.ButtonRow>
             <Button variant="secondary" type="button" onClick={onCancel}>
@@ -626,7 +622,7 @@ export function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
   };
 
   return (
-    <Stack direction="column" justify-content="flex-start" align-items="flex-start">
+    <Stack direction="column" justify-content="flex-start" align-items="flex-start" gap={2}>
       <Field
         noMargin
         label={
@@ -680,7 +676,7 @@ function KeepFiringFor({ evaluateEvery }: { evaluateEvery: string }) {
   };
 
   return (
-    <Stack direction="column" justify-content="flex-start" align-items="flex-start">
+    <Stack direction="column" justify-content="flex-start" align-items="flex-start" gap={2}>
       <Field
         noMargin
         label={
