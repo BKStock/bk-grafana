@@ -31,10 +31,6 @@ const (
 	maxLimit           = 1000
 	Namespace          = "grafana"
 	Subsystem          = "alerting"
-
-	// LogQL field path for alert rule UID after JSON parsing.
-	// Loki flattens nested JSON fields with underscores: alert.labels.__alert_rule_uid__ -> alert_labels___alert_rule_uid__
-	lokiAlertRuleUIDField = "alert_labels___alert_rule_uid__"
 )
 
 var (
@@ -42,6 +38,7 @@ var (
 	ErrInvalidQuery = errors.New("invalid query")
 
 	validLabelKeyRegex = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	validRuleUIDRegex  = regexp.MustCompile(`^[a-zA-Z0-9\-\_]*$`)
 )
 
 type lokiClient interface {
@@ -104,8 +101,133 @@ func (h *LokiReader) Query(ctx context.Context, query Query) (QueryResult, error
 		return QueryResult{}, err
 	}
 
+	// Prune entries to the requested limit
+	if int64(len(entries)) > limit {
+		entries = entries[:limit]
+	}
+
 	return QueryResult{
 		Entries: entries,
+	}, nil
+}
+
+// QueryAlerts retrieves individual alert entries from an external Loki instance.
+func (h *LokiReader) QueryAlerts(ctx context.Context, query AlertQuery) (AlertQueryResult, error) {
+	logql, err := buildAlertQuery(query)
+	if err != nil {
+		return AlertQueryResult{}, err
+	}
+
+	now := time.Now().UTC()
+	from := now.Add(-defaultQueryRange)
+	if query.From != nil {
+		from = *query.From
+	}
+	to := now
+	if query.To != nil {
+		to = *query.To
+	}
+
+	limit := int64(defaultLimit)
+	if query.Limit != nil {
+		limit = *query.Limit
+	}
+
+	if limit > maxLimit {
+		return AlertQueryResult{}, fmt.Errorf("%w: limit (%d) over maximum allowed (%d)", ErrInvalidQuery, limit, maxLimit)
+	}
+
+	alerts, err := h.runAlertQuery(ctx, logql, from, to, limit)
+	if err != nil {
+		return AlertQueryResult{}, err
+	}
+
+	// Prune alerts to the requested limit.
+	if int64(len(alerts)) > limit {
+		alerts = alerts[:limit]
+	}
+
+	return AlertQueryResult{
+		Alerts: alerts,
+	}, nil
+}
+
+// buildAlertQuery creates the LogQL to perform the requested alert query.
+func buildAlertQuery(query AlertQuery) (string, error) {
+	selectors := []string{
+		fmt.Sprintf(`%s=%q`, historian.LabelFrom, historian.LabelFromValueAlerts),
+	}
+
+	logql := fmt.Sprintf(`{%s}`, strings.Join(selectors, `,`))
+
+	// UUID filtering uses structured metadata.
+	if query.Uuid != nil && *query.Uuid != "" {
+		logql += fmt.Sprintf(` | uuid = %q`, *query.Uuid)
+	}
+
+	logql += ` | json`
+
+	return logql, nil
+}
+
+// runAlertQuery runs the query and collects alert results.
+func (l *LokiReader) runAlertQuery(ctx context.Context, logql string, from, to time.Time, limit int64) ([]AlertEntry, error) {
+	alerts := make([]AlertEntry, 0)
+	r, err := l.client.RangeQuery(ctx, logql, from.UnixNano(), to.UnixNano(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("loki range query: %w", err)
+	}
+
+	for _, stream := range r.Data.Result {
+		for _, s := range stream.Values {
+			alert, err := parseLokiAlertEntry(s)
+			if err != nil {
+				l.logger.Warn("Ignoring alert history entry", "err", err)
+				continue
+			}
+			alerts = append(alerts, alert)
+		}
+	}
+
+	// Sort entries by timestamp (descending - newest first).
+	sort.Slice(alerts, func(i, j int) bool {
+		return alerts[i].StartsAt.After(alerts[j].StartsAt)
+	})
+
+	l.logger.Debug("Alert history query complete", "alerts", len(alerts))
+
+	return alerts, nil
+}
+
+// parseLokiAlertEntry unmarshals the JSON stored in an alert entry.
+func parseLokiAlertEntry(s lokiclient.Sample) (AlertEntry, error) {
+	var lokiEntry historian.NotificationHistoryLokiEntryAlert
+	err := json.Unmarshal([]byte(s.V), &lokiEntry)
+	if err != nil {
+		return AlertEntry{}, fmt.Errorf("failed to unmarshal alert entry [%s]: %w", s.T, err)
+	}
+
+	if lokiEntry.SchemaVersion != historian.SchemaVersion {
+		return AlertEntry{}, fmt.Errorf("unsupported schema version [%s]: %d", s.T, lokiEntry.SchemaVersion)
+	}
+
+	labels := lokiEntry.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	annotations := lokiEntry.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	return AlertEntry{
+		Status:      lokiEntry.Status,
+		Labels:      labels,
+		Annotations: annotations,
+		StartsAt:    lokiEntry.StartsAt,
+		EndsAt:      lokiEntry.EndsAt,
+		Enrichments: lokiEntry.ExtraData,
 	}, nil
 }
 
@@ -115,17 +237,25 @@ func buildQuery(query Query) (string, error) {
 		fmt.Sprintf(`%s=%q`, historian.LabelFrom, historian.LabelFromValue),
 	}
 
-	logql := fmt.Sprintf(`{%s} | json`, strings.Join(selectors, `,`))
+	logql := fmt.Sprintf(`{%s}`, strings.Join(selectors, `,`))
 
-	// Add ruleUID filter as JSON line filter if specified.
+	// RuleUID filtering can be performed using the comma separated structured metadata fields.
+	// We can match the uid exactly by anchoring the match to a comma or start/end.
 	if query.RuleUID != nil && *query.RuleUID != "" {
-		logql += fmt.Sprintf(` | %s = %q`, lokiAlertRuleUIDField, *query.RuleUID)
+		// Validate the uid close to where it is used to form the query,
+		// to reduce the risk of introducing a query injection bug.
+		if !validRuleUIDRegex.MatchString(*query.RuleUID) {
+			return "", fmt.Errorf("%w: rule uid: %q", ErrInvalidQuery, *query.RuleUID)
+		}
+		logql += fmt.Sprintf(` | rule_uids =~ "(^|.*,)%s($|,.*)"`, *query.RuleUID)
 	}
 
-	// Add receiver filter if specified.
+	// Receiver filtering can be done entirely using structured metadata fields.
 	if query.Receiver != nil && *query.Receiver != "" {
 		logql += fmt.Sprintf(` | receiver = %q`, *query.Receiver)
 	}
+
+	logql += ` | json`
 
 	// Add status filter if specified.
 	if query.Status != nil && *query.Status != "" {
@@ -162,7 +292,7 @@ func buildQuery(query Query) (string, error) {
 	return logql, nil
 }
 
-// runQuery runs the query and collects results.
+// runQuery runs the query and collects results, grouping alerts into notifications.
 func (l *LokiReader) runQuery(ctx context.Context, logql string, from, to time.Time, limit int64) ([]Entry, error) {
 	entries := make([]Entry, 0)
 	r, err := l.client.RangeQuery(ctx, logql, from.UnixNano(), to.UnixNano(), limit)
@@ -181,12 +311,12 @@ func (l *LokiReader) runQuery(ctx context.Context, logql string, from, to time.T
 		}
 	}
 
-	// We need to sort as results might be from a combination of streams.
+	// Sort entries by timestamp (descending - newest first)
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Timestamp.After(entries[j].Timestamp)
 	})
 
-	l.logger.Debug("Notification history query complete", "entries", len(entries))
+	l.logger.Debug("Notification history query complete", "notifications", len(entries))
 
 	return entries, nil
 }
@@ -199,7 +329,7 @@ func parseLokiEntry(s lokiclient.Sample) (Entry, error) {
 		return Entry{}, fmt.Errorf("failed to unmarshal entry [%s]: %w", s.T, err)
 	}
 
-	if lokiEntry.SchemaVersion != 1 {
+	if lokiEntry.SchemaVersion != 2 {
 		return Entry{}, fmt.Errorf("unsupported schema version [%s]: %d", s.T, lokiEntry.SchemaVersion)
 	}
 
@@ -215,25 +345,27 @@ func parseLokiEntry(s lokiclient.Sample) (Entry, error) {
 		groupLabels = make(map[string]string)
 	}
 
-	alerts := []EntryAlert{{
-		Status:      lokiEntry.Alert.Status,
-		Labels:      lokiEntry.Alert.Labels,
-		Annotations: lokiEntry.Alert.Annotations,
-		StartsAt:    lokiEntry.Alert.StartsAt,
-		EndsAt:      lokiEntry.Alert.EndsAt,
-	}}
+	ruleUIDs := lokiEntry.RuleUIDs
+	if ruleUIDs == nil {
+		ruleUIDs = []string{}
+	}
 
 	return Entry{
-		Timestamp:    s.T,
-		Receiver:     lokiEntry.Receiver,
-		Status:       Status(lokiEntry.Status),
-		Outcome:      outcome,
-		GroupKey:     lokiEntry.GroupKey,
-		GroupLabels:  groupLabels,
-		Alerts:       alerts,
-		Retry:        lokiEntry.Retry,
-		Error:        entryError,
-		Duration:     lokiEntry.Duration,
-		PipelineTime: lokiEntry.PipelineTime,
+		Timestamp:        s.T,
+		Uuid:             lokiEntry.UUID,
+		Receiver:         lokiEntry.Receiver,
+		Integration:      lokiEntry.Integration,
+		IntegrationIndex: int64(lokiEntry.IntegrationIdx),
+		Status:           Status(lokiEntry.Status),
+		Outcome:          outcome,
+		GroupKey:         lokiEntry.GroupKey,
+		GroupLabels:      groupLabels,
+		RuleUIDs:         ruleUIDs,
+		AlertCount:       int64(lokiEntry.AlertCount),
+		Alerts:           []EntryAlert{},
+		Retry:            lokiEntry.Retry,
+		Error:            entryError,
+		Duration:         lokiEntry.Duration,
+		PipelineTime:     lokiEntry.PipelineTime,
 	}, nil
 }

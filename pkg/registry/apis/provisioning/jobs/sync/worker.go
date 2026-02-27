@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/grafana/grafana-app-sdk/logging"
@@ -162,6 +163,9 @@ func (r *SyncWorker) Process(ctx context.Context, repo repository.Repository, jo
 	currentRef, syncError := r.syncer.Sync(syncCtx, rw, *job.Spec.Pull, repositoryResources, clients, progress)
 	jobStatus := progress.Complete(ctx, syncError)
 	syncStatus = jobStatus.ToSyncStatus(job.Name)
+	resultReasons := progress.ResultReasons()
+	isQuotaWarning := slices.Contains(resultReasons, provisioning.ReasonQuotaExceeded)
+
 	if syncError != nil {
 		logger.Debug("failed to sync the repository", "error", syncError)
 		_ = tracing.Error(syncSpan, syncError)
@@ -173,10 +177,12 @@ func (r *SyncWorker) Process(ctx context.Context, repo repository.Repository, jo
 	}
 	syncSpan.End()
 
-	if syncStatus.State != provisioning.JobStateError {
+	if syncStatus.State != provisioning.JobStateError && !isQuotaWarning {
 		syncStatus.LastRef = currentRef
 	} else {
-		// Preserve the original lastRef on error
+		if isQuotaWarning {
+			logger.Info("repository is over quota, preserving lastRef", "repository", cfg.Name)
+		}
 		syncStatus.LastRef = lastRef
 	}
 
@@ -213,18 +219,19 @@ func (r *SyncWorker) Process(ctx context.Context, repo repository.Repository, jo
 		finalSpan.SetAttributes(attribute.Int("stats.unexpected_count", len(stats.Managed)))
 	}
 
-	// Update Quota condition based on stats and configured limits.
-	// Quotas are evaluated here in the sync worker (pull) rather than in the controller because:
+	// Update conditions based on sync outcome and quota evaluation.
+	// Both conditions are evaluated here in the sync worker (pull) because:
 	// 1. The sync worker performs reconciliation and eventually cleans up resources, so it has
 	//    the most up-to-date view of what resources actually exist.
 	// 2. The sync worker is responsible for updating stats after each sync operation, making it
 	//    the natural place to evaluate quotas against those stats.
-	// 3. This ensures quota conditions reflect the actual resource state after reconciliation,
+	// 3. This ensures conditions reflect the actual state after reconciliation,
 	//    not just what the controller thinks should exist.
 	quotaStatus := repo.Config().Status.Quota
 	quotaCondition := quotas.EvaluateCondition(quotaStatus, quotas.NewQuotaUsageFromStats(repoStats))
-	if quotaConditionOps := controller.BuildConditionPatchOpsFromExisting(cfg.Status.Conditions, cfg.GetGeneration(), quotaCondition); quotaConditionOps != nil {
-		patchOperations = append(patchOperations, quotaConditionOps...)
+	syncCondition := EvaluatePullCondition(jobStatus.State, resultReasons)
+	if conditionOps := controller.BuildConditionPatchOpsFromExisting(cfg.Status.Conditions, cfg.GetGeneration(), quotaCondition, syncCondition); conditionOps != nil {
+		patchOperations = append(patchOperations, conditionOps...)
 	}
 
 	// Only patch the specific fields we want to update, not the entire status

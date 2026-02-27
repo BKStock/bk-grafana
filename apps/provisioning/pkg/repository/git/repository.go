@@ -24,6 +24,7 @@ import (
 	"github.com/grafana/nanogit/log"
 	"github.com/grafana/nanogit/options"
 	"github.com/grafana/nanogit/protocol"
+	"github.com/grafana/nanogit/protocol/client"
 	"github.com/grafana/nanogit/protocol/hash"
 	"github.com/grafana/nanogit/retry"
 )
@@ -82,6 +83,64 @@ func (r *gitRepository) SetBranch(branch string) {
 	r.gitConfig.Branch = branch
 }
 
+func (r *gitRepository) GetCurrentBranch() string {
+	return r.gitConfig.Branch
+}
+
+func (r *gitRepository) GetDefaultBranch(ctx context.Context) (string, error) {
+	ctx, _ = r.withGitContext(ctx, "")
+
+	// Get all refs to find the default branch
+	refs, err := r.client.ListRefs(ctx)
+	if err != nil {
+		return "", fmt.Errorf("list refs: %w", err)
+	}
+
+	var hasMain, hasMaster bool
+	var firstBranch string
+
+	// Single pass through refs to find main, master, or first branch alphabetically
+	for _, ref := range refs {
+		if !strings.HasPrefix(ref.Name, "refs/heads/") {
+			continue
+		}
+
+		branchName := strings.TrimPrefix(ref.Name, "refs/heads/")
+
+		// Check for main or master
+		switch branchName {
+		case "main":
+			hasMain = true
+		case "master":
+			hasMaster = true
+		}
+
+		// Track first branch alphabetically as fallback
+		if firstBranch == "" || branchName < firstBranch {
+			firstBranch = branchName
+		}
+	}
+
+	// No branches found
+	if firstBranch == "" {
+		return "", fmt.Errorf("no branches found in repository")
+	}
+
+	// Prefer main, then master, then first branch alphabetically
+	if hasMain {
+		return "main", nil
+	}
+	if hasMaster {
+		return "master", nil
+	}
+
+	// If neither main nor master exists, return the first branch alphabetically.
+	// This provides deterministic behavior when working with repositories that use
+	// non-standard default branch names (e.g., "develop", "trunk", custom names).
+	// Users can always change the branch afterward or specify it directly in the repository configuration.
+	return firstBranch, nil
+}
+
 func (r *gitRepository) Config() *provisioning.Repository {
 	return r.config
 }
@@ -93,8 +152,8 @@ func isValidGitURL(gitURL string) bool {
 		return false
 	}
 
-	// Must be HTTPS
-	if parsed.Scheme != "https" {
+	// Must be HTTPS or HTTP (HTTP allowed for local development)
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return false
 	}
 
@@ -117,7 +176,26 @@ func (r *gitRepository) Test(ctx context.Context) (*provisioning.TestResults, er
 
 	t := string(r.config.Spec.Type)
 
+	// In case the branch is empty
+	if r.GetCurrentBranch() == "" {
+		branch, err := r.GetDefaultBranch(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		r.SetBranch(branch)
+	}
+
+	// Check authorization
 	if ok, err := r.client.IsAuthorized(ctx); err != nil || !ok {
+		// Map nanogit errors to repository errors for proper HTTP status codes
+		if err != nil {
+			err = mapNanogitError(err)
+			if result := checkHTTPError(err, field.NewPath("secure", "token")); result != nil {
+				return result, nil
+			}
+		}
+
 		detail := "not authorized"
 		if err != nil {
 			detail = fmt.Sprintf("failed check if authorized: %v", err)
@@ -134,7 +212,16 @@ func (r *gitRepository) Test(ctx context.Context) (*provisioning.TestResults, er
 		}, nil
 	}
 
+	// Check if repository exists
 	if ok, err := r.client.RepoExists(ctx); err != nil || !ok {
+		// Map nanogit errors to repository errors for proper HTTP status codes
+		if err != nil {
+			err = mapNanogitError(err)
+			if result := checkHTTPError(err, field.NewPath("spec", t, "url")); result != nil {
+				return result, nil
+			}
+		}
+
 		detail := "repository not found"
 		if err != nil {
 			detail = fmt.Sprintf("failed check if repository exists: %v", err)
@@ -154,7 +241,7 @@ func (r *gitRepository) Test(ctx context.Context) (*provisioning.TestResults, er
 	// Test basic connectivity by getting the branch reference
 	_, err := r.client.GetRef(ctx, fmt.Sprintf("refs/heads/%s", r.gitConfig.Branch))
 	if err != nil {
-		detail := "branch not found"
+		// Check for branch not found first (before mapping)
 		if errors.Is(err, nanogit.ErrObjectNotFound) {
 			return &provisioning.TestResults{
 				Code:    http.StatusBadRequest,
@@ -162,12 +249,18 @@ func (r *gitRepository) Test(ctx context.Context) (*provisioning.TestResults, er
 				Errors: []provisioning.ErrorDetails{{
 					Type:   metav1.CauseTypeFieldValueInvalid,
 					Field:  field.NewPath("spec", t, "branch").String(),
-					Detail: detail,
+					Detail: "branch not found",
 				}},
 			}, nil
 		}
 
-		detail = fmt.Sprintf("failed to check if branch exists: %v", err)
+		// Map nanogit errors to repository errors for proper HTTP status codes
+		err = mapNanogitError(err)
+		if result := checkHTTPError(err, field.NewPath("spec", t, "branch")); result != nil {
+			return result, nil
+		}
+
+		detail := fmt.Sprintf("failed to check if branch exists: %v", err)
 
 		return &provisioning.TestResults{
 			Code:    http.StatusBadRequest,
@@ -850,4 +943,73 @@ func (r *gitRepository) withGitContext(ctx context.Context, ref string) (context
 	ctx = log.ToContext(ctx, logger)
 
 	return ctx, logger
+}
+
+// mapNanogitError converts nanogit-specific errors to repository errors.
+// This maintains the abstraction boundary and allows proper HTTP status code handling.
+func mapNanogitError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Map structured nanogit errors to repository errors using the sentinel errors
+	// from the client package (nanogit re-exports error types but not sentinel errors)
+	if errors.Is(err, client.ErrUnauthorized) {
+		return repository.ErrUnauthorized
+	}
+	if errors.Is(err, client.ErrPermissionDenied) {
+		return repository.ErrPermissionDenied
+	}
+	if errors.Is(err, client.ErrServerUnavailable) {
+		return repository.ErrServerUnavailable
+	}
+
+	// Return original error if not a known nanogit error
+	return err
+}
+
+// checkHTTPError checks if the error is a known HTTP error (401, 403, 503) and returns
+// the appropriate TestResults. Returns nil if the error is not a known HTTP error.
+func checkHTTPError(err error, fieldPath *field.Path) *provisioning.TestResults {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, repository.ErrUnauthorized) {
+		return &provisioning.TestResults{
+			Code:    http.StatusUnauthorized,
+			Success: false,
+			Errors: []provisioning.ErrorDetails{{
+				Type:   metav1.CauseTypeFieldValueInvalid,
+				Field:  field.NewPath("secure", "token").String(),
+				Detail: "authentication failed",
+			}},
+		}
+	}
+
+	if errors.Is(err, repository.ErrPermissionDenied) {
+		return &provisioning.TestResults{
+			Code:    http.StatusForbidden,
+			Success: false,
+			Errors: []provisioning.ErrorDetails{{
+				Type:   metav1.CauseTypeFieldValueInvalid,
+				Field:  field.NewPath("secure", "token").String(),
+				Detail: "permission denied",
+			}},
+		}
+	}
+
+	if errors.Is(err, repository.ErrServerUnavailable) {
+		return &provisioning.TestResults{
+			Code:    http.StatusServiceUnavailable,
+			Success: false,
+			Errors: []provisioning.ErrorDetails{{
+				Type:   metav1.CauseTypeFieldValueInvalid,
+				Field:  fieldPath.String(),
+				Detail: fmt.Sprintf("server unavailable: %v", err),
+			}},
+		}
+	}
+
+	return nil
 }

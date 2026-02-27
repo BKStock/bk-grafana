@@ -34,31 +34,29 @@ export function EditableQueryName({ query, queries, onQueryUpdate }: EditableQue
     }
 
     if (name.length === 0) {
-      return t('query-editor.validation.empty-name', 'An empty query name is not allowed');
+      return t('query-editor-next.validation.empty-name', 'An empty query name is not allowed');
     }
 
     if (existingRefIds.has(name)) {
-      return t('query-editor.validation.duplicate-name', 'Query name already exists');
+      return t('query-editor-next.validation.duplicate-name', 'Query name already exists');
     }
 
     return null;
   };
 
   const onEndEditName = (newName: string) => {
-    const trimmedName = newName.trim();
-    const error = validateQueryName(trimmedName);
+    setIsEditing(false);
+    setValidationError(null);
 
-    if (error) {
-      setValidationError(error);
+    const trimmedName = newName.trim();
+
+    if (validateQueryName(trimmedName)) {
       return;
     }
 
     if (query.refId !== trimmedName) {
       onQueryUpdate({ ...query, refId: trimmedName }, query.refId);
     }
-
-    setIsEditing(false);
-    setValidationError(null);
   };
 
   const onInputChange = (event: React.SyntheticEvent<HTMLInputElement>) => {
@@ -67,12 +65,28 @@ export function EditableQueryName({ query, queries, onQueryUpdate }: EditableQue
     setValidationError(error);
   };
 
-  const onEditQueryBlur = (event: React.SyntheticEvent<HTMLInputElement>) => {
+  const onEditQueryBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    // Switching cards should cancel in-progress rename edits.
+    if (isSidebarCardElement(event.relatedTarget)) {
+      setIsEditing(false);
+      setValidationError(null);
+      return;
+    }
+
+    // Any other blur should finish the edit flow (validate + optional rename).
     onEndEditName(event.currentTarget.value);
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
+      const trimmedName = event.currentTarget.value.trim();
+      const error = validateQueryName(trimmedName);
+
+      if (error) {
+        setValidationError(error);
+        return;
+      }
+
       onEndEditName(event.currentTarget.value);
     } else if (event.key === 'Escape') {
       event.stopPropagation(); // Prevent going all the way back to the dashboard scene
@@ -112,8 +126,8 @@ export function EditableQueryName({ query, queries, onQueryUpdate }: EditableQue
       className={styles.queryNameWrapper}
       onClick={onEditQuery}
       type="button"
-      aria-label={t('query-editor.edit-query-name', 'Edit query name')}
-      title={t('query-editor.edit-query-name', 'Edit query name')}
+      aria-label={t('query-editor-next.edit-query-name', 'Edit query name')}
+      title={t('query-editor-next.edit-query-name', 'Edit query name')}
     >
       <span className={styles.queryNameText}>
         <Text color="primary" element="p" truncate variant="code">
@@ -123,6 +137,10 @@ export function EditableQueryName({ query, queries, onQueryUpdate }: EditableQue
       <Icon name="pen" className={styles.queryEditIcon} data-edit-icon size="sm" />
     </button>
   );
+}
+
+function isSidebarCardElement(target: EventTarget | null) {
+  return target instanceof HTMLElement && target.closest('[data-query-sidebar-card]') !== null;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
