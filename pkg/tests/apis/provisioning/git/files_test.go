@@ -199,17 +199,14 @@ func (h *gitTestHelper) createGitRepo(t *testing.T, repoName string, initialFile
 
 	require.NoError(t, result.Error(), "failed to create repository")
 
-	// Wait for repository to be healthy
-	h.waitForHealthyRepository(t, repoName)
-
-	// Trigger initial sync to make repository operational
-	h.syncAndWait(t, repoName)
+	// Wait for repository to be ready
+	h.waitForReadyRepository(t, repoName)
 
 	return remote, local
 }
 
-// waitForHealthyRepository waits for a repository to become healthy
-func (h *gitTestHelper) waitForHealthyRepository(t *testing.T, repoName string) {
+// waitForReadyRepository waits for a repository to have Ready=True condition
+func (h *gitTestHelper) waitForReadyRepository(t *testing.T, repoName string) {
 	t.Helper()
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -218,36 +215,37 @@ func (h *gitTestHelper) waitForHealthyRepository(t *testing.T, repoName string) 
 			return
 		}
 
-		// Check health status
+		// Check for Ready condition
 		conditions, found, err := unstructured.NestedSlice(repo.Object, "status", "conditions")
 		if !assert.NoError(collect, err) {
 			return
 		}
 
-		// Log conditions for debugging
 		if !found || len(conditions) == 0 {
-			t.Logf("No conditions found for repository %s, checking if repository exists", repoName)
-			// Repository might be healthy without explicit conditions, just check it exists
-			assert.True(collect, true, "repository exists")
+			collect.Errorf("no conditions found for repository %s", repoName)
 			return
 		}
 
-		// Check for Health=True or Ready=True conditions
-		healthy := false
+		// Look for Ready=True condition
+		ready := false
 		for _, cond := range conditions {
 			condMap := cond.(map[string]interface{})
-			condType := condMap["type"]
-			condStatus := condMap["status"]
-			t.Logf("Repository %s condition: type=%v status=%v", repoName, condType, condStatus)
+			condType, _ := condMap["type"].(string)
+			condStatus, _ := condMap["status"].(string)
+			condReason, _ := condMap["reason"].(string)
+			condMessage, _ := condMap["message"].(string)
 
-			if (condType == "Health" || condType == "Ready") && condStatus == "True" {
-				healthy = true
+			t.Logf("Repository %s condition: type=%s status=%s reason=%s message=%s",
+				repoName, condType, condStatus, condReason, condMessage)
+
+			if condType == "Ready" && condStatus == "True" {
+				ready = true
 				break
 			}
 		}
 
-		assert.True(collect, healthy, "repository not healthy")
-	}, waitTimeoutDefault, waitIntervalDefault, "repository %s should become healthy", repoName)
+		assert.True(collect, ready, "repository not ready")
+	}, waitTimeoutDefault, waitIntervalDefault, "repository %s should become ready", repoName)
 }
 
 // syncAndWait triggers a sync job and waits for it to complete
@@ -320,12 +318,16 @@ func TestIntegrationGitFiles_CreateFile(t *testing.T) {
 	_, _ = helper.createGitRepo(t, repoName, nil)
 
 	t.Run("create file on default branch", func(t *testing.T) {
-		// Create a simple dashboard file
+		// Create a proper dashboard file
 		dashboardContent := []byte(`{
 			"uid": "test-dashboard-1",
 			"title": "Test Dashboard 1",
+			"tags": [],
+			"timezone": "browser",
 			"schemaVersion": 39,
-			"version": 1
+			"version": 1,
+			"refresh": "",
+			"panels": []
 		}`)
 
 		result := helper.AdminREST.Post().
@@ -333,6 +335,7 @@ func TestIntegrationGitFiles_CreateFile(t *testing.T) {
 			Resource("repositories").
 			Name(repoName).
 			SubResource("files", "dashboard1.json").
+			Param("message", "Create dashboard1.json").
 			Body(dashboardContent).
 			SetHeader("Content-Type", "application/json").
 			Do(ctx)
