@@ -2,9 +2,11 @@ package controller
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/grafana/grafana-app-sdk/logging"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,10 +18,12 @@ import (
 	"github.com/grafana/grafana/pkg/registry/apis/provisioning/jobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	provisioning "github.com/grafana/grafana/apps/provisioning/pkg/apis/provisioning/v0alpha1"
 	provisioningv0alpha1 "github.com/grafana/grafana/apps/provisioning/pkg/generated/applyconfiguration/provisioning/v0alpha1"
 	client "github.com/grafana/grafana/apps/provisioning/pkg/generated/clientset/versioned/typed/provisioning/v0alpha1"
+	"github.com/grafana/grafana/apps/provisioning/pkg/quotas"
 	"github.com/grafana/grafana/apps/provisioning/pkg/repository"
 )
 
@@ -702,4 +706,99 @@ func TestRepositoryController_shouldResync_StaleSyncStatus(t *testing.T) {
 			assert.Equal(t, tc.expectedResync, result, tc.description)
 		})
 	}
+}
+
+// capturePatcher captures all patch operations for inspection in tests.
+type capturePatcher struct {
+	ops []map[string]interface{}
+}
+
+func (c *capturePatcher) Patch(_ context.Context, _ *provisioning.Repository, patchOperations ...map[string]interface{}) error {
+	c.ops = append(c.ops, patchOperations...)
+	return nil
+}
+
+// TestRepositoryController_process_ConditionsNotOverwritten verifies that the reconciliation loop
+// produces a final /status/conditions patch containing both the quota and ready condition.
+func TestRepositoryController_process_ConditionsNotOverwritten(t *testing.T) {
+	repo := &provisioning.Repository{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-repo",
+			Namespace:  "default",
+			Generation: 2,
+		},
+		Spec: provisioning.RepositorySpec{
+			Type: provisioning.LocalRepositoryType,
+			Sync: provisioning.SyncOptions{
+				Enabled: false,
+			},
+		},
+		Status: provisioning.RepositoryStatus{
+			ObservedGeneration: 1,
+		},
+	}
+
+	mockNamespaceLister := &MockRepositoryNamespaceLister{}
+	mockNamespaceLister.On("List", mock.Anything).Return([]*provisioning.Repository{repo}, nil)
+	mockNamespaceLister.On("Get", repo.Name).Return(repo, nil)
+	mockLister := &MockRepositoryLister{namespaceLister: mockNamespaceLister}
+
+	mockMetrics := NewMockHealthMetricsRecorder(t)
+	mockMetrics.EXPECT().RecordHealthCheck(mock.Anything, mock.Anything, mock.Anything).Return()
+
+	tester := repository.NewTester()
+	healthChecker := NewRepositoryHealthChecker(nil, tester, mockMetrics)
+
+	mockConfigRepo := repository.NewMockConfigRepository(t)
+	mockConfigRepo.EXPECT().Config().Return(repo)
+	mockConfigRepo.EXPECT().Test(mock.Anything).Return(
+		&provisioning.TestResults{Success: true, Code: http.StatusOK},
+		nil,
+	)
+
+	mockFactory := repository.NewMockFactory(t)
+	mockFactory.EXPECT().Build(mock.Anything, mock.Anything).Return(mockConfigRepo, nil)
+
+	patcher := &capturePatcher{}
+
+	rc := &RepositoryController{
+		repoLister:    mockLister,
+		quotaGetter:   quotas.NewFixedQuotaGetter(provisioning.QuotaStatus{}),
+		quotaChecker:  NewRepositoryQuotaChecker(mockLister),
+		healthChecker: healthChecker,
+		repoFactory:   mockFactory,
+		statusPatcher: patcher,
+		logger:        logging.DefaultLogger,
+	}
+
+	err := rc.process(&queueItem{key: "default/test-repo"})
+	require.NoError(t, err)
+
+	// Find the last /status/conditions patch operation — if there are multiple
+	// replace ops on the same path, the last one wins when applied as a JSON Patch.
+	var lastConditionsPatch map[string]interface{}
+	for _, op := range patcher.ops {
+		if path, ok := op["path"].(string); ok && path == "/status/conditions" {
+			lastConditionsPatch = op
+		}
+	}
+
+	require.NotNil(t, lastConditionsPatch, "expected at least one /status/conditions patch")
+
+	conditions, ok := lastConditionsPatch["value"].([]metav1.Condition)
+	require.True(t, ok, "expected conditions value to be []metav1.Condition")
+
+	var hasQuotaCondition, hasReadyCondition bool
+	for _, c := range conditions {
+		switch c.Type {
+		case provisioning.ConditionTypeNamespaceQuota:
+			hasQuotaCondition = true
+		case provisioning.ConditionTypeReady:
+			hasReadyCondition = true
+		}
+	}
+
+	assert.True(t, hasQuotaCondition, "expected quota condition in final /status/conditions patch")
+	assert.True(t, hasReadyCondition, "expected ready condition in final /status/conditions patch")
+	assert.Len(t, conditions, 2, "expected exactly 2 conditions (quota + ready)")
 }

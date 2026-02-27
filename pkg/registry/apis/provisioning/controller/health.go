@@ -9,6 +9,7 @@ import (
 	provisioning "github.com/grafana/grafana/apps/provisioning/pkg/apis/provisioning/v0alpha1"
 	"github.com/grafana/grafana/apps/provisioning/pkg/repository"
 	"github.com/grafana/grafana/pkg/registry/apis/provisioning/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -180,6 +181,8 @@ func (hc *RepositoryHealthChecker) RefreshHealth(ctx context.Context, repo repos
 // and returns the test results, health status, and patch operations to apply.
 // This method does NOT apply the patch itself, allowing the caller to batch
 // multiple status updates together to avoid race conditions.
+//
+// NOTE: This intentionally does NOT include condition patches (e.g. Ready).
 func (hc *RepositoryHealthChecker) RefreshHealthWithPatchOps(ctx context.Context, repo repository.Repository) (*provisioning.TestResults, provisioning.HealthStatus, []map[string]interface{}, error) {
 	cfg := repo.Config()
 
@@ -200,14 +203,12 @@ func (hc *RepositoryHealthChecker) RefreshHealthWithPatchOps(ctx context.Context
 		})
 	}
 
-	// Update Ready condition based on health status
-	// Repository health checks don't classify error types, so we use InvalidSpec as the default reason
-	readyCondition := buildReadyConditionWithReason(newHealthStatus, provisioning.ReasonInvalidSpec)
-	if conditionPatchOps := BuildConditionPatchOpsFromExisting(cfg.Status.Conditions, cfg.GetGeneration(), readyCondition); conditionPatchOps != nil {
-		patchOps = append(patchOps, conditionPatchOps...)
-	}
-
 	return testResults, newHealthStatus, patchOps, nil
+}
+
+// BuildReadyCondition returns the Ready condition derived from the given health status.
+func (hc *RepositoryHealthChecker) BuildReadyCondition(healthStatus provisioning.HealthStatus) metav1.Condition {
+	return buildReadyConditionWithReason(healthStatus, provisioning.ReasonInvalidSpec)
 }
 
 // RefreshTimestamp updates the health status timestamp without changing other fields
