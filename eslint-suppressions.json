@@ -1719,9 +1719,6 @@
   "public/app/features/dashboard-scene/scene/export/exporters.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
-    },
-    "no-restricted-syntax": {
-      "count": 3
     }
   },
   "public/app/features/dashboard-scene/scene/export/exporters.ts": {
@@ -1730,9 +1727,6 @@
     },
     "@typescript-eslint/no-explicit-any": {
       "count": 8
-    },
-    "no-restricted-syntax": {
-      "count": 1
     }
   },
   "public/app/features/dashboard-scene/scene/layout-auto-grid/AutoGridItemEditor.tsx": {
@@ -2150,9 +2144,6 @@
   "public/app/features/dashboard/state/DashboardMigrator.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 10
-    },
-    "no-restricted-syntax": {
-      "count": 1
     }
   },
   "public/app/features/dashboard/state/DashboardMigrator.ts": {
@@ -2178,7 +2169,7 @@
       "count": 1
     },
     "@typescript-eslint/no-explicit-any": {
-      "count": 23
+      "count": 24
     }
   },
   "public/app/features/dashboard/state/PanelModel.test.ts": {
@@ -2607,11 +2598,6 @@
   },
   "public/app/features/panel/panellinks/linkSuppliers.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "public/app/features/panel/state/util.ts": {
-    "no-restricted-syntax": {
       "count": 1
     }
   },
