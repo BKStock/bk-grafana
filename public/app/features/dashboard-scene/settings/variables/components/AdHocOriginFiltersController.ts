@@ -2,7 +2,7 @@ import { SelectableValue } from '@grafana/data';
 import { t } from '@grafana/i18n';
 import { AdHocFiltersController, AdHocFilterWithLabels } from '@grafana/scenes';
 
-export class AdHocBaseFiltersController implements AdHocFiltersController {
+export class AdHocOriginFiltersController implements AdHocFiltersController {
   constructor(
     private filters: AdHocFilterWithLabels[],
     private setFilters: (filters: AdHocFilterWithLabels[]) => void,
@@ -20,7 +20,10 @@ export class AdHocBaseFiltersController implements AdHocFiltersController {
       readOnly: false,
       allowCustomValue: true,
       supportsMultiValueOperators: true,
-      inputPlaceholder: t('dashboard-scene.adhoc-base-filters-controller.input-placeholder', 'Add a default filter...'),
+      inputPlaceholder: t(
+        'dashboard-scene.adhoc-origin-filters-controller.input-placeholder',
+        'Add a default filter...'
+      ),
     };
   }
 

@@ -7,7 +7,7 @@ import { getDataSourceSrv } from '@grafana/runtime';
 import { AdHocFiltersVariable, AdHocFilterWithLabels, SceneVariable } from '@grafana/scenes';
 import { OptionsPaneItemDescriptor } from 'app/features/dashboard/components/PanelEditor/OptionsPaneItemDescriptor';
 
-import { AdHocBaseFiltersController } from '../components/AdHocBaseFiltersController';
+import { AdHocOriginFiltersController } from '../components/AdHocOriginFiltersController';
 import { AdHocVariableForm } from '../components/AdHocVariableForm';
 
 interface AdHocFiltersVariableEditorProps {
@@ -18,13 +18,13 @@ interface AdHocFiltersVariableEditorProps {
 
 export function AdHocFiltersVariableEditor(props: AdHocFiltersVariableEditorProps) {
   const { variable } = props;
-  const { datasource: datasourceRef, defaultKeys, originFilters } = variable.useState();
+  const { datasource: datasourceRef, defaultKeys, allowCustomValue, originFilters } = variable.useState();
 
   const [wip, setWip] = useState<AdHocFilterWithLabels | undefined>(undefined);
 
-  const baseFiltersController = useMemo(
+  const originFiltersController = useMemo(
     () =>
-      new AdHocBaseFiltersController(
+      new AdHocOriginFiltersController(
         originFilters ?? [],
         // TODO: do I need to filter out dashboard origin only? Or other origins wont live here?
         (filters) => variable.setState({ originFilters: filters }),
@@ -73,7 +73,7 @@ export function AdHocFiltersVariableEditor(props: AdHocFiltersVariableEditorProp
       defaultKeys={defaultKeys}
       onDefaultKeysChange={onDefaultKeysChange}
       onAllowCustomValueChange={onAllowCustomValueChange}
-      baseFiltersController={baseFiltersController}
+      originFiltersController={originFiltersController}
       inline={props.inline}
       datasourceSupported={datasourceSettings?.getTagKeys ? true : false}
     />

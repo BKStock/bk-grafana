@@ -9,7 +9,7 @@ import { DataSourceRef } from '@grafana/schema';
 import { Alert, CodeEditor, Field, Switch, Stack } from '@grafana/ui';
 import { DataSourcePicker } from 'app/features/datasources/components/picker/DataSourcePicker';
 
-import { AdHocBaseFiltersEditor } from './AdHocBaseFiltersEditor';
+import { AdHocOriginFiltersEditor } from './AdHocOriginFiltersEditor';
 import { VariableCheckboxField } from './VariableCheckboxField';
 import { VariableLegend } from './VariableLegend';
 
@@ -21,7 +21,7 @@ export interface AdHocVariableFormProps {
   defaultKeys?: MetricFindValue[];
   onDefaultKeysChange?: (keys?: MetricFindValue[]) => void;
   onAllowCustomValueChange?: (event: FormEvent<HTMLInputElement>) => void;
-  baseFiltersController?: AdHocFiltersController;
+  originFiltersController?: AdHocFiltersController;
   inline?: boolean;
   datasourceSupported: boolean;
 }
@@ -33,7 +33,7 @@ export function AdHocVariableForm({
   onDataSourceChange,
   onDefaultKeysChange,
   onAllowCustomValueChange,
-  baseFiltersController,
+  originFiltersController,
   defaultKeys,
   inline,
   datasourceSupported,
@@ -86,7 +86,9 @@ export function AdHocVariableForm({
         />
       ) : null}
 
-      {datasourceSupported && baseFiltersController && <AdHocBaseFiltersEditor controller={baseFiltersController} />}
+      {datasourceSupported && originFiltersController && (
+        <AdHocOriginFiltersEditor controller={originFiltersController} />
+      )}
 
       {datasourceSupported && onDefaultKeysChange && (
         <>

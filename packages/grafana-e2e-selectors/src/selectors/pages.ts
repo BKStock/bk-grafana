@@ -621,8 +621,8 @@ export const versionedPages = {
             modeToggle: {
               '11.0.0': 'data-testid ad-hoc filters variable mode toggle',
             },
-            baseFiltersSection: {
-              '13.0.0': 'data-testid ad-hoc filters variable base filters',
+            originFiltersSection: {
+              '13.0.0': 'data-testid ad-hoc filters variable origin filters',
             },
           },
           SwitchVariable: {

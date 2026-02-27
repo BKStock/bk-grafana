@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 
 import { AdHocFiltersController } from '@grafana/scenes';
 
-import { AdHocBaseFiltersEditor } from './AdHocBaseFiltersEditor';
+import { AdHocOriginFiltersEditor } from './AdHocOriginFiltersEditor';
 
 jest.mock('@grafana/scenes', () => {
   const actual = jest.requireActual('@grafana/scenes');
@@ -35,19 +35,19 @@ function createMockController(): AdHocFiltersController {
   };
 }
 
-describe('AdHocBaseFiltersEditor', () => {
+describe('AdHocOriginFiltersEditor', () => {
   it('should render the combobox renderer', () => {
-    render(<AdHocBaseFiltersEditor controller={createMockController()} />);
+    render(<AdHocOriginFiltersEditor controller={createMockController()} />);
     expect(screen.getByTestId('adhoc-combobox-renderer')).toBeInTheDocument();
   });
 
   it('should render with the correct test id', () => {
-    render(<AdHocBaseFiltersEditor controller={createMockController()} />);
-    expect(screen.getByTestId('data-testid ad-hoc filters variable base filters')).toBeInTheDocument();
+    render(<AdHocOriginFiltersEditor controller={createMockController()} />);
+    expect(screen.getByTestId('data-testid ad-hoc filters variable origin filters')).toBeInTheDocument();
   });
 
   it('should render the field label', () => {
-    render(<AdHocBaseFiltersEditor controller={createMockController()} />);
-    expect(screen.getByText('Base filters')).toBeInTheDocument();
+    render(<AdHocOriginFiltersEditor controller={createMockController()} />);
+    expect(screen.getByText('Default filters')).toBeInTheDocument();
   });
 });

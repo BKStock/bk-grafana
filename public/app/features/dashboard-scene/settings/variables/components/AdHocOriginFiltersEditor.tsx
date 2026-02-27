@@ -5,21 +5,21 @@ import { t } from '@grafana/i18n';
 import { AdHocFiltersComboboxRenderer, AdHocFiltersController } from '@grafana/scenes';
 import { Field, Stack } from '@grafana/ui';
 
-export interface AdHocBaseFiltersEditorProps {
+export interface AdHocOriginFiltersEditorProps {
   controller: AdHocFiltersController;
 }
 
-export function AdHocBaseFiltersEditor({ controller }: AdHocBaseFiltersEditorProps): ReactElement {
+export function AdHocOriginFiltersEditor({ controller }: AdHocOriginFiltersEditorProps): ReactElement {
   return (
     <Stack
       direction="column"
       gap={1}
-      data-testid={selectors.pages.Dashboard.Settings.Variables.Edit.AdHocFiltersVariable.baseFiltersSection}
+      data-testid={selectors.pages.Dashboard.Settings.Variables.Edit.AdHocFiltersVariable.originFiltersSection}
     >
       <Field
-        label={t('dashboard-scene.adhoc-base-filters-editor.label', 'Base filters')}
+        label={t('dashboard-scene.adhoc-origin-filters-editor.label', 'Default filters')}
         description={t(
-          'dashboard-scene.adhoc-base-filters-editor.description',
+          'dashboard-scene.adhoc-origin-filters-editor.description',
           'Filters that are pre-selected by default.'
         )}
         noMargin
