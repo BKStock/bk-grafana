@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/grafana/dskit/services"
+	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -15,27 +18,27 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type fakeProvider struct {
-	server *grpc.Server
-}
-
-func (f *fakeProvider) Run(_ context.Context) error { return nil }
-func (f *fakeProvider) IsDisabled() bool            { return false }
-func (f *fakeProvider) GetServer() *grpc.Server     { return f.server }
-func (f *fakeProvider) GetAddress() string          { return "" }
-
-func newTestHealthService(t *testing.T, opts ...Option) *HealthService {
+func newTestHealthService(t *testing.T) *HealthService {
 	t.Helper()
-	svc, err := ProvideHealthServiceWithOpts(&fakeProvider{server: grpc.NewServer()}, opts...)
-	require.NoError(t, err)
+	srv := grpc.NewServer()
+	t.Cleanup(srv.Stop)
+	svc := newHealthService()
+	svc.logger = log.NewNopLogger()
+	grpc_health_v1.RegisterHealthServer(srv, svc)
 	return svc
 }
 
 func TestHealthCheck(t *testing.T) {
-	t.Run("returns NOT_SERVING with WithInitialStatuses", func(t *testing.T) {
-		svc := newTestHealthService(t, WithInitialStatuses(
-			map[string]grpc_health_v1.HealthCheckResponse_ServingStatus{"": grpc_health_v1.HealthCheckResponse_NOT_SERVING},
-		))
+	t.Run("returns SERVING initially", func(t *testing.T) {
+		svc := newTestHealthService(t)
+		res, err := svc.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, res.Status)
+	})
+
+	t.Run("returns NOT_SERVING with empty service", func(t *testing.T) {
+		svc := newTestHealthService(t)
+		svc.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 		res, err := svc.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, res.Status)
@@ -199,4 +202,113 @@ func (f *fakeHealthWatchServer) Context() context.Context {
 		f.context = context.Background()
 	}
 	return f.context
+}
+
+// fakeHealthProbeService is a dskit service that also implements HealthProbe.
+type fakeHealthProbeService struct {
+	*services.BasicService
+	healthy atomic.Bool
+}
+
+func newFakeHealthProbeService(name string, healthy bool) *fakeHealthProbeService {
+	s := &fakeHealthProbeService{}
+	s.healthy.Store(healthy)
+	s.BasicService = services.NewIdleService(nil, nil).WithName(name)
+	return s
+}
+
+func (f *fakeHealthProbeService) CheckHealth(_ context.Context) bool {
+	return f.healthy.Load()
+}
+
+func TestHealthService_StateChangeUpdatesStatus(t *testing.T) {
+	hs := newTestHealthService(t)
+	svc := newFakeHealthProbeService("test-svc", true)
+
+	hs.AddHealthListener(svc)
+
+	ctx := context.Background()
+	mgr, err := services.NewManager(svc)
+	require.NoError(t, err)
+	mgr.AddListener(hs)
+	require.NoError(t, mgr.StartAsync(ctx))
+	require.NoError(t, mgr.AwaitHealthy(ctx))
+
+	// The Running callback should have called CheckHealth (true) -> SERVING.
+	// Listener notifications are asynchronous, so poll until the status updates.
+	var res *grpc_health_v1.HealthCheckResponse
+
+	require.NoError(t, mgr.AwaitHealthy(ctx))
+
+	require.Eventually(t, func() bool {
+		var err error
+		res, err = hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "test-svc"})
+		return err == nil && res.Status == grpc_health_v1.HealthCheckResponse_SERVING
+	}, 2*time.Second, 50*time.Millisecond)
+
+	// Stop -> NOT_SERVING.
+	mgr.StopAsync()
+	require.NoError(t, mgr.AwaitStopped(ctx))
+
+	// Listener notifications are asynchronous, so poll until the status updates.
+	require.Eventually(t, func() bool {
+		var err error
+		res, err = hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "test-svc"})
+		return err == nil && res.Status == grpc_health_v1.HealthCheckResponse_NOT_SERVING
+	}, 2*time.Second, 50*time.Millisecond)
+}
+
+func TestHealthService_PollUpdatesStatus(t *testing.T) {
+	hs := newTestHealthService(t)
+	svc := newFakeHealthProbeService("poll-svc", true)
+	hs.AddHealthListener(svc)
+
+	ctx := context.Background()
+	require.NoError(t, svc.StartAsync(ctx))
+	require.NoError(t, svc.AwaitRunning(ctx))
+	defer svc.StopAsync()
+
+	hs.pollServices(ctx)
+	res, err := hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "poll-svc"})
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, res.Status)
+
+	svc.healthy.Store(false)
+	hs.pollServices(ctx)
+	res, err = hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "poll-svc"})
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, res.Status)
+}
+
+func TestHealthService_StoppedCallsShutdown(t *testing.T) {
+	hs := newTestHealthService(t)
+	hs.SetServingStatus("some-svc", grpc_health_v1.HealthCheckResponse_SERVING)
+
+	hs.Stopped()
+
+	res, err := hs.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{Service: "some-svc"})
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, res.Status)
+}
+
+func TestHealthService_FailureStopsServing(t *testing.T) {
+	hs := newTestHealthService(t)
+	registered := newFakeHealthProbeService("registered-svc", true)
+	hs.AddHealthListener(registered)
+
+	ctx := context.Background()
+	require.NoError(t, registered.StartAsync(ctx))
+	require.NoError(t, registered.AwaitRunning(ctx))
+	defer registered.StopAsync()
+
+	hs.pollServices(ctx)
+	res, err := hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "registered-svc"})
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, res.Status)
+
+	// Failure with registered service should mark it NOT_SERVING.
+	hs.Failure(registered)
+	res, err = hs.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "registered-svc"})
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, res.Status)
 }

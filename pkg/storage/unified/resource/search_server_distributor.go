@@ -33,6 +33,7 @@ type UnifiedStorageGrpcService interface {
 
 var (
 	_ UnifiedStorageGrpcService = (*distributorServer)(nil)
+	_ grpcserver.HealthProbe    = (*distributorServer)(nil)
 )
 
 func ProvideSearchDistributorServer(tracer trace.Tracer, cfg *setting.Cfg, ring *ring.Ring, ringClientPool *ringclient.Pool, grpcService *grpcserver.DSKitService) (UnifiedStorageGrpcService, error) {
@@ -48,21 +49,9 @@ func ProvideSearchDistributorServer(tracer trace.Tracer, cfg *setting.Cfg, ring 
 	resourcepb.RegisterManagedObjectIndexServer(srv, s)
 	_, _ = grpcserver.ProvideReflectionService(cfg, grpcService)
 
-	healthService := grpcService.Health
 	s.BasicService = services.NewBasicService(nil, func(ctx context.Context) error {
-		s.checkHealth(healthService)
-
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				s.checkHealth(healthService)
-			case <-ctx.Done():
-				healthService.SetServingStatus(modules.SearchServerDistributor, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-				return nil
-			}
-		}
+		<-ctx.Done()
+		return nil
 	}, nil).WithName(modules.SearchServerDistributor)
 	return s, nil
 }
@@ -306,12 +295,9 @@ func (ds *distributorServer) getClientToDistributeRequest(ctx context.Context, n
 	return userutils.InjectOrgID(metadata.NewOutgoingContext(ctx, md), namespace), client.(*RingClient).Client, nil
 }
 
-func (ds *distributorServer) checkHealth(healthService HealthService) {
-	if ds.ring.State() == services.Running {
-		healthService.SetServingStatus(modules.SearchServerDistributor, grpc_health_v1.HealthCheckResponse_SERVING)
-	} else {
-		healthService.SetServingStatus(modules.SearchServerDistributor, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-	}
+// CheckHealth implements grpcserver.HealthProbe.
+func (ds *distributorServer) CheckHealth(_ context.Context) bool {
+	return ds.ring.State() == services.Running
 }
 
 func (ds *distributorServer) IsHealthy(ctx context.Context, r *resourcepb.HealthCheckRequest) (*resourcepb.HealthCheckResponse, error) {

@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -59,12 +58,6 @@ type SearchServer interface {
 
 type ResourceServerStopper interface {
 	Stop(ctx context.Context) error
-}
-
-// HealthService allows modules to report their health status.
-// Implementations aggregate per-service status and update the gRPC health server.
-type HealthService interface {
-	SetServingStatus(service string, status grpc_health_v1.HealthCheckResponse_ServingStatus)
 }
 
 type ListIterator interface {

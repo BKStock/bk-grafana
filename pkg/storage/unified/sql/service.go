@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/grafana/authlib/grpcutils"
 	"github.com/grafana/dskit/kv"
@@ -40,6 +39,7 @@ import (
 
 var (
 	_ resource.UnifiedStorageGrpcService = (*service)(nil)
+	_ grpcserver.HealthProbe             = (*service)(nil)
 )
 
 type service struct {
@@ -53,7 +53,6 @@ type service struct {
 	// -- Shared Components
 	backend       resource.StorageBackend
 	serverStopper resource.ResourceServerStopper
-	healthService resource.HealthService
 	cfg           *setting.Cfg
 	features      featuremgmt.FeatureToggles
 	log           log.Logger
@@ -88,7 +87,7 @@ func ProvideSearchGRPCService(cfg *setting.Cfg,
 	backend resource.StorageBackend,
 	grpcService *grpcserver.DSKitService,
 ) (resource.UnifiedStorageGrpcService, error) {
-	s := newService(cfg, features, log, reg, otel.Tracer("unified-storage"), docBuilders, nil, indexMetrics, searchRing, backend, nil, grpcService.Health)
+	s := newService(cfg, features, log, reg, otel.Tracer("unified-storage"), docBuilders, nil, indexMetrics, searchRing, backend, nil)
 	s.searchStandalone = true
 	if cfg.EnableSharding {
 		err := s.withRingLifecycle(memberlistKVConfig, httpServerRouter)
@@ -122,7 +121,7 @@ func ProvideUnifiedStorageGrpcService(cfg *setting.Cfg,
 	searchClient resourcepb.ResourceIndexClient,
 	grpcService *grpcserver.DSKitService,
 ) (resource.UnifiedStorageGrpcService, error) {
-	s := newService(cfg, features, log, reg, otel.Tracer("unified-storage"), docBuilders, storageMetrics, indexMetrics, searchRing, backend, searchClient, grpcService.Health)
+	s := newService(cfg, features, log, reg, otel.Tracer("unified-storage"), docBuilders, storageMetrics, indexMetrics, searchRing, backend, searchClient)
 
 	// TODO: move to standalone search once we only use sharding in search servers
 	if cfg.EnableSharding {
@@ -175,7 +174,6 @@ func newService(
 	searchRing *ring.Ring,
 	backend resource.StorageBackend,
 	searchClient resourcepb.ResourceIndexClient,
-	healthService resource.HealthService,
 ) *service {
 	// FIXME: This is a temporary solution while we are migrating to the new authn interceptor
 	// grpcutils.NewGrpcAuthenticator should be used instead.
@@ -198,7 +196,6 @@ func newService(
 		searchRing:         searchRing,
 		searchClient:       searchClient,
 		subservicesWatcher: services.NewFailureWatcher(),
-		healthService:      healthService,
 	}
 }
 
@@ -324,8 +321,6 @@ func (s *service) starting(ctx context.Context) error {
 		s.log.Info("resource server is ACTIVE in the ring")
 	}
 
-	// check health for setting service status
-	s.checkHealth(ctx)
 	return nil
 }
 
@@ -371,18 +366,11 @@ func (s *service) registerServer(provider grpcserver.Provider) error {
 }
 
 func (s *service) running(ctx context.Context) error {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
 	for {
 		select {
-		case <-ticker.C:
-			s.checkHealth(ctx)
 		case err := <-s.subservicesWatcher.Chan():
-			s.healthService.SetServingStatus(s.ServiceName(), grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 			return fmt.Errorf("subservice failure: %w", err)
 		case <-ctx.Done():
-			s.healthService.SetServingStatus(s.ServiceName(), grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 			s.log.Info("Stopping resource server")
 			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -397,24 +385,15 @@ func (s *service) running(ctx context.Context) error {
 	}
 }
 
-// checkHealth calls IsHealthy on the storage backend and updates the health status.
-func (s *service) checkHealth(ctx context.Context) {
-	if s.healthService == nil {
-		return
-	}
+// CheckHealth calls IsHealthy on the storage backend and returns whether it is healthy.
+// It implements grpcserver.HealthProbe.
+func (s *service) CheckHealth(ctx context.Context) bool {
 	diag, ok := s.backend.(resourcepb.DiagnosticsServer) //nolint:staticcheck
 	if !ok {
-		s.healthService.SetServingStatus(s.ServiceName(), grpc_health_v1.HealthCheckResponse_SERVING)
-		return
+		return true
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 	resp, err := diag.IsHealthy(ctx, &resourcepb.HealthCheckRequest{}) //nolint:staticcheck
-	if err != nil || resp.GetStatus() != resourcepb.HealthCheckResponse_SERVING {
-		s.healthService.SetServingStatus(s.ServiceName(), grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-	} else {
-		s.healthService.SetServingStatus(s.ServiceName(), grpc_health_v1.HealthCheckResponse_SERVING)
-	}
+	return err == nil && resp.GetStatus() == resourcepb.HealthCheckResponse_SERVING
 }
 
 func (s *service) stopping(_ error) error {
