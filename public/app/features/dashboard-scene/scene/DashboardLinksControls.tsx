@@ -34,6 +34,7 @@ export function DashboardLinksControls({ links, dashboard }: Props) {
             link={link}
             dashboardUID={uid}
             key={`${link.title}-$${index}`}
+            linkIndex={linkIndex}
             onEditClick={isEditing && linkIndex >= 0 ? () => openLinkEditPane(dashboard, linkIndex) : undefined}
           />
         );

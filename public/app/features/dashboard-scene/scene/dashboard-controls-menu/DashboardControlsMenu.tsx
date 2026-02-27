@@ -78,6 +78,7 @@ export function DashboardControlsMenu({
                   link={link}
                   dashboardUID={dashboardUID}
                   inMenu
+                  linkIndex={linkIndex}
                   onEditClick={
                     isEditingNewLayouts && dashboard && linkIndex >= 0
                       ? () => openLinkEditPane(dashboard, linkIndex)

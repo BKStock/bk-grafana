@@ -19,9 +19,14 @@ export function openAddLinkPane(dashboard: DashboardScene) {
   dashboard.state.editPane.selectObject(element, element.state.key!, { force: true, multi: false });
 }
 
+export function linkSelectionId(linkIndex: number) {
+  return `dashboard-link-${linkIndex}`;
+}
+
 export function openLinkEditPane(dashboard: DashboardScene, linkIndex: number) {
-  const element = new LinkEdit({ dashboardRef: dashboard.getRef(), linkIndex });
-  dashboard.state.editPane.selectObject(element, element.state.key!, { force: true, multi: false });
+  const selectionId = linkSelectionId(linkIndex);
+  const element = new LinkEdit({ dashboardRef: dashboard.getRef(), linkIndex, key: selectionId });
+  dashboard.state.editPane.selectObject(element, selectionId, { force: true, multi: false });
 }
 
 export interface LinkAddState extends SceneObjectState {

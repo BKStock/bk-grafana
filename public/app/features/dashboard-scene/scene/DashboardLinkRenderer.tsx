@@ -4,13 +4,14 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { sanitizeUrl } from '@grafana/data/internal';
 import { selectors } from '@grafana/e2e-selectors';
 import { DashboardLink } from '@grafana/schema';
-import { MenuItem, Tooltip, useStyles2 } from '@grafana/ui';
+import { MenuItem, Tooltip, useElementSelection, useStyles2 } from '@grafana/ui';
 import {
   DashboardLinkButton,
   DashboardLinksDashboard,
 } from 'app/features/dashboard/components/SubMenu/DashboardLinksDashboard';
 import { getLinkSrv } from 'app/features/panel/panellinks/link_srv';
 
+import { linkSelectionId } from '../settings/links/LinkAddEditableElement';
 import { LINK_ICON_MAP } from '../settings/links/utils';
 
 export interface Props {
@@ -20,12 +21,16 @@ export interface Props {
   inMenu?: boolean;
   /** When set, clicking the link opens the edit pane instead of navigating (edit mode) */
   onEditClick?: (e: React.PointerEvent) => void;
+  /** Index of this link in the dashboard links array (used for selection tracking in edit mode) */
+  linkIndex?: number;
 }
 
-export function DashboardLinkRenderer({ link, dashboardUID, inMenu, onEditClick }: Props) {
+export function DashboardLinkRenderer({ link, dashboardUID, inMenu, onEditClick, linkIndex }: Props) {
   const linkInfo = getLinkSrv().getAnchorInfo(link);
   const styles = useStyles2(getStyles);
   const isEditMode = Boolean(onEditClick);
+  const selectionId = linkIndex != null && linkIndex >= 0 ? linkSelectionId(linkIndex) : undefined;
+  const { isSelected, isSelectable } = useElementSelection(selectionId);
 
   const handleEditPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -69,7 +74,8 @@ export function DashboardLinkRenderer({ link, dashboardUID, inMenu, onEditClick 
 
   const containerClassName = cx(
     isEditMode ? styles.clickableLinkContainer : styles.linkContainer,
-    isEditMode && 'dashboard-selectable-element'
+    isSelected && 'dashboard-selected-element',
+    isSelectable && !isSelected && 'dashboard-selectable-element'
   );
 
   return (
