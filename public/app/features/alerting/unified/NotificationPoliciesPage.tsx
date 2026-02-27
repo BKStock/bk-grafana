@@ -26,6 +26,7 @@ import { alertmanagerApi } from './api/alertmanagerApi';
 import { AlertmanagerPageWrapper } from './components/AlertingPageWrapper';
 import { GrafanaAlertmanagerWarning } from './components/GrafanaAlertmanagerWarning';
 import { InhibitionRulesAlert } from './components/InhibitionRulesAlert';
+import { Spacer } from './components/Spacer';
 import { TimeIntervalsTable } from './components/mute-timings/MuteTimingsTable';
 import { useNotificationPoliciesNav } from './navigation/useNotificationConfigNav';
 import { useAlertmanager } from './state/AlertmanagerContext';
@@ -233,6 +234,10 @@ function PolicyTreeTab() {
       <Stack direction="column" gap={2}>
         {/* Filter bar row */}
         <Stack direction="row" alignItems="flex-end" gap={1} wrap="wrap">
+          <NotificationPoliciesFilter
+            onChangeMatchers={handleChangeLabelMatchers}
+            onChangeReceiver={handleChangeContactPoint}
+          />
           <Button
             icon={isAllExpanded ? 'table-collapse-all' : 'table-expand-all'}
             onClick={toggleAllExpanded}
@@ -249,10 +254,7 @@ function PolicyTreeTab() {
               <Trans i18nKey="alerting.multiple-policies-view.expand-all">Expand all</Trans>
             )}
           </Button>
-          <NotificationPoliciesFilter
-            onChangeMatchers={handleChangeLabelMatchers}
-            onChangeReceiver={handleChangeContactPoint}
-          />
+          <Spacer />
           {createPoliciesSupported && (
             <Button
               data-testid="create-policy-button"

@@ -85,7 +85,7 @@ const NotificationPoliciesFilter = ({ onChangeReceiver, onChangeMatchers }: Noti
               <Tooltip
                 content={
                   <Trans i18nKey="alerting.policies.filter-description">
-                    Filter notification policies by using a comma separated list of matchers, e.g.:
+                    Filter routes by using a comma separated list of matchers, e.g.:
                     <pre>severity=critical, region=EMEA</pre>
                   </Trans>
                 }
@@ -112,7 +112,7 @@ const NotificationPoliciesFilter = ({ onChangeReceiver, onChangeMatchers }: Noti
       </Field>
       {contactPointsSupported && canSeeContactPoints && (
         <Field
-          label={t('alerting.notification-policies-filter.label-search-by-contact-point', 'Search by contact point')}
+          label={t('alerting.notification-policies-filter.label-search-by-contact-point', 'Contact point')}
           noMargin
         >
           {isGrafanaAlertmanager ? (
@@ -155,7 +155,7 @@ const NotificationPoliciesFilter = ({ onChangeReceiver, onChangeMatchers }: Noti
         </Field>
       )}
       {isGrafanaAlertmanager && config.featureToggles.alertingMultiplePolicies && (
-        <Field label={t('alerting.multiple-policies-view.policy-tree-filter-label', 'Filter by policy tree')} noMargin>
+        <Field label={t('alerting.multiple-policies-view.policy-tree-filter-label', 'Policy')} noMargin>
           <RoutingTreeSelector
             multi
             value={selectedPolicyTreeNames}

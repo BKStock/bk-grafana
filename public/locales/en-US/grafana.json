@@ -2059,7 +2059,7 @@
     "multiple-policies-view": {
       "collapse-all": "Collapse all",
       "expand-all": "Expand all",
-      "policy-tree-filter-label": "Filter by policy tree",
+      "policy-tree-filter-label": "Policy",
       "policy-tree-filter-placeholder": "Select policy trees"
     },
     "mute-timing-actions-button": {
@@ -2198,7 +2198,7 @@
       "summary": "Summary:"
     },
     "notification-policies-filter": {
-      "label-search-by-contact-point": "Search by contact point",
+      "label-search-by-contact-point": "Contact point",
       "placeholder-search-by-contact-point": "Choose a contact point",
       "search-query-input-placeholder-search": "Search"
     },
@@ -2365,6 +2365,7 @@
       "tooltip-managed-by-plugin": "This rule is managed by the {{pluginName}} plugin"
     },
     "policies": {
+      "add-route": "Add route",
       "aria-label-collapse": "Collapse",
       "aria-label-expand": "Expand",
       "aria-label-more": "more actions for policy",
@@ -2375,9 +2376,8 @@
         "title-new-notification-policy": "New notification policy"
       },
       "default-policy": {
-        "description": "All alert instances will be handled by the default policy if no other matching policies are found.",
         "title": "Default policy",
-        "update": "Update default policy"
+        "update": "Update policy"
       },
       "delete": {
         "confirm": "Yes, delete policy",
@@ -2392,7 +2392,7 @@
         "failed-to-update-your-configuration": "Failed to update your configuration:",
         "title-something-went-wrong": "Something went wrong"
       },
-      "filter-description": "Filter notification policies by using a comma separated list of matchers, e.g.:<1>severity=critical, region=EMEA</1>",
+      "filter-description": "Filter routes by using a comma separated list of matchers, e.g.:<1>severity=critical, region=EMEA</1>",
       "generated-policies": "Auto-generated policies",
       "matchers": "Matchers",
       "metadata": {
@@ -2425,8 +2425,8 @@
       },
       "n-more-policies_one": "{{count}} additional policies",
       "n-more-policies_other": "{{count}} additional policies",
-      "new-child": "New child policy",
-      "new-policy": "Add new policy",
+      "new-child": "Add route",
+      "new-policy": "Add route",
       "no-matchers": "No matchers",
       "reload-policies": "Reload policies",
       "reset-modal": {
@@ -2439,13 +2439,9 @@
         "title-delete-notification-policy": "Delete notification policy",
         "title-reset-notification-policy": "Reset notification policy"
       },
-      "root-policy": {
-        "description": "All alert instances associated with this route will be handled by this default policy if no other matching policies are found."
-      },
-      "save-policy": "Save policy",
       "update": {
         "please-wait": "Please wait while we update your notification policies.",
-        "update-policy": "Update policy",
+        "update-route": "Update route",
         "updating": "Updating..."
       },
       "update-errors": {
@@ -2487,9 +2483,9 @@
       "title-routing-tree-not-found": "Routing tree not found"
     },
     "policy": {
-      "label-new-child-policy": "New child policy",
-      "label-new-sibling-above": "New sibling above",
-      "label-new-sibling-below": "New sibling below"
+      "label-new-child-policy": "Add child",
+      "label-new-sibling-above": "Add sibling above",
+      "label-new-sibling-below": "Add sibling below"
     },
     "policy-page": {
       "text-subtitle": "Determine how alerts are routed to contact points for alert rules configured to use this notification policy."
@@ -3450,7 +3446,7 @@
     },
     "use-add-policy-modal": {
       "modal-element": {
-        "title-add-notification-policy": "Add notification policy"
+        "title-add-route": "Add route"
       }
     },
     "use-columns": {
@@ -3524,7 +3520,7 @@
     },
     "use-edit-policy-modal": {
       "modal-element": {
-        "title-edit-notification-policy": "Edit notification policy"
+        "title-edit-route": "Edit route"
       }
     },
     "use-page-nav": {

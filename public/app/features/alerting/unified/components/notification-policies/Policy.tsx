@@ -9,7 +9,6 @@ import { AlertLabel, getInheritedProperties } from '@grafana/alerting';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
 import {
-  Badge,
   Button,
   Dropdown,
   Icon,
@@ -314,25 +313,25 @@ const Policy = (props: PolicyComponentProps) => {
                             type="button"
                             onClick={() => onAddPolicy(currentRoute, 'child')}
                           >
-                            <Trans i18nKey="alerting.policies.new-child">New child policy</Trans>
+                            <Trans i18nKey="alerting.policies.new-child">Add route</Trans>
                           </Button>
                         ) : (
                           <Dropdown
                             overlay={
                               <Menu>
                                 <Menu.Item
-                                  label={t('alerting.policy.label-new-sibling-above', 'New sibling above')}
+                                  label={t('alerting.policy.label-new-sibling-above', 'Add sibling above')}
                                   icon="arrow-up"
                                   onClick={() => onAddPolicy(currentRoute, 'above')}
                                 />
                                 <Menu.Item
-                                  label={t('alerting.policy.label-new-sibling-below', 'New sibling below')}
+                                  label={t('alerting.policy.label-new-sibling-below', 'Add sibling below')}
                                   icon="arrow-down"
                                   onClick={() => onAddPolicy(currentRoute, 'below')}
                                 />
                                 <Menu.Divider />
                                 <Menu.Item
-                                  label={t('alerting.policy.label-new-child-policy', 'New child policy')}
+                                  label={t('alerting.policy.label-new-child-policy', 'Add child')}
                                   icon="plus"
                                   onClick={() => onAddPolicy(currentRoute, 'child')}
                                 />
@@ -346,7 +345,7 @@ const Policy = (props: PolicyComponentProps) => {
                               icon="angle-down"
                               type="button"
                             >
-                              <Trans i18nKey="alerting.policies.new-policy">Add new policy</Trans>
+                              <Trans i18nKey="alerting.policies.new-policy">Add route</Trans>
                             </Button>
                           </Dropdown>
                         )}
@@ -783,23 +782,19 @@ const ErrorsGutterIndicator: FC<{ errors: React.ReactNode[] }> = ({ errors }) =>
 type DefaultPolicyIndicatorProps = { route?: RouteWithID };
 
 export const DefaultPolicyIndicator: FC<DefaultPolicyIndicatorProps> = ({ route = { name: '' } }) => {
-  const styles = useStyles2(getStyles);
   return (
     <>
       <Text element="h2" variant="body" weight="medium">
         {route.name === ROOT_ROUTE_NAME || !route.name ? (
           <Trans i18nKey="alerting.policies.default-policy.title">Default policy</Trans>
         ) : (
-          <Stack direction="row" gap={1} wrap="nowrap">
-            {route.name}
-            <Badge color="darkgrey" text={t('alerting.policies.default-policy.title', 'Default policy')} />
-          </Stack>
+          route.name
         )}
       </Text>
-      <span className={styles.metadata}>
+      {/*<span className={styles.metadata}>
         {route.name === ROOT_ROUTE_NAME || !route.name ? (
           <Trans i18nKey="alerting.policies.default-policy.description">
-            All alert instances will be handled by the default policy if no other matching policies are found.
+            All alert instances will be handled by the default policy if no matching routes are found.
           </Trans>
         ) : (
           <Trans i18nKey="alerting.policies.root-policy.description">
@@ -807,7 +802,7 @@ export const DefaultPolicyIndicator: FC<DefaultPolicyIndicatorProps> = ({ route 
             policies are found.
           </Trans>
         )}
-      </span>
+      </span>*/}
     </>
   );
 };
