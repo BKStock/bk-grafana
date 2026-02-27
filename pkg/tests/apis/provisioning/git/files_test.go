@@ -168,9 +168,10 @@ func (h *gitTestHelper) createGitRepo(t *testing.T, repoName string, initialFile
 			"description": fmt.Sprintf("Integration test repository for %s", repoName),
 			"type":        "git",
 			"git": map[string]interface{}{
-				"url":    remote.URL,
-				"branch": "main",
-				"path":   "",
+				"url":       remote.URL,
+				"branch":    "main",
+				"path":      "",
+				"tokenUser": user.Username,
 			},
 			"sync": map[string]interface{}{
 				"enabled":         true,
@@ -181,7 +182,7 @@ func (h *gitTestHelper) createGitRepo(t *testing.T, repoName string, initialFile
 		},
 		"secure": map[string]interface{}{
 			"token": map[string]interface{}{
-				"create": fmt.Sprintf("%s:%s", user.Username, user.Password),
+				"create": user.Password,
 			},
 		},
 	}
