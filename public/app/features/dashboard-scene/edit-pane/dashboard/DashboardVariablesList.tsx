@@ -297,7 +297,7 @@ function getStyles(theme: GrafanaTheme2) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing(0.5),
-      padding: theme.spacing(0.5),
+      padding: theme.spacing(0.25),
     }),
     variableName: css({
       display: 'flex',
