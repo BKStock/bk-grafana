@@ -88,12 +88,12 @@ func TestHealthWatch(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		stream := &fakeHealthWatchServer{context: ctx}
+		stream := newFakeHealthWatchServer(ctx)
 		go func() {
 			_ = svc.Watch(&grpc_health_v1.HealthCheckRequest{}, stream)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		stream.waitForSends(t, 1)
 		stream.mu.Lock()
 		require.Len(t, stream.healthChecks, 1)
 		assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, stream.healthChecks[0].Status)
@@ -106,16 +106,16 @@ func TestHealthWatch(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		stream := &fakeHealthWatchServer{context: ctx}
+		stream := newFakeHealthWatchServer(ctx)
 		go func() {
 			_ = svc.Watch(&grpc_health_v1.HealthCheckRequest{}, stream)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		stream.waitForSends(t, 1)
 
 		// Push NOT_SERVING — Watch should be notified immediately
 		svc.SetServingStatus("storage", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-		time.Sleep(50 * time.Millisecond)
+		stream.waitForSends(t, 2)
 
 		stream.mu.Lock()
 		defer stream.mu.Unlock()
@@ -129,7 +129,7 @@ func TestHealthWatch(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
-		stream := &fakeHealthWatchServer{context: ctx}
+		stream := newFakeHealthWatchServer(ctx)
 		err := svc.Watch(&grpc_health_v1.HealthCheckRequest{}, stream)
 		require.Error(t, err)
 	})
@@ -140,16 +140,16 @@ func TestHealthWatch(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		stream := &fakeHealthWatchServer{context: ctx}
+		stream := newFakeHealthWatchServer(ctx)
 		go func() {
 			_ = svc.Watch(&grpc_health_v1.HealthCheckRequest{}, stream)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		stream.waitForSends(t, 1)
 
 		// Shutdown sets all services to NOT_SERVING and notifies watchers
 		svc.Shutdown()
-		time.Sleep(50 * time.Millisecond)
+		stream.waitForSends(t, 2)
 
 		stream.mu.Lock()
 		defer stream.mu.Unlock()
@@ -174,13 +174,43 @@ type fakeHealthWatchServer struct {
 	grpc.ServerStream
 	healthChecks []*grpc_health_v1.HealthCheckResponse
 	context      context.Context
+	sent         chan struct{} // signalled on each Send
+}
+
+func newFakeHealthWatchServer(ctx context.Context) *fakeHealthWatchServer {
+	return &fakeHealthWatchServer{
+		context: ctx,
+		sent:    make(chan struct{}, 16),
+	}
 }
 
 func (f *fakeHealthWatchServer) Send(resp *grpc_health_v1.HealthCheckResponse) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.healthChecks = append(f.healthChecks, resp)
+	select {
+	case f.sent <- struct{}{}:
+	default:
+	}
 	return nil
+}
+
+// waitForSends blocks until at least n total sends have occurred.
+func (f *fakeHealthWatchServer) waitForSends(t *testing.T, n int) {
+	t.Helper()
+	for {
+		f.mu.Lock()
+		count := len(f.healthChecks)
+		f.mu.Unlock()
+		if count >= n {
+			return
+		}
+		select {
+		case <-f.sent:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for %d sends (got %d)", n, count)
+		}
+	}
 }
 
 func (f *fakeHealthWatchServer) RecvMsg(m interface{}) error {
