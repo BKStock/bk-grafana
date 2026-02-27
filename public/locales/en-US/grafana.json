@@ -6375,6 +6375,11 @@
       "label-use-static-key-dimensions": "Use static key dimensions",
       "name-allow-custom-values": "Allow custom values"
     },
+    "add-link": {
+      "inline-instance-name": "New link",
+      "label-link": "Link",
+      "tooltip": "Add link to another dashboard or external site"
+    },
     "add-to-dashboard": {
       "message": {
         "could-navigate-selected-dashboard-please-again": "Could not navigate to the selected dashboard. Please try again.",
@@ -6405,10 +6410,6 @@
     },
     "add-variable": {
       "label-variable": "Variable"
-    },
-    "add-link": {
-      "label-link": "Link",
-      "tooltip": "Add link to another dashboard or external site"
     },
     "annotation-control": {
       "description-add-event-data-to-graphs": "Add event data to graphs",
@@ -6796,6 +6797,31 @@
       "last-edited": "{{timeAgo}} by <person />",
       "usage-count_one": "Used on {{count}} dashboards",
       "usage-count_other": "Used on {{count}} dashboards"
+    },
+    "link-edit-actions": {
+      "add-link": "Add link",
+      "change-title": "Change link title",
+      "change-tooltip": "Change link tooltip",
+      "change-url": "Change link URL",
+      "remove-link": "Remove link",
+      "update-link": "Update link"
+    },
+    "link-options": {
+      "icon": "Icon",
+      "include-time-range": "Include current time range",
+      "include-variables": "Include current template variable values",
+      "open-in-new-tab": "Open link in new tab",
+      "options-category": "Options",
+      "show-as-dropdown": "Show as dropdown",
+      "show-in-controls-menu": "Show in controls menu",
+      "title": "Title",
+      "tooltip": "Tooltip",
+      "tooltip-placeholder": "Open dashboard",
+      "type": "Type",
+      "type-dashboards": "Dashboards",
+      "type-link": "Link",
+      "url": "URL",
+      "with-tags": "With tags"
     },
     "managed-badge": {
       "kubectl": "Managed by: Kubectl",

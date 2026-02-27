@@ -19,12 +19,7 @@ import { SceneGridRowEditableElement } from '../scene/layout-default/SceneGridRo
 import { EditableDashboardElement, isEditableDashboardElement } from '../scene/types/EditableDashboardElement';
 import { AnnotationEditableElement } from '../settings/annotations/AnnotationEditableElement';
 import { AnnotationSetEditableElement } from '../settings/annotations/AnnotationSetEditableElement';
-import {
-  LinkAdd,
-  LinkAddEditableElement,
-  LinkEdit,
-  LinkEditEditableElement,
-} from '../settings/links/LinkAddEditableElement';
+import { LinkEdit, LinkEditEditableElement } from '../settings/links/LinkAddEditableElement';
 import { LocalVariableEditableElement } from '../settings/variables/LocalVariableEditableElement';
 import { VariableAdd, VariableAddEditableElement } from '../settings/variables/VariableAddEditableElement';
 import { VariableEditableElement } from '../settings/variables/VariableEditableElement';
@@ -73,10 +68,6 @@ export function getEditableElementFor(sceneObj: SceneObject | undefined): Editab
 
   if (sceneObj instanceof VariableAdd) {
     return new VariableAddEditableElement(sceneObj);
-  }
-
-  if (sceneObj instanceof LinkAdd) {
-    return new LinkAddEditableElement(sceneObj);
   }
 
   if (sceneObj instanceof LinkEdit) {

@@ -40,11 +40,7 @@ export function DashboardLinkRenderer({ link, dashboardUID, inMenu, onEditClick,
 
   let content: React.ReactNode;
   if (link.type === 'dashboards') {
-    content = (
-      <div className={isEditMode ? styles.pointerEventsNone : undefined}>
-        <DashboardLinksDashboard link={link} linkInfo={linkInfo} dashboardUID={dashboardUID} />
-      </div>
-    );
+    content = <DashboardLinksDashboard link={link} linkInfo={linkInfo} dashboardUID={dashboardUID} />;
   } else {
     const icon = LINK_ICON_MAP[link.icon];
     const linkElement = inMenu ? (
@@ -67,9 +63,6 @@ export function DashboardLinkRenderer({ link, dashboardUID, inMenu, onEditClick,
       </DashboardLinkButton>
     );
     content = link.tooltip ? <Tooltip content={linkInfo.tooltip}>{linkElement}</Tooltip> : linkElement;
-    if (isEditMode) {
-      content = <div className={styles.pointerEventsNone}>{content}</div>;
-    }
   }
 
   const containerClassName = cx(
@@ -98,6 +91,8 @@ function getStyles(theme: GrafanaTheme2) {
       alignItems: 'center',
       verticalAlign: 'middle',
       lineHeight: 1,
+      flexWrap: 'wrap',
+      gap: theme.spacing(1),
     }),
     clickableLinkContainer: css({
       display: 'inline-flex',
@@ -105,14 +100,11 @@ function getStyles(theme: GrafanaTheme2) {
       verticalAlign: 'middle',
       lineHeight: 1,
       cursor: 'pointer',
-    }),
-    // In edit mode, disable pointer events on the inner link so the wrapper always receives the click.
-    // Use inline-flex + alignItems center + lineHeight 1 so this wrapper doesn't shift vertical alignment vs variables/annotations.
-    pointerEventsNone: css({
-      display: 'inline-flex',
-      alignItems: 'center',
-      lineHeight: 1,
-      pointerEvents: 'none',
+      flexWrap: 'wrap',
+      gap: theme.spacing(1),
+      '> *': {
+        pointerEvents: 'none',
+      },
     }),
   };
 }
