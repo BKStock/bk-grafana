@@ -102,7 +102,7 @@ func (cp *corePlugin) QueryData(ctx context.Context, req *backend.QueryDataReque
 func (cp *corePlugin) QueryChunkedData(ctx context.Context, req *backend.QueryChunkedDataRequest, w backend.ChunkedDataWriter) error {
 	ctx = backend.WithGrafanaConfig(ctx, req.PluginContext.GrafanaConfig)
 	if raw, isRaw := w.(chunked.RawChunkReceiver); isRaw {
-		w = backend.NewChunkedDataWriter(req.Format, raw.OnChunk) // converts to requested format
+		w = backend.NewChunkedDataWriter(req.Format, raw.OnChunk) // keeps the raw bytes
 	}
 
 	if cp.QueryChunkedDataHandler != nil {
@@ -116,7 +116,7 @@ func (cp *corePlugin) QueryChunkedData(ctx context.Context, req *backend.QueryCh
 		PluginContext: req.PluginContext,
 		Queries:       req.Queries,
 		Headers:       req.Headers,
-		// TODO format
+		Format:        req.Format,
 	})
 	if err != nil {
 		return err

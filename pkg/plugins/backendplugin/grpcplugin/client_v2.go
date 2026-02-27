@@ -275,8 +275,7 @@ func (c *ClientV2) queryChunkedDataFacade(ctx context.Context, req *backend.Quer
 			PluginContext: req.PluginContext,
 			Queries:       req.Queries,
 			Headers:       req.Headers,
-			// FORMAT... JSON!!!! (TODO)
-			// https://github.com/grafana/grafana-plugin-sdk-go/pull/1491
+			Format:        req.Format,
 		})
 	if err != nil {
 		return err
