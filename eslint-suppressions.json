@@ -2155,9 +2155,6 @@
   "public/app/features/dashboard/state/DashboardMigrator.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 10
-    },
-    "no-restricted-syntax": {
-      "count": 1
     }
   },
   "public/app/features/dashboard/state/DashboardMigrator.ts": {
@@ -2612,11 +2609,6 @@
   },
   "public/app/features/panel/panellinks/linkSuppliers.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "public/app/features/panel/state/util.ts": {
-    "no-restricted-syntax": {
       "count": 1
     }
   },
