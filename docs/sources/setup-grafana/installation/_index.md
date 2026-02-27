@@ -55,7 +55,7 @@ These minimums support evaluation and single-user development only. For any shar
 Four factors most directly drive Grafana's resource needs:
 
 - **Concurrent users:** active, concurrent browser sessions issuing queries or causing panels to refresh. This is the primary driver of CPU and memory load. Users who have Grafana open but are not actively viewing dashboards contribute little load, unless those dashboards have auto-refresh enabled.
-- **Alert rules:** background evaluation load on the alert scheduler. High rule counts with short evaluation intervals can saturate CPU independently of user activity. In Grafana OSS, the alert engine runs in the same process as the UI and data source proxy, so alert CPU saturation directly competes with dashboard query performance. This is why isolating alert evaluation to dedicated instances matters at Large scale.
+- **Alert rules:** background evaluation load on the alert scheduler. High rule counts with short evaluation intervals can saturate CPU independently of user activity. In Grafana OSS, the alert engine runs in the same process as the UI and data source proxy, so alert CPU saturation directly competes with dashboard query performance. This is why isolating alert evaluation to dedicated instances matters at Large scale. Refer to [Performance considerations and limitations](../../alerting/set-up/performance-limitations/) for details.
 - **Data sources:** the number of proxied data source connections matters, but type matters more. Plugins that use the Grafana backend data source proxy — most SQL sources such as MySQL, PostgreSQL, and Microsoft SQL Server — hold an open connection per query on the server. Pull-based metric sources such as Prometheus or Graphite are queried more efficiently and place less load on the Grafana process. Some plugins, such as certain public API or Infinity sources, execute queries directly in the browser and may place no server-side load — depending on plugin configuration and authentication requirements. A deployment with five heavily-queried proxied SQL data sources can exceed the resource needs of one with twenty Prometheus sources.
 - **Dashboards and panels:** panel count and refresh interval together determine query throughput. A dashboard with 30 panels refreshing every 10 seconds generates roughly six times the query load of the same dashboard refreshing every minute. Dashboards with many panels and short refresh intervals should be treated as a tier higher than their raw dashboard count suggests. Note that Grafana Enterprise includes query caching, which can significantly reduce this multiplier when many users view the same dashboard simultaneously and may shift a deployment down a tier.
 
@@ -86,7 +86,7 @@ Small deployments suit small teams, internal tooling, and low-traffic environmen
 | Disk | 10 – 20 GB SSD (database host) |
 | Instances | 1 |
 
-**Database:** SQLite is acceptable for development and evaluation only. Use an external MySQL or PostgreSQL instance for production. Refer to [Supported databases](#supported-databases).
+**Database:** SQLite is acceptable for development and evaluation only. Use an external MySQL or PostgreSQL instance for production. For more information, refer to [Supported databases](#supported-databases).
 
 **Image rendering:** optional; can run on the same host for light use. Refer to [Server-side image rendering](/grafana/plugins/grafana-image-renderer#requirements).
 
@@ -123,7 +123,7 @@ Large deployments suit organization-wide platforms and high-traffic production e
 
 **Image rendering:** run a dedicated renderer fleet with multiple workers, isolated from Grafana instances. Each renderer worker uses approximately 1 GB of memory. Refer to [Server-side image rendering](/grafana/plugins/grafana-image-renderer#requirements).
 
-**Alert evaluation:** with more than 1,000 alert rules or short evaluation intervals (under one minute), alert evaluation can saturate CPU and degrade dashboard query performance on the same instance. Isolate alert evaluation to one or more dedicated Grafana instances in [remote evaluation mode](../../alerting/) to prevent this.
+**Alert evaluation:** with more than 1,000 alert rules or short evaluation intervals (under one minute), alert evaluation can saturate CPU and degrade dashboard query performance on the same instance. Isolate alert evaluation to one or more dedicated Grafana instances in [remote evaluation mode](../../alerting/) to prevent this. Refer to [Performance considerations and limitations](../../alerting/set-up/performance-limitations/).
 
 **High availability:** sticky sessions or a shared Redis session store are required. Refer to [Set up Grafana for high availability](../../setup-grafana/set-up-for-high-availability/).
 
