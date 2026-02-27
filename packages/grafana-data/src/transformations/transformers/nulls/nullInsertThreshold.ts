@@ -26,8 +26,6 @@ function getRefField(frame: DataFrame, refFieldName?: string | null) {
 
 /** @internal */
 export function applyNullInsertThreshold(opts: NullInsertOptions): DataFrame {
-  return opts.frame;
-
   if (opts.frame.length === 0) {
     return opts.frame;
   }
@@ -71,28 +69,48 @@ export function applyNullInsertThreshold(opts: NullInsertOptions): DataFrame {
 
     const frameValues = frame.fields.map((field) => field.values);
 
-    const filledFieldValues = nullInsertThreshold(
-      refValues,
-      frameValues,
-      threshold,
-      refFieldPseudoMin,
-      refFieldPseudoMax,
-      insertMode,
-      thorough
-    );
+    let needsInsert = false;
 
-    if (filledFieldValues === frameValues) {
-      return frame;
+    if (
+      (refFieldPseudoMin != null && refFieldPseudoMin < refValues[0] - threshold) ||
+      (refFieldPseudoMax != null && refFieldPseudoMax > refValues.at(-1) + threshold)
+    ) {
+      needsInsert = true;
+    } else {
+      for (let i = 1; i < refValues.length; i++) {
+        if (refValues[i] - refValues[i - 1] > threshold) {
+          needsInsert = true;
+          break;
+        }
+      }
     }
 
-    return {
-      ...frame,
-      length: filledFieldValues[0].length,
-      fields: frame.fields.map((field, i) => ({
-        ...field,
-        values: filledFieldValues[i],
-      })),
-    };
+    if (needsInsert) {
+      const filledFieldValues = nullInsertThreshold(
+        refValues,
+        frameValues,
+        threshold,
+        refFieldPseudoMin,
+        refFieldPseudoMax,
+        insertMode,
+        thorough
+      );
+
+      if (filledFieldValues === frameValues) {
+        return frame;
+      }
+
+      return {
+        ...frame,
+        length: filledFieldValues[0].length,
+        fields: frame.fields.map((field, i) => ({
+          ...field,
+          values: filledFieldValues[i],
+        })),
+      };
+    }
+
+    return frame;
   }
 
   // TODO: unique threshold-per-field (via overrides) is unimplemented
