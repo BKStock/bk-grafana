@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BBox } from 'uplot';
+import uPlot, { BBox } from 'uplot';
 
 import { DataFrame, FieldType } from '@grafana/data';
 import { TimeRange2 } from '@grafana/ui/internal';
@@ -30,8 +30,7 @@ const buildAnnotationClusters = (frame: DataFrame, timeVals: number[], plotBox: 
 
   // 10% of box width
   // annotations are 10x, but we want to leave 24px of space between annos so everything is clickable
-  // @todo need pixel device ratio
-  const pixelThreshold = 24 * devicePixelRatio;
+  const pixelThreshold = 24 * uPlot.pxRatio;
   const dt = timeRange.to - timeRange.from;
   const plotWidth = plotBox?.width;
   const thresholdRatio = pixelThreshold / plotWidth;
