@@ -273,6 +273,9 @@ export function buildVizAndDataPaneGrid({
   grid.push(['viz', 'viz']);
 
   if (hasDataPane) {
+    rows.push('auto');
+    grid.push([isSidebarFullWidth ? 'sidebar' : 'version-toggle', 'version-toggle']);
+
     rows.push('1fr');
     grid.push(['sidebar', 'data-pane']);
   }

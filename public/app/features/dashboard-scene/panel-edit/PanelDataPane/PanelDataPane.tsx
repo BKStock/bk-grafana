@@ -9,6 +9,7 @@ import {
   SceneObjectState,
   SceneObjectUrlSyncConfig,
   SceneObjectUrlValues,
+  sceneGraph,
   VizPanel,
 } from '@grafana/scenes';
 import { Container, ScrollContainer, TabContent, TabsBar, useStyles2 } from '@grafana/ui';
@@ -18,11 +19,17 @@ import { getRulesPermissions } from 'app/features/alerting/unified/utils/access-
 import { GRAFANA_RULES_SOURCE_NAME } from 'app/features/alerting/unified/utils/datasource';
 
 import { PanelDataPaneNext } from '../PanelEditNext/PanelDataPaneNext';
+import { PanelEditor } from '../PanelEditor';
+import { QueryEditorBanner } from '../QueryEditorBanner';
 
 import { PanelDataAlertingTab } from './PanelDataAlertingTab';
 import { PanelDataQueriesTab } from './PanelDataQueriesTab';
 import { PanelDataTransformationsTab } from './PanelDataTransformationsTab';
 import { PanelDataPaneTab, TabId } from './types';
+
+function isTabId(value: string): value is TabId {
+  return Object.values<string>(TabId).includes(value);
+}
 
 export interface PanelDataPaneState extends SceneObjectState {
   tabs: PanelDataPaneTab[];
@@ -76,8 +83,8 @@ export class PanelDataPane extends SceneObjectBase<PanelDataPaneState> {
     if (!values.tab) {
       return;
     }
-    if (typeof values.tab === 'string') {
-      this.setState({ tab: values.tab as TabId });
+    if (typeof values.tab === 'string' && isTabId(values.tab)) {
+      this.setState({ tab: values.tab });
     }
   }
 }
@@ -85,6 +92,7 @@ export class PanelDataPane extends SceneObjectBase<PanelDataPaneState> {
 function PanelDataPaneRendered({ model }: SceneComponentProps<PanelDataPane>) {
   const { tab, tabs } = model.useState();
   const styles = useStyles2(getStyles);
+  const panelEditor = sceneGraph.getAncestor(model, PanelEditor);
 
   if (!tabs || !tabs.length) {
     return;
@@ -94,6 +102,9 @@ function PanelDataPaneRendered({ model }: SceneComponentProps<PanelDataPane>) {
 
   return (
     <div className={styles.dataPane} data-testid={selectors.components.PanelEditor.DataPane.content}>
+      <div className={styles.bannerWrapper}>
+        <QueryEditorBanner panelEditor={panelEditor} variant="upgrade" />
+      </div>
       <TabsBar hideBorder className={styles.tabsBar}>
         {tabs.map((t) => t.renderTab({ active: t.tabId === tab, onChangeTab: () => model.onChangeTab(t) }))}
       </TabsBar>
@@ -131,6 +142,10 @@ function getStyles(theme: GrafanaTheme2) {
       minHeight: 0,
       height: '100%',
       width: '100%',
+    }),
+    bannerWrapper: css({
+      paddingLeft: theme.spacing(2),
+      flexShrink: 0,
     }),
     tabBorder: css({
       background: theme.colors.background.primary,

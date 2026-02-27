@@ -7,6 +7,7 @@ import { SceneComponentProps } from '@grafana/scenes';
 import { Button, useStyles2 } from '@grafana/ui';
 
 import { PanelEditor } from '../PanelEditor';
+import { QueryEditorBanner } from '../QueryEditorBanner';
 
 import { PanelDataPaneNext } from './PanelDataPaneNext';
 import { QueryEditorContextWrapper } from './QueryEditor/QueryEditorContextWrapper';
@@ -41,6 +42,9 @@ export function VizAndDataPaneNext({ model }: SceneComponentProps<PanelEditor>) 
             </div>
           </div>
           <QueryEditorContextWrapper dataPane={nextDataPane}>
+            <div className={styles.versionToggle}>
+              <QueryEditorBanner panelEditor={model} variant="downgrade" />
+            </div>
             <div className={styles.sidebar}>
               <div className={styles.sidebarContent}>
                 <QueryEditorSidebar sidebarSize={layout.sidebarSize} setSidebarSize={layout.setSidebarSize} />
@@ -84,6 +88,12 @@ function getStyles(theme: GrafanaTheme2, sidebarSize: SidebarSize) {
       gap: theme.spacing(2),
       overflow: 'hidden',
       paddingBottom: theme.spacing(2),
+    }),
+    versionToggle: css({
+      gridArea: 'version-toggle',
+      ...(sidebarSize === SidebarSize.Mini && {
+        paddingLeft: theme.spacing(2),
+      }),
     }),
     sidebar: css({
       gridArea: 'sidebar',
