@@ -181,7 +181,7 @@ describe('AnnotationsPlugin2', () => {
         const thirdMarker = screen.queryAllByTestId(selectors.pages.Dashboard.Annotations.marker)[2];
         expect(thirdMarker).toBeVisible();
         await event(thirdMarker);
-        const tags = screen.queryAllByTestId('annotation-tag');
+        const tags = screen.getAllByTestId('annotation-tag');
 
         expectedTags.forEach((tag, index) => {
           expect(tags[index]).toBeVisible();
