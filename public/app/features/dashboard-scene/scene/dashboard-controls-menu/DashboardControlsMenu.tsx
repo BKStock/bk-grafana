@@ -7,6 +7,7 @@ import { DashboardLink } from '@grafana/schema';
 import { Box, Menu, useStyles2 } from '@grafana/ui';
 
 import { openLinkEditPane } from '../../settings/links/LinkAddEditableElement';
+import { sortDefaultLinksFirst, sortDefaultVarsFirst } from '../../utils/dashboardControls';
 import { DashboardLinkRenderer } from '../DashboardLinkRenderer';
 import { DashboardScene } from '../DashboardScene';
 import { DataLayerControl } from '../DataLayerControl';
@@ -51,7 +52,7 @@ export function DashboardControlsMenu({
       }}
     >
       {/* Variables */}
-      {variables.map((variable, index) => (
+      {sortDefaultVarsFirst(variables).map((variable, index) => (
         <div key={variable.state.key}>
           <VariableValueSelectWrapper variable={variable} inMenu isEditingNewLayouts={isEditingNewLayouts} />
         </div>
@@ -69,7 +70,7 @@ export function DashboardControlsMenu({
       {links.length > 0 && dashboardUID && (
         <>
           {(variables.length > 0 || annotations.length > 0) && <MenuDivider />}
-          {links.map((link, index) => {
+          {sortDefaultLinksFirst(links).map((link, index) => {
             const linkIndex = fullLinks.indexOf(link);
             return (
               <div key={`${link.title}-${index}`}>
