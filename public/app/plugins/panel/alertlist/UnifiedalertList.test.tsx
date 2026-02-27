@@ -279,8 +279,6 @@ describe('UnifiedAlertList', () => {
     await waitFor(() => expect(unsubscribeMock).toHaveBeenCalled());
 
     // The subscription should be re-created after the useEffect re-runs.
-    // BUG: With the current code, `dashboard` is a local `let` variable set by useEffectOnce.
-    // On re-render, it resets to `undefined`, so `dashboard?.events.subscribe(...)` is never called.
     await waitFor(() => expect(subscribeMock).toHaveBeenCalledTimes(2));
     expect(subscribeMock.mock.calls[1][0]).toEqual(TimeRangeUpdatedEvent);
   });
