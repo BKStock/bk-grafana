@@ -185,6 +185,10 @@ func (b *FolderAPIBuilder) UpdateAPIGroupInfo(apiGroupInfo *genericapiserver.API
 		}
 	}
 
+	if b.maxNestedFolderDepth <= 0 {
+		b.maxNestedFolderDepth = setting.DefaultMaxNestedFolderDepth
+	}
+
 	storage := map[string]rest.Storage{}
 	storage[resourceInfo.StoragePath()] = b.storage
 
