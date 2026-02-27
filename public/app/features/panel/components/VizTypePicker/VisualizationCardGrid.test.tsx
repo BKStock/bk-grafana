@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -90,6 +90,38 @@ describe('VisualizationCardGrid', () => {
 
       expect(onItemClick).toHaveBeenCalledWith(mockItem[0], 0);
     });
+
+    it('should call onItemClick when Enter key is pressed on a card', () => {
+      render(
+        <VisualizationCardGrid
+          items={mockItem}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      const card = screen.getByTestId('card-ts-hash').closest('[role="button"]')!;
+      fireEvent.keyDown(card, { key: 'Enter' });
+
+      expect(onItemClick).toHaveBeenCalledWith(mockItem[0], 0);
+    });
+
+    it('should call onItemClick when Space key is pressed on a card', () => {
+      render(
+        <VisualizationCardGrid
+          items={mockItem}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      const card = screen.getByTestId('card-ts-hash').closest('[role="button"]')!;
+      fireEvent.keyDown(card, { key: ' ' });
+
+      expect(onItemClick).toHaveBeenCalledWith(mockItem[0], 0);
+    });
   });
 
   describe('grouped items', () => {
@@ -132,6 +164,19 @@ describe('VisualizationCardGrid', () => {
       await user.click(screen.getByTestId('card-table-hash'));
 
       expect(onItemClick).toHaveBeenCalledWith(mockItem[1], 1);
+    });
+
+    it('should render unknown viz type header when group meta is undefined', () => {
+      render(
+        <VisualizationCardGrid
+          groups={[{ meta: undefined, items: [mockItem[0]] }]}
+          data={mockData}
+          onItemClick={onItemClick}
+          getItemKey={(item) => item.hash}
+        />
+      );
+
+      expect(screen.getByText('Unknown visualization type')).toBeInTheDocument();
     });
   });
 });
