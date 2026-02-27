@@ -14,6 +14,7 @@ jest.mock('./interactions', () => ({
   ...jest.requireActual('./interactions'),
   VizSuggestionsInteractions: {
     suggestionAccepted: jest.fn(),
+    suggestionPreviewed: jest.fn(),
   },
 }));
 jest.mock('./VisualizationSuggestionCard', () => ({
