@@ -469,10 +469,6 @@
     },
     "alert-manager-picker": {
       "external-alertmanagers-group": "Externe Alertmanagers",
-      "extra-config-warning": {
-        "content": "Dit toont de samengevoegde configuratie van Grafana alertmanager met geïmporteerde configuraties. Deze samengevoegde weergave is alleen-lezen in de gebruikersinterface.",
-        "title": "Geïmporteerde configuratie"
-      },
       "noOptionsMessage-no-datasources-found": "Geen gegevensbronnen gevonden"
     },
     "alert-menu": {
@@ -4186,6 +4182,16 @@
       "clear": "Zoekopdracht en filters wissen",
       "text": "Geen resultaten gevonden voor je zoekopdracht"
     },
+    "quota-banner": {
+      "at-limit-body": "",
+      "at-limit-title": "",
+      "dismiss": "",
+      "nearing-body": "",
+      "nearing-title": "",
+      "request-extension": "",
+      "resource-detail-dashboards": "",
+      "resource-detail-folders": ""
+    },
     "recently-viewed": {
       "clear": "Geschiedenis wissen",
       "error": "Recent bekeken dashboards konden niet worden geladen.",
@@ -4857,6 +4863,10 @@
       "view-json-diff": "JSON diff weergeven om alle wijzigingen te bekijken"
     }
   },
+  "correlation": {
+    "edit-error": "",
+    "edit-success": ""
+  },
   "correlations": {
     "add-new": "Nieuw toevoegen",
     "alert": {
@@ -5003,6 +5013,7 @@
       "description-color-annotation-event-markers": "Te gebruiken kleur voor het markeren van gebeurtenisannotaties",
       "description-enabled-annotation-query-issued-every-dashboard": "Wanneer ingeschakeld, wordt de annotatiequery elke dashboardvernieuwing uitgegeven",
       "description-hidden": "Annotatiequery's kunnen bovenaan het dashboard worden in- of uitgeschakeld. Als deze optie is aangevinkt, wordt deze schakelaar verborgen.",
+      "error-loading-panels": "",
       "label-color": "Kleur",
       "label-data-source": "Gegevensbron",
       "label-enabled": "Ingeschakeld",
@@ -5057,7 +5068,7 @@
     "canvas-actions": {
       "add-panel": "Paneel toevoegen",
       "disabled-child-contains-tabs": "Kan niet wijzigen in tabbladen omdat een rij al tabbladen bevat",
-      "disabled-nested-grouping": "Groepering is beperkt tot twee niveaus",
+      "disabled-nested-grouping": "",
       "disabled-nested-tabs": "Tabbladen kunnen niet in andere tabbladen worden genest",
       "group-into-row": "Groeperen in rij",
       "group-into-tab": "Groeperen in tabblad",
@@ -5685,10 +5696,7 @@
       "empty-state-message": "Voer een query uit om deze hier te visualiseren of ga naar alle visualisaties om andere paneeltypen toe te voegen",
       "menu-open-panel-editor": "Configureren",
       "menu-use-library-panel": "Bibliotheekpaneel gebruiken",
-      "missing-config": "Ontbrekende paneelconfiguratie",
-      "suggestions": {
-        "empty-state-message": "Voer een query uit om voorgestelde visualisaties te zien"
-      }
+      "missing-config": "Ontbrekende paneelconfiguratie"
     },
     "new-panel-title": "Nieuw paneel",
     "on-create-new-row": {
@@ -6444,6 +6452,7 @@
       "delete": "Verwijderen",
       "description-color-annotation-event-markers": "Te gebruiken kleur voor het markeren van gebeurtenisannotaties",
       "description-enabled-annotation-query-issued-every-dashboard": "Wanneer ingeschakeld, wordt de annotatiequery elke dashboardvernieuwing uitgegeven",
+      "error-loading-panels": "",
       "label-annotation-controls-display": "Annotatiebesturingselementen weergeven in",
       "label-color": "Kleur",
       "label-data-source": "Gegevensbron",
@@ -6922,11 +6931,11 @@
       "static-options-legend": "Statische opties"
     },
     "resource-export": {
+      "classic-v2-warning": "",
       "label": {
         "advanced-options": "Geavanceerde opties",
         "classic": "Klassiek",
         "json": "JSON",
-        "v1-resource": "V1-bron",
         "v2-resource": "V2-bron",
         "yaml": "YAML"
       },
@@ -10970,7 +10979,9 @@
     "manage-folder-owner-alert-text": "",
     "manage-folder-owner-alert-title": "",
     "save-owner": "",
-    "select-owner": ""
+    "select-owner": "",
+    "selected-team-not-found": "",
+    "team-not-found": ""
   },
   "metric-select": {
     "noOptionsMessage-no-options-found": "Geen opties gevonden"
@@ -11926,6 +11937,10 @@
         "title": "Fout",
         "try-again-button": "Probeer het opnieuw"
       },
+      "or-divider": "",
+      "run-query-hint": "",
+      "start-without-data-description": "",
+      "start-without-data-title": "",
       "unknown-viz-type": "Onbekend visualisatietype"
     },
     "viz-type-picker": {
@@ -12369,6 +12384,11 @@
       "text-loading-teams": "Teams laden..."
     }
   },
+  "provisioned-folder-preview-banner": {
+    "folder-pushed-to-repository": "",
+    "sync-needed": "",
+    "view-folder": ""
+  },
   "provisioned-resource-form": {
     "save-or-delete-resource-shared-fields": {
       "comment-placeholder-describe-changes-optional": "Een opmerking toevoegen om je wijzigingen te beschrijven (optioneel)",
@@ -12636,6 +12656,9 @@
       "label-read-only": "Alleen lezen",
       "label-sync-interval": "Synchronisatie-interval (seconden)"
     },
+    "folder-permissions": {
+      "loading": ""
+    },
     "folder-repository-list": {
       "no-results-matching-your-query": "Geen resultaten die overeenkomen met je query",
       "partial-managed": "{{managedCount}}/{{resourceCount}} bronnen beheerd door Git-synchronisatie.",
@@ -12770,6 +12793,12 @@
       "show-more": "meer weergeven",
       "truncated": "Bericht afgekapt"
     },
+    "missing-folder-metadata-banner": {
+      "error-message": "",
+      "error-title": "",
+      "message": "",
+      "title": ""
+    },
     "mode-options": {
       "disabled": {
         "folder-connected": "Volledige instantiesynchronisatie is uitgeschakeld omdat een andere map al is gesynchroniseerd met een repository.",
@@ -12900,6 +12929,7 @@
       "header-status": "Status",
       "header-title": "Titel",
       "header-type": "Type",
+      "missing-folder-metadata": "",
       "search-placeholder": "Zoeken op pad of titel",
       "source": "Bron",
       "status-pending": "In afwachting",
@@ -13301,7 +13331,8 @@
       "cache-timeout-tooltip": "",
       "cache-ttl": "",
       "cache-ttl-tooltip": "",
-      "collapse": "",
+      "hide-time-override": "",
+      "hide-time-override-tooltip": "",
       "interval": "",
       "interval-tooltip": "",
       "max-data-points": "",
@@ -13311,9 +13342,10 @@
       "no-limit": "",
       "relative-time": "",
       "relative-time-tooltip": "",
+      "time-range-max-data-points": "",
       "time-shift": "",
       "time-shift-tooltip": "",
-      "title": ""
+      "width-of-panel": ""
     },
     "edit-query-name": "",
     "footer": {
@@ -13357,20 +13389,20 @@
       "add-saved-query": "",
       "add-transformation": "",
       "add-transformation-below": "",
-      "alert-indicator": {
-        "button-label": "",
-        "button-label-hide": "",
-        "close": ""
-      },
+      "alerts-loading": "",
       "card-click": "Kaart {{id}} selecteren",
       "data": "",
+      "loading-queries-transformations": "",
       "queries-expressions": "Queries en expressies",
       "toggle-size": "Grootte van zijbalk in-/uitschakelen",
       "transformations": "Transformaties",
+      "view-toggle": "",
       "alerts_one": "",
       "alerts_other": "",
       "footer-items_one": "",
-      "footer-items_other": ""
+      "footer-items_other": "",
+      "footer-items-alert_one": "",
+      "footer-items-alert_other": ""
     },
     "transformation-debug": {
       "input-data": "",
@@ -13567,6 +13599,7 @@
       "panel-type": "Paneel: {{panel}}"
     },
     "actions": {
+      "created-by-me": "",
       "include-panels": "Panelen opnemen",
       "remove-datasource-filter": "Gegevensbron: {{datasource}}",
       "sort-placeholder": "Sorteren",
