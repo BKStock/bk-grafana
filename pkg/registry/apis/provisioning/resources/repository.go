@@ -18,14 +18,13 @@ import (
 
 //go:generate mockery --name RepositoryResourcesFactory --structname MockRepositoryResourcesFactory --inpackage --filename repository_resources_factory_mock.go --with-expecter
 type RepositoryResourcesFactory interface {
-	Client(ctx context.Context, repo repository.ReaderWriter) (RepositoryResources, error)
+	Client(ctx context.Context, repo repository.ReaderWriter, opts ...RepositoryResourcesOption) (RepositoryResources, error)
 }
 
 //go:generate mockery --name RepositoryResources --structname MockRepositoryResources --inpackage --filename repository_resources_mock.go --with-expecter
 type RepositoryResources interface {
 	// Folders
 	SetTree(tree FolderTree)
-	SetFolderCreationInterceptor(interceptor FolderCreationInterceptor)
 	EnsureFolderPathExist(ctx context.Context, filePath string) (parent string, err error)
 	EnsureFolderExists(ctx context.Context, folder Folder, parentID string) error
 	EnsureFolderTreeExists(ctx context.Context, ref, path string, tree FolderTree, fn func(folder Folder, created bool, err error) error) error
@@ -47,6 +46,19 @@ type repositoryResourcesFactory struct {
 	clients ClientFactory
 	lister  ResourceLister
 }
+
+type RepositoryResourcesOption func(*repositoryResourcesOptions)
+
+type repositoryResourcesOptions struct {
+	folderManagerOptions []FolderManagerOption
+}
+
+func WithFolderManagerOptions(opts ...FolderManagerOption) RepositoryResourcesOption {
+	return func(cfg *repositoryResourcesOptions) {
+		cfg.folderManagerOptions = append(cfg.folderManagerOptions, opts...)
+	}
+}
+
 type repositoryResources struct {
 	*FolderManager
 	*ResourcesManager
@@ -103,7 +115,7 @@ func NewRepositoryResourcesFactory(parsers ParserFactory, clients ClientFactory,
 	return &repositoryResourcesFactory{parsers, clients, lister}
 }
 
-func (r *repositoryResourcesFactory) Client(ctx context.Context, repo repository.ReaderWriter) (RepositoryResources, error) {
+func (r *repositoryResourcesFactory) Client(ctx context.Context, repo repository.ReaderWriter, opts ...RepositoryResourcesOption) (RepositoryResources, error) {
 	clients, err := r.clients.Clients(ctx, repo.Config().Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("create clients: %w", err)
@@ -118,7 +130,12 @@ func (r *repositoryResourcesFactory) Client(ctx context.Context, repo repository
 		return nil, fmt.Errorf("create parser: %w", err)
 	}
 
-	folders := NewFolderManager(repo, folderClient, NewEmptyFolderTree())
+	cfg := &repositoryResourcesOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	folders := NewFolderManager(repo, folderClient, NewEmptyFolderTree(), cfg.folderManagerOptions...)
 	resources := NewResourcesManager(repo, folders, parser, clients)
 
 	return &repositoryResources{

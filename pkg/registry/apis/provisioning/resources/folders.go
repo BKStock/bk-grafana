@@ -39,19 +39,33 @@ func (e *PathCreationError) Error() string {
 // traversal. Return an error to prevent the folder from being created.
 type FolderCreationInterceptor func(ctx context.Context, folder Folder) error
 
+type FolderManagerOption func(*FolderManager)
+
 type FolderManager struct {
-	repo        repository.ReaderWriter
-	tree        FolderTree
-	client      dynamic.ResourceInterface
-	interceptor FolderCreationInterceptor
+	repo         repository.ReaderWriter
+	tree         FolderTree
+	client       dynamic.ResourceInterface
+	beforeCreate FolderCreationInterceptor
 }
 
-func NewFolderManager(repo repository.ReaderWriter, client dynamic.ResourceInterface, lookup FolderTree) *FolderManager {
-	return &FolderManager{
-		repo:        repo,
-		tree:        lookup,
-		client:      client,
-		interceptor: func(context.Context, Folder) error { return nil },
+func NewFolderManager(repo repository.ReaderWriter, client dynamic.ResourceInterface, lookup FolderTree, opts ...FolderManagerOption) *FolderManager {
+	fm := &FolderManager{
+		repo:   repo,
+		tree:   lookup,
+		client: client,
+		beforeCreate: func(context.Context, Folder) error {
+			return nil
+		},
+	}
+	for _, opt := range opts {
+		opt(fm)
+	}
+	return fm
+}
+
+func WithBeforeCreate(beforeCreate FolderCreationInterceptor) FolderManagerOption {
+	return func(fm *FolderManager) {
+		fm.beforeCreate = beforeCreate
 	}
 }
 
@@ -65,10 +79,6 @@ func (fm *FolderManager) Tree() FolderTree {
 
 func (fm *FolderManager) SetTree(tree FolderTree) {
 	fm.tree = tree
-}
-
-func (fm *FolderManager) SetFolderCreationInterceptor(interceptor FolderCreationInterceptor) {
-	fm.interceptor = interceptor
 }
 
 // EnsureFoldersExist creates the folder structure in the cluster.
@@ -97,7 +107,7 @@ func (fm *FolderManager) EnsureFolderPathExist(ctx context.Context, filePath str
 			return nil
 		}
 
-		if err := fm.interceptor(ctx, f); err != nil {
+		if err := fm.beforeCreate(ctx, f); err != nil {
 			return &PathCreationError{
 				Path: f.Path,
 				Err:  err,
