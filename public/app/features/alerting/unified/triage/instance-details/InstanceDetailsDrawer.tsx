@@ -5,7 +5,7 @@ import { useMeasure } from 'react-use';
 
 import { GrafanaTheme2, Labels } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { isFetchError } from '@grafana/runtime';
+import { config, isFetchError } from '@grafana/runtime';
 import { TimeRangePicker, useTimeRange } from '@grafana/scenes-react';
 import {
   Alert,
@@ -35,6 +35,7 @@ import { useWorkbenchContext } from '../WorkbenchContext';
 import { DrawerTimeRangeInfoBanner } from './DrawerTimeRangeInfoBanner';
 import { InstanceDetailsDrawerTitle } from './InstanceDetailsDrawerTitle';
 import { InstanceStateInfoBanner } from './InstanceStateInfoBanner';
+import { NotificationDelivery } from './NotificationDelivery';
 import { QueryVisualization } from './QueryVisualization';
 import { isDrawerRangeShorterThanQuery } from './drawerTimeRangeUtils';
 import { useInstanceAlertState } from './instanceStateUtils';
@@ -170,13 +171,22 @@ export function InstanceDetailsDrawer({ ruleUID, instanceLabels, onClose }: Inst
           {!stateHistoryFetching && !stateHistoryError && (
             <Stack direction="column" gap={1}>
               {historyRecords.length > 0 ? (
-                <InstanceStateTransitions records={historyRecords} />
+                <InstanceStateTransitions records={historyRecords} maxItems={10} />
               ) : (
                 <Text color="secondary">{t('alerting.instance-details.no-history', 'No recent state changes')}</Text>
               )}
             </Stack>
           )}
         </Box>
+
+        {config.featureToggles.alertingNotificationHistory && historyRecords.length > 0 && (
+          <NotificationDelivery
+            ruleUID={ruleUID}
+            instanceLabels={instanceLabels}
+            timeRange={timeRange}
+            records={historyRecords}
+          />
+        )}
       </Stack>
     </Drawer>
   );
@@ -235,6 +245,8 @@ function extractQueryDetails(rule: GrafanaRuleDefinition) {
   return { dataQueries, thresholds };
 }
 
+const MAX_STATE_TRANSITIONS = 10;
+
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: '2-digit',
@@ -247,9 +259,15 @@ function formatTimestamp(timestamp: number) {
   return dateFormatter.format(new Date(timestamp));
 }
 
-function InstanceStateTransitions({ records }: { records: LogRecord[] }) {
+function InstanceStateTransitions({
+  records,
+  maxItems = MAX_STATE_TRANSITIONS,
+}: {
+  records: LogRecord[];
+  maxItems?: number;
+}) {
   const styles = useStyles2(stateTransitionStyles);
-  const sortedRecords = orderBy(records, (r) => r.timestamp, 'desc');
+  const sortedRecords = orderBy(records, (r) => r.timestamp, 'desc').slice(0, maxItems);
 
   return (
     <div className={styles.container}>
