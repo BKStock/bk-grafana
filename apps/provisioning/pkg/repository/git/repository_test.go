@@ -249,6 +249,7 @@ func TestGitRepository_Test(t *testing.T) {
 		name        string
 		setupMock   func(*mocks.FakeClient)
 		gitConfig   RepositoryConfig
+		workflows   []provisioning.Workflow
 		wantResults *provisioning.TestResults
 		wantError   error
 	}{
@@ -640,6 +641,112 @@ func TestGitRepository_Test(t *testing.T) {
 			},
 			wantError: nil,
 		},
+		{
+			name: "success - write permission check passes when workflows are configured",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				mockClient.CanWriteReturns(true, nil)
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+			wantResults: &provisioning.TestResults{
+				Success: true,
+				Errors:  nil,
+				Code:    http.StatusOK,
+			},
+			wantError: nil,
+		},
+		{
+			name: "failure - write permission denied when workflows are configured",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				mockClient.CanWriteReturns(false, nil)
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+			wantResults: &provisioning.TestResults{
+				Success: false,
+				Errors: []provisioning.ErrorDetails{
+					{
+						Type:   metav1.CauseTypeFieldValueInvalid,
+						Field:  field.NewPath("secure", "token").String(),
+						Detail: "write permission denied",
+					},
+				},
+				Code: http.StatusForbidden,
+			},
+			wantError: nil,
+		},
+		{
+			name: "failure - write permission check error when workflows are configured",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				mockClient.CanWriteReturns(false, errors.New("write check failed"))
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+			wantResults: &provisioning.TestResults{
+				Success: false,
+				Errors: []provisioning.ErrorDetails{
+					{
+						Type:   metav1.CauseTypeFieldValueInvalid,
+						Field:  field.NewPath("secure", "token").String(),
+						Detail: "failed to check write permission: write check failed",
+					},
+				},
+				Code: http.StatusForbidden,
+			},
+			wantError: nil,
+		},
+		{
+			name: "failure - permission denied (HTTP 403) from CanWrite",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				mockClient.CanWriteReturns(false, client.NewPermissionDeniedError("POST", "/git-receive-pack", nil))
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+			wantResults: &provisioning.TestResults{
+				Success: false,
+				Errors: []provisioning.ErrorDetails{
+					{
+						Type:   metav1.CauseTypeFieldValueInvalid,
+						Field:  field.NewPath("secure", "token").String(),
+						Detail: "permission denied",
+					},
+				},
+				Code: http.StatusForbidden,
+			},
+			wantError: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -652,7 +759,8 @@ func TestGitRepository_Test(t *testing.T) {
 				gitConfig: tt.gitConfig,
 				config: &provisioning.Repository{
 					Spec: provisioning.RepositorySpec{
-						Type: "test_type",
+						Type:      "test_type",
+						Workflows: tt.workflows,
 					},
 				},
 			}
