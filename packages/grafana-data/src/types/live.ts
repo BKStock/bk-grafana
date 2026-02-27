@@ -141,6 +141,9 @@ export interface LiveChannelAddress {
   stream: string; // depends on the scope
   path: string;
 
+  /** @deprecated use 'stream' instead.  */
+  namespace?: string;
+
   /**
    * Additional metadata passed to a channel.  The backend will propagate this JSON object to
    * each OnSubscribe and RunStream calls.  This value should be constant across multiple requests
@@ -173,9 +176,7 @@ export function parseLiveChannelAddress(id?: string): LiveChannelAddress | undef
  *
  * @alpha -- experimental
  */
-export function isValidLiveChannelAddress(
-  addr?: LiveChannelAddress & { namespace?: string }
-): addr is LiveChannelAddress {
+export function isValidLiveChannelAddress(addr?: LiveChannelAddress): addr is LiveChannelAddress {
   // convert requested namespace into "stream" property
   if (addr?.namespace && !addr?.stream?.length) {
     addr.stream = addr.namespace;
@@ -188,7 +189,7 @@ export function isValidLiveChannelAddress(
  *
  * @alpha -- experimental
  */
-export function toLiveChannelId(addr: LiveChannelAddress & { namespace?: string }): LiveChannelId {
+export function toLiveChannelId(addr: LiveChannelAddress): LiveChannelId {
   let { scope, stream, path, namespace } = addr;
   if (!stream && namespace) {
     stream = namespace;
