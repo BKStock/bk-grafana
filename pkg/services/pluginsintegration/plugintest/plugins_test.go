@@ -238,7 +238,6 @@ func verifyCorePluginCatalogue(t *testing.T, ctx context.Context, ps *pluginstor
 	}
 
 	expDataSources := map[string]struct{}{
-		"cloudwatch":                       {},
 		"grafana-azure-monitor-datasource": {},
 		"stackdriver":                      {},
 		"elasticsearch":                    {},
