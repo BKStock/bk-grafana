@@ -14392,14 +14392,14 @@
     },
     "team-pages": {
       "team-folders": {
-        "empty": "No folders owned by this team",
+        "empty-state-content": "You can set up ownership of a folder from folder detail page",
+        "empty-state-message": "This team does not own any folders yet.",
         "error-loading-folders": "Could not load team folders",
         "loading": "Loading...",
         "open-folder": "Open folder",
-        "open-parent-folder": "Open parent folder",
         "table": {
           "name": "Name",
-          "parent-folder": "Parent folder"
+          "path": "Full path"
         }
       }
     },
