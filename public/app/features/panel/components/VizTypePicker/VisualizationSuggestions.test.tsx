@@ -355,6 +355,86 @@ describe('VisualizationSuggestions', () => {
     });
   });
 
+  it('should show an error alert when suggestions fail to load', async () => {
+    mockGetAllSuggestions.mockRejectedValue(new Error('Network error'));
+
+    const data: PanelData = {
+      series: [],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+    };
+
+    render(<VisualizationSuggestions onChange={jest.fn()} data={data} panel={undefined} searchQuery="" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Error')).toBeInTheDocument();
+    });
+
+    mockGetAllSuggestions.mockResolvedValue({
+      suggestions: [{ pluginId: 'timeseries', name: 'Time series', hash: 'test-hash', options: {} }],
+      hasErrors: false,
+    });
+  });
+
+  it('should show a warning alert when some suggestions could not be loaded', async () => {
+    mockGetAllSuggestions.mockResolvedValue({
+      suggestions: [{ pluginId: 'timeseries', name: 'Time series', hash: 'test-hash', options: {} }],
+      hasErrors: true,
+    });
+
+    const data: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    render(<VisualizationSuggestions onChange={jest.fn()} data={data} panel={undefined} searchQuery="" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Some suggestions could not be loaded')).toBeInTheDocument();
+    });
+  });
+
+  it('should filter suggestions by search query when data has series', async () => {
+    mockGetAllSuggestions.mockResolvedValue({
+      suggestions: [
+        { pluginId: 'timeseries', name: 'Time series', hash: 'ts-hash', options: {} },
+        { pluginId: 'table', name: 'Table', hash: 'table-hash', options: {} },
+      ],
+      hasErrors: false,
+    });
+
+    const data: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    render(<VisualizationSuggestions onChange={jest.fn()} data={data} panel={undefined} searchQuery="time" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suggestion-card-ts-hash')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('suggestion-card-table-hash')).not.toBeInTheDocument();
+  });
+
   it('should call onChange with withModKey: false when a suggestion card is clicked', async () => {
     const mockOnChange = jest.fn();
     const dataWithSeries: PanelData = {
