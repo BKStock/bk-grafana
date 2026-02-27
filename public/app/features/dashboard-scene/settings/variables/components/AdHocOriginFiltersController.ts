@@ -51,7 +51,17 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
       return;
     }
 
-    this.setFilters(this.filters.map((f) => (f === filter ? { ...f, ...update, origin: 'dashboard' } : f)));
+    const index = this.filters.findIndex((item) => {
+      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
+    });
+
+    if (index !== -1) {
+      this.setFilters(
+        this.filters.map((item, i) => {
+          return i === index ? { ...item, ...update, origin: 'dashboard' } : item;
+        })
+      );
+    }
   }
 
   updateToMatchAll(filter: AdHocFilterWithLabels): void {
@@ -59,8 +69,13 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
   }
 
   removeFilter(filter: AdHocFilterWithLabels): void {
-    const updatedFilters = this.filters.filter((f) => f !== filter);
-    this.setFilters(updatedFilters);
+    const index = this.filters.findIndex((item) => {
+      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
+    });
+
+    if (index !== -1) {
+      this.setFilters(this.filters.filter((_, i) => i !== index));
+    }
   }
 
   removeLastFilter(): void {
@@ -71,11 +86,15 @@ export class AdHocOriginFiltersController implements AdHocFiltersController {
   }
 
   handleComboboxBackspace(filter: AdHocFilterWithLabels): void {
-    // TODO: verify this is correct
-    const index = this.filters.indexOf(filter);
+    const index = this.filters.findIndex((item) => {
+      return item.key === filter.key && item.operator === filter.operator && item.value === filter.value;
+    });
+
     if (index > 0) {
       this.setFilters(
-        this.filters.map((f, i) => (i === index - 1 ? { ...f, forceEdit: true } : { ...f, forceEdit: false }))
+        this.filters.map((item, i) => {
+          return i === index - 1 ? { ...item, forceEdit: true } : { ...item, forceEdit: false };
+        })
       );
     }
   }
