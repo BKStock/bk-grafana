@@ -222,7 +222,7 @@ Dashboards are reloaded when the JSON files change.
 
 #### `protocol`
 
-`http`,`https`,`h2` or `socket`
+`http`,`https`,`h2`,`socket` or `socket_h2`
 
 #### `min_tls_version`
 
@@ -334,6 +334,10 @@ Mode where the socket should be set when `protocol=socket`. Make sure that Grafa
 #### `socket`
 
 Path where the socket should be created when `protocol=socket`. Make sure Grafana has appropriate permissions for that path before you change this setting.
+
+#### `serve_on_socket`
+
+If set to `true` and the primary `protocol` is `http`, `https`, or `h2`, Grafana will additionally serve on the Unix domain socket configured via `socket`. Defaults to `false`.
 
 #### `cdn_url`
 
@@ -1672,10 +1676,6 @@ Enables the [Content Security Policy Violations instrumentation](https://grafana
 
 Enables the [Tracing instrumentation](https://grafana.com/docs/grafana-cloud/monitor-applications/frontend-observability/instrument/tracing-instrumentation/) for Grafana Faro, defaults to `true`.
 
-#### `web_vitals_attribution_enabled`
-
-Enables sending [attribution data for web vitals](https://grafana.com/docs/grafana-cloud/monitor-applications/frontend-observability/instrument/web-vitals/#web-vitals-attribution-data) with the Performance instrumentation, defaults to `true`.
-
 #### `log_endpoint_requests_per_second_limit`
 
 Requests per second limit enforced per an extended period, for Grafana backend log ingestion endpoint, `/log-grafana-javascript-agent`. Default is `3`.
@@ -2572,6 +2572,10 @@ The `callback_url` can also be configured to support usage of the image renderer
 
 Concurrent render request limit affects when the /render HTTP endpoint is used. Rendering many images at the same time can overload the server,
 which this setting can help protect against by only allowing a certain number of concurrent requests. Default is `30`.
+
+#### `ca_cert_file_path`
+
+Path to the PEM-encoded CA certificate file from the Image Renderer server.
 
 #### `default_image_width`
 

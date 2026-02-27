@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -78,11 +79,21 @@ func TestUseFieldSelectorSearch(t *testing.T) {
 			req: &resourcepb.ListRequest{
 				Source: resourcepb.ListRequest_STORE,
 				Options: &resourcepb.ListOptions{
-					Key:    &resourcepb.ResourceKey{Namespace: "ns"},
+					Key:    &resourcepb.ResourceKey{Namespace: "ns", Group: "advisor.grafana.app"},
 					Fields: []*resourcepb.Requirement{{Key: "spec.foo"}},
 				},
 			},
 			expectedAllowed: true,
+		},
+		"false when group has no kinds in manifest": {
+			req: &resourcepb.ListRequest{
+				Source: resourcepb.ListRequest_STORE,
+				Options: &resourcepb.ListOptions{
+					Key:    &resourcepb.ResourceKey{Namespace: "ns", Group: "provisioning.grafana.app"},
+					Fields: []*resourcepb.Requirement{{Key: "spec.foo"}},
+				},
+			},
+			expectedAllowed: false,
 		},
 	}
 
@@ -206,6 +217,7 @@ func TestListWithFieldSelectors(t *testing.T) {
 			queue:            scheduler.NewNoopQueue(),
 			queueConfig:      QueueConfig{Timeout: time.Second, MinBackoff: time.Millisecond, MaxBackoff: time.Millisecond, MaxRetries: 1},
 			maxPageSizeBytes: 1024,
+			log:              log.NewNopLogger(),
 		}
 		req := &resourcepb.ListRequest{
 			Limit: 10,
@@ -372,6 +384,7 @@ func createTestServer(searchClient resourcepb.ResourceIndexClient, maxPageSizeBy
 		queue:            scheduler.NewNoopQueue(),
 		queueConfig:      QueueConfig{Timeout: time.Second, MinBackoff: time.Millisecond, MaxBackoff: time.Millisecond, MaxRetries: 1},
 		maxPageSizeBytes: maxPageSizeBytes,
+		log:              log.NewNopLogger(),
 	}
 }
 

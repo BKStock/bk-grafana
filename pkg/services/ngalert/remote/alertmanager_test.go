@@ -21,8 +21,8 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/grafana/alerting/http/v0mimir1"
 	amv2 "github.com/prometheus/alertmanager/api/v2/models"
-	"github.com/prometheus/alertmanager/config"
 	"github.com/prometheus/alertmanager/pkg/labels"
 	"github.com/prometheus/client_golang/prometheus"
 	common_config "github.com/prometheus/common/config"
@@ -555,6 +555,32 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 			},
 		},
 		{
+			name:                  "no error, with extra configurations and managed routes enabled",
+			config:                string(cfgWithExtraUnmergedBytes),
+			enabledMultipleRoutes: true,
+			autogenFn:             NoopAutogenFn,
+			expCfg: &client.UserGrafanaConfig{
+				GrafanaAlertmanagerConfig: func() client.GrafanaAlertmanagerConfig {
+					cfgWithExtraUnmerged, err := notifier.Load(cfgWithExtraUnmergedBytes)
+					require.NoError(t, err)
+					r, err := cfgWithExtraUnmerged.GetMergedAlertmanagerConfig()
+					require.NoError(t, err)
+					managed := make(map[string]*definition.Route)
+					managed[r.Identifier] = r.ExtraRoute
+					r.Config.Route = legacy_storage.WithManagedRoutes(r.Config.Route, managed)
+					importedRules, err := legacy_storage.BuildManagedInhibitionRules(r.Identifier, r.ExtraInhibitRules)
+					require.NoError(t, err)
+					r.Config.InhibitRules = legacy_storage.WithManagedInhibitionRules(r.Config.InhibitRules, importedRules)
+					cfgWithExtraMerged := client.GrafanaAlertmanagerConfig{
+						TemplateFiles:      cfgWithExtraUnmerged.TemplateFiles,
+						AlertmanagerConfig: r.Config,
+						Templates:          definition.TemplatesMapToPostableAPITemplates(cfgWithExtraUnmerged.ExtraConfigs[0].TemplateFiles, definition.MimirTemplateKind),
+					}
+					return cfgWithExtraMerged
+				}(),
+			},
+		},
+		{
 			name:                  "no error, with managed routes",
 			config:                string(mustMarshal(policy_exports.Config())),
 			enabledMultipleRoutes: true,
@@ -578,6 +604,37 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 				GrafanaAlertmanagerConfig: client.GrafanaAlertmanagerConfig{
 					AlertmanagerConfig: policy_exports.Config().AlertmanagerConfig,
 				},
+			},
+		},
+		{
+			name: "do not add managed route from extra config if name conflict",
+			config: func() string {
+				cfgWithExtraUnmerged, err := notifier.Load(cfgWithExtraUnmergedBytes)
+				require.NoError(t, err)
+
+				cfgWithExtraUnmerged.ManagedRoutes = map[string]*definition.Route{
+					"imported": {Receiver: "grafana-default-email"},
+				}
+				return string(mustMarshal(cfgWithExtraUnmerged))
+			}(),
+			enabledMultipleRoutes: true,
+			autogenFn:             NoopAutogenFn,
+			expCfg: &client.UserGrafanaConfig{
+				GrafanaAlertmanagerConfig: func() client.GrafanaAlertmanagerConfig {
+					cfgWithExtraUnmerged, err := notifier.Load(cfgWithExtraUnmergedBytes)
+					require.NoError(t, err)
+					r, err := cfgWithExtraUnmerged.GetMergedAlertmanagerConfig()
+					require.NoError(t, err)
+					r.Config.Route = legacy_storage.WithManagedRoutes(r.Config.Route, map[string]*definition.Route{
+						"imported": {Receiver: "grafana-default-email"},
+					})
+					cfgWithExtraMerged := client.GrafanaAlertmanagerConfig{
+						TemplateFiles:      cfgWithExtraUnmerged.TemplateFiles,
+						AlertmanagerConfig: r.Config,
+						Templates:          definition.TemplatesMapToPostableAPITemplates(cfgWithExtraUnmerged.ExtraConfigs[0].TemplateFiles, definition.MimirTemplateKind),
+					}
+					return cfgWithExtraMerged
+				}(),
 			},
 		},
 	}
@@ -613,6 +670,7 @@ func TestCompareAndSendConfiguration(t *testing.T) {
 					cmpopts.IgnoreUnexported(
 						time.Location{},
 						labels.Matcher{},
+						v0mimir1.ProxyConfig{},
 						common_config.ProxyConfig{})))
 
 				got1 := got
@@ -839,7 +897,7 @@ func TestCompareAndSendConfigurationWithExtraConfigs(t *testing.T) {
 			},
 			Receivers: []*apimodels.PostableApiReceiver{
 				{
-					Receiver: config.Receiver{Name: "grafana-default-email"},
+					Receiver: apimodels.Receiver{Name: "grafana-default-email"},
 					PostableGrafanaReceivers: apimodels.PostableGrafanaReceivers{
 						GrafanaManagedReceivers: []*apimodels.PostableGrafanaReceiver{
 							{
@@ -1305,11 +1363,11 @@ func TestIntegrationRemoteAlertmanagerReceivers(t *testing.T) {
 	// We should start with the default config.
 	rcvs, err := am.GetReceivers(ctx)
 	require.NoError(t, err)
-	require.Equal(t, []apimodels.Receiver{
+	require.Equal(t, []alertingModels.ReceiverStatus{
 		{
 			Active:       true,
 			Name:         "empty-receiver",
-			Integrations: []apimodels.Integration{},
+			Integrations: []alertingModels.IntegrationStatus{},
 		},
 	}, rcvs)
 }
