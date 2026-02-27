@@ -8,6 +8,7 @@ import {
 } from '@grafana/alerting/unstable';
 import { RoutingTree } from '@grafana/api-clients/rtkq/notifications.alerting/v0alpha1';
 import { Trans, t } from '@grafana/i18n';
+import { config } from '@grafana/runtime';
 import { Button, Field, Icon, Input, Label, Stack, Tooltip } from '@grafana/ui';
 import { AlertmanagerAction, useAlertmanagerAbility } from 'app/features/alerting/unified/hooks/useAbilities';
 import { ObjectMatcher, RouteWithID } from 'app/plugins/datasource/alertmanager/types';
@@ -153,15 +154,17 @@ const NotificationPoliciesFilter = ({ onChangeReceiver, onChangeMatchers }: Noti
           )}
         </Field>
       )}
-      <Field label={t('alerting.multiple-policies-view.policy-tree-filter-label', 'Filter by policy tree')} noMargin>
-        <RoutingTreeSelector
-          multi
-          value={selectedPolicyTreeNames}
-          onChange={handlePolicyTreeFilterChange}
-          placeholder={t('alerting.multiple-policies-view.policy-tree-filter-placeholder', 'Select policy trees')}
-          width={40}
-        />
-      </Field>
+      {isGrafanaAlertmanager && config.featureToggles.alertingMultiplePolicies && (
+        <Field label={t('alerting.multiple-policies-view.policy-tree-filter-label', 'Filter by policy tree')} noMargin>
+          <RoutingTreeSelector
+            multi
+            value={selectedPolicyTreeNames}
+            onChange={handlePolicyTreeFilterChange}
+            placeholder={t('alerting.multiple-policies-view.policy-tree-filter-placeholder', 'Select policy trees')}
+            width={40}
+          />
+        </Field>
+      )}
       {hasFilters && (
         <Button variant="secondary" icon="times" onClick={clearFilters}>
           <Trans i18nKey="alerting.common.clear-filters">Clear filters</Trans>

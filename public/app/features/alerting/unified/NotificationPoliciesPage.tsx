@@ -197,14 +197,22 @@ function PolicyTreeTab() {
     });
   }, [sortedPolicies, selectedPolicyTreeNames]);
 
-  // Single-tree mode: just render one PoliciesTree with no list/create chrome
+  // Single-tree mode: show filters but no collapse/expand or create button
   if (!useMultiplePolicies) {
     return (
-      <PoliciesTree
-        alertGroups={alertGroups}
-        refetchAlertGroups={refetchAlertGroups}
-        getRouteGroupsMap={getRouteGroupsMap}
-      />
+      <Stack direction="column" gap={2}>
+        <NotificationPoliciesFilter
+          onChangeMatchers={handleChangeLabelMatchers}
+          onChangeReceiver={handleChangeContactPoint}
+        />
+        <PoliciesTree
+          contactPointFilter={contactPointFilter}
+          labelMatchersFilter={labelMatchersFilter}
+          alertGroups={alertGroups}
+          refetchAlertGroups={refetchAlertGroups}
+          getRouteGroupsMap={getRouteGroupsMap}
+        />
+      </Stack>
     );
   }
 
