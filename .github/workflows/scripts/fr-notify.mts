@@ -136,13 +136,6 @@ async function sendNotifications(): Promise<void> {
             text: { type: 'mrkdwn', text: `*<${frUrl}|${frTitle}>*\nby @${author}` },
           },
           { type: 'divider' },
-          {
-            type: 'context',
-            elements: [{
-              type: 'mrkdwn',
-              text: `🔍 <https://github.com/${repo}/issues?q=is%3Aissue+is%3Aopen+label%3Atype%2Ffeature-request+label%3Afr%2Fauto-triaged+label%3A${matchedLabelEncoded}|View all ${team.name} feature requests>`,
-            }],
-          },
         ],
       }],
     });
