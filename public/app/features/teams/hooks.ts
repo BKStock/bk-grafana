@@ -1,5 +1,5 @@
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import {
   CreateTeamApiArg,
@@ -129,39 +129,36 @@ export const useCreateTeam = () => {
   const [createTeam, response] = useCreateTeamMutation();
   const [setTeamRoles] = useSetTeamRolesMutation();
 
-  const trigger = useCallback(
-    async (
-      team: CreateTeamCommand,
-      pendingRoles?: Role[],
-      options?: {
-        showSuccessAlert?: boolean;
+  const trigger = async (
+    team: CreateTeamCommand,
+    pendingRoles?: Role[],
+    options?: {
+      showSuccessAlert?: boolean;
+    }
+  ) => {
+    const mutationArg: CreateTeamApiArg & { showSuccessAlert?: boolean } = {
+      createTeamCommand: team,
+      showSuccessAlert: options?.showSuccessAlert,
+    };
+    const mutationResult = await createTeam(mutationArg);
+
+    const { data } = mutationResult;
+
+    // Add any pending roles to the team
+    if (data && data.teamId && pendingRoles && pendingRoles.length) {
+      await contextSrv.fetchUserPermissions();
+      if (contextSrv.licensedAccessControlEnabled() && canUpdateRoles()) {
+        await setTeamRoles({
+          teamId: data.teamId,
+          setTeamRolesCommand: {
+            roleUids: pendingRoles.map((role) => role.uid),
+          },
+        });
       }
-    ) => {
-      const mutationArg: CreateTeamApiArg & { showSuccessAlert?: boolean } = {
-        createTeamCommand: team,
-        showSuccessAlert: options?.showSuccessAlert,
-      };
-      const mutationResult = await createTeam(mutationArg);
+    }
 
-      const { data } = mutationResult;
+    return mutationResult;
+  };
 
-      // Add any pending roles to the team
-      if (data && data.teamId && pendingRoles && pendingRoles.length) {
-        await contextSrv.fetchUserPermissions();
-        if (contextSrv.licensedAccessControlEnabled() && canUpdateRoles()) {
-          await setTeamRoles({
-            teamId: data.teamId,
-            setTeamRolesCommand: {
-              roleUids: pendingRoles.map((role) => role.uid),
-            },
-          });
-        }
-      }
-
-      return mutationResult;
-    },
-    [createTeam, setTeamRoles]
-  );
-
-  return useMemo(() => [trigger, response] as const, [trigger, response]);
+  return [trigger, response] as const;
 };
