@@ -2,13 +2,16 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { LoadingState, PanelData, PanelModel, toDataFrame, FieldType, getDefaultTimeRange } from '@grafana/data';
+import { config } from '@grafana/runtime';
 import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene/UnconfiguredPanel';
 
 import * as getAllSuggestionsModule from '../../suggestions/getAllSuggestions';
+import * as getPresetsModule from '../../suggestions/getPresets';
 
 import { VisualizationSuggestions } from './VisualizationSuggestions';
 
 jest.mock('../../suggestions/getAllSuggestions');
+jest.mock('../../suggestions/getPresets');
 jest.mock('./VisualizationSuggestionCard', () => ({
   VisualizationSuggestionCard: ({
     suggestion,
@@ -544,6 +547,150 @@ describe('VisualizationSuggestions', () => {
 
       expect(screen.queryByText('Dashboard list')).not.toBeInTheDocument();
       expect(screen.queryByText('Alert list')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('VisualizationSuggestions when vizPresets flag is enabled', () => {
+    const mockGetPresets = jest.mocked(getPresetsModule.getPresets);
+
+    const dataWithSeries: PanelData = {
+      series: [
+        toDataFrame({
+          fields: [
+            { name: 'time', type: FieldType.time, values: [1, 2, 3] },
+            { name: 'value', type: FieldType.number, values: [10, 20, 30] },
+          ],
+        }),
+      ],
+      state: LoadingState.Done,
+      timeRange: getDefaultTimeRange(),
+      structureRev: 1,
+    };
+
+    beforeEach(() => {
+      config.featureToggles.vizPresets = true;
+    });
+
+    afterEach(() => {
+      config.featureToggles.vizPresets = false;
+      mockGetPresets.mockReset();
+    });
+
+    it('should call onShowPresets and onChange with withModKey: true when the plugin has presets', async () => {
+      const presets = [{ pluginId: 'timeseries', name: 'Default', hash: 'preset-hash', options: {} }];
+      mockGetPresets.mockResolvedValue(presets);
+
+      const mockOnChange = jest.fn();
+      const mockOnShowPresets = jest.fn();
+
+      render(
+        <VisualizationSuggestions
+          onChange={mockOnChange}
+          onShowPresets={mockOnShowPresets}
+          data={dataWithSeries}
+          panel={undefined}
+          searchQuery=""
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+      await waitFor(() => {
+        expect(mockOnShowPresets).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'timeseries' }), presets);
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'timeseries', withModKey: true }));
+      expect(mockOnChange).not.toHaveBeenCalledWith(expect.objectContaining({ withModKey: false }));
+    });
+
+    it('should call onChange with withModKey: false when the plugin has no presets', async () => {
+      mockGetPresets.mockResolvedValue([]);
+
+      const mockOnChange = jest.fn();
+      const mockOnShowPresets = jest.fn();
+
+      render(
+        <VisualizationSuggestions
+          onChange={mockOnChange}
+          onShowPresets={mockOnShowPresets}
+          data={dataWithSeries}
+          panel={undefined}
+          searchQuery=""
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(
+          expect.objectContaining({ pluginId: 'timeseries', withModKey: false })
+        );
+      });
+
+      expect(mockOnShowPresets).not.toHaveBeenCalled();
+    });
+
+    it('should call onChange with withModKey: false when getPresets throws', async () => {
+      mockGetPresets.mockRejectedValue(new Error('Failed to load presets'));
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockOnChange = jest.fn();
+      const mockOnShowPresets = jest.fn();
+
+      render(
+        <VisualizationSuggestions
+          onChange={mockOnChange}
+          onShowPresets={mockOnShowPresets}
+          data={dataWithSeries}
+          panel={undefined}
+          searchQuery=""
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(
+          expect.objectContaining({ pluginId: 'timeseries', withModKey: false })
+        );
+      });
+
+      expect(mockOnShowPresets).not.toHaveBeenCalled();
+      jest.restoreAllMocks();
+    });
+
+    it('should call onChange with withModKey: false when onShowPresets is not provided', async () => {
+      mockGetPresets.mockResolvedValue([{ pluginId: 'timeseries', name: 'Default', hash: 'preset-hash', options: {} }]);
+
+      const mockOnChange = jest.fn();
+
+      render(
+        <VisualizationSuggestions onChange={mockOnChange} data={dataWithSeries} panel={undefined} searchQuery="" />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('suggestion-card-test-hash')).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByTestId('suggestion-card-test-hash'));
+
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(
+          expect.objectContaining({ pluginId: 'timeseries', withModKey: false })
+        );
+      });
     });
   });
 });
