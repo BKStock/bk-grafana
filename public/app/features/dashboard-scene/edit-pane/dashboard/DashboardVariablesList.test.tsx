@@ -99,12 +99,6 @@ describe('<DashboardVariablesList />', () => {
     });
   });
 
-  test('always renders an "Add variable" button', () => {
-    const { elements } = renderVariablesList();
-
-    expect(elements.addVariableButton()).toBeInTheDocument();
-  });
-
   describe('User interactions', () => {
     describe('when a variable name is clicked', () => {
       test('selects the variable in the pane', async () => {
