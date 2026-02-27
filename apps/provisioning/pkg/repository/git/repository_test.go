@@ -747,6 +747,50 @@ func TestGitRepository_Test(t *testing.T) {
 			},
 			wantError: nil,
 		},
+		{
+			name: "success - read-only repository skips write permission check",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				// CanWrite should NOT be called for read-only repositories
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: nil, // Read-only repository (no workflows configured)
+			wantResults: &provisioning.TestResults{
+				Success: true,
+				Errors:  nil,
+				Code:    http.StatusOK,
+			},
+			wantError: nil,
+		},
+		{
+			name: "success - empty workflows array skips write permission check",
+			setupMock: func(mockClient *mocks.FakeClient) {
+				mockClient.IsAuthorizedReturns(true, nil)
+				mockClient.RepoExistsReturns(true, nil)
+				mockClient.GetRefReturns(nanogit.Ref{
+					Name: "refs/heads/main",
+					Hash: hash.Hash{},
+				}, nil)
+				// CanWrite should NOT be called for repositories with empty workflows
+			},
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			workflows: []provisioning.Workflow{}, // Empty workflows array (read-only)
+			wantResults: &provisioning.TestResults{
+				Success: true,
+				Errors:  nil,
+				Code:    http.StatusOK,
+			},
+			wantError: nil,
+		},
 	}
 
 	for _, tt := range tests {
