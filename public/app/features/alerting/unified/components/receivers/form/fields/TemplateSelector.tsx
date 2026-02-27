@@ -357,11 +357,11 @@ export function WrapWithTemplateSelection({
   const styles = useStyles2(getStyles);
   const { getValues } = useFormContext();
   const value = getValues(name) ?? '';
+  const showTemplatePicker = useTemplates && !readOnly;
   // if the placeholder does not contain a template, we don't need to show the template picker
   if (!option.placeholder.includes('{{ template ') || typeof value !== 'string') {
     return <>{children}</>;
   }
-  const showTemplatePicker = useTemplates && !readOnly;
 
   // Otherwise, we can use templates on this field
   // if the value is empty, we only show the template picker

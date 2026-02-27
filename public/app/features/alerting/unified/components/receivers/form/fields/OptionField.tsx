@@ -130,27 +130,24 @@ export const OptionField: FC<Props> = ({
   );
 };
 
-interface ConfiguredSecureFieldProps {
+export interface ConfiguredSecureFieldProps {
   id: string;
   readOnly: boolean;
   onReset: () => void;
-  variant: 'input' | 'textarea';
 }
 
-function ConfiguredSecureField({ id, readOnly, onReset, variant }: ConfiguredSecureFieldProps) {
+export function ConfiguredSecretInput({ id, readOnly, onReset }: ConfiguredSecureFieldProps) {
   if (readOnly) {
-    return variant === 'input' ? (
-      <Input id={id} disabled={true} value="configured" />
-    ) : (
-      <TextArea id={id} disabled={true} value="configured" />
-    );
+    return <Input id={id} disabled={true} value="configured" />;
   }
+  return <SecretInput id={id} onReset={onReset} isConfigured />;
+}
 
-  return variant === 'input' ? (
-    <SecretInput id={id} onReset={onReset} isConfigured />
-  ) : (
-    <SecretTextArea id={id} onReset={onReset} isConfigured />
-  );
+function ConfiguredSecretTextArea({ id, readOnly, onReset }: ConfiguredSecureFieldProps) {
+  if (readOnly) {
+    return <TextArea id={id} disabled={true} value="configured" />;
+  }
+  return <SecretTextArea id={id} onReset={onReset} isConfigured />;
 }
 
 const OptionInput: FC<Props & { id: string }> = ({
@@ -172,7 +169,7 @@ const OptionInput: FC<Props & { id: string }> = ({
   const name = `${pathPrefix}${option.propertyName}`;
 
   const secureFieldKey = option.secure && option.secureFieldKey ? option.secureFieldKey : '';
-  const isEncryptedInput = secureFieldKey && secureFields?.[secureFieldKey];
+  const isSecureFieldConfigured = secureFieldKey && secureFields?.[secureFieldKey];
 
   const useTemplates = option.placeholder.includes('{{ template');
 
@@ -202,13 +199,8 @@ const OptionInput: FC<Props & { id: string }> = ({
           onSelectTemplate={onSelectTemplate}
           readOnly={readOnly}
         >
-          {isEncryptedInput ? (
-            <ConfiguredSecureField
-              id={id}
-              readOnly={readOnly}
-              onReset={() => onResetSecureField?.(secureFieldKey)}
-              variant="input"
-            />
+          {isSecureFieldConfigured ? (
+            <ConfiguredSecretInput id={id} readOnly={readOnly} onReset={() => onResetSecureField?.(secureFieldKey)} />
           ) : (
             <Input
               id={id}
@@ -283,12 +275,11 @@ const OptionInput: FC<Props & { id: string }> = ({
           onSelectTemplate={onSelectTemplate}
           readOnly={readOnly}
         >
-          {isEncryptedInput ? (
-            <ConfiguredSecureField
+          {isSecureFieldConfigured ? (
+            <ConfiguredSecretTextArea
               id={id}
               readOnly={readOnly}
               onReset={() => onResetSecureField?.(secureFieldKey)}
-              variant="textarea"
             />
           ) : (
             <TextArea
