@@ -770,7 +770,7 @@ var (
 			Description: "Enable the secrets management app platform UI",
 			Stage:       FeatureStagePublicPreview,
 			Owner:       grafanaOperatorExperienceSquad,
-			Expression:  "true",
+			Expression:  "false",
 		},
 		{
 			Name:         "secretsKeeperUI",
