@@ -545,3 +545,227 @@ func TestIntegrationProvisioning_ConnectionTestEndpointWithPermissions(t *testin
 		require.NotNil(t, c)
 	})
 }
+
+func TestIntegrationProvisioning_RepositoryTestWritePermissions(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
+	helper := runGrafana(t)
+	ctx := context.Background()
+
+	t.Run("repository with write workflow checks write permissions via Test endpoint", func(t *testing.T) {
+		// Create a local repository with write workflow
+		repoConfig := map[string]any{
+			"apiVersion": "provisioning.grafana.app/v0alpha1",
+			"kind":       "Repository",
+			"metadata": map[string]any{
+				"name":      "test-repo-write-permissions",
+				"namespace": "default",
+				"finalizers": []string{
+					"remove-orphan-resources",
+					"cleanup",
+				},
+			},
+			"spec": map[string]any{
+				"title": "Test Repository with Write Workflow",
+				"type":  "local",
+				"local": map[string]any{
+					"path": helper.ProvisioningPath,
+				},
+				"workflows": []string{"write"}, // Write workflow configured
+				"sync": map[string]any{
+					"enabled":         false, // Disable sync for this test
+					"target":          "folder",
+					"intervalSeconds": 10,
+				},
+			},
+		}
+
+		configBytes, err := json.Marshal(repoConfig)
+		require.NoError(t, err)
+
+		// Test the repository configuration with dryRun
+		// This should trigger the Test method which checks CanWrite
+		result := helper.AdminREST.Post().
+			Namespace("default").
+			Resource("repositories").
+			Name("test-repo-write-permissions").
+			SubResource("test").
+			Body(configBytes).
+			SetHeader("Content-Type", "application/json").
+			Do(ctx)
+
+		require.NoError(t, result.Error(), "test endpoint should work for repository with write workflow")
+
+		obj, err := result.Get()
+		require.NoError(t, err)
+
+		testResults := parseTestResults(t, obj)
+		require.True(t, testResults.Success, "local repository with write workflow should pass write permission check")
+		require.Equal(t, 200, testResults.Code, "should return 200 for successful test")
+	})
+
+	t.Run("read-only repository skips write permission check via Test endpoint", func(t *testing.T) {
+		// Create a local repository WITHOUT workflows (read-only)
+		repoConfig := map[string]any{
+			"apiVersion": "provisioning.grafana.app/v0alpha1",
+			"kind":       "Repository",
+			"metadata": map[string]any{
+				"name":      "test-repo-readonly",
+				"namespace": "default",
+				"finalizers": []string{
+					"remove-orphan-resources",
+					"cleanup",
+				},
+			},
+			"spec": map[string]any{
+				"title": "Test Read-Only Repository",
+				"type":  "local",
+				"local": map[string]any{
+					"path": helper.ProvisioningPath,
+				},
+				// No workflows = read-only
+				"sync": map[string]any{
+					"enabled":         false,
+					"target":          "folder",
+					"intervalSeconds": 10,
+				},
+			},
+		}
+
+		configBytes, err := json.Marshal(repoConfig)
+		require.NoError(t, err)
+
+		// Test the repository configuration with dryRun
+		// This should NOT trigger write permission check (no workflows)
+		result := helper.AdminREST.Post().
+			Namespace("default").
+			Resource("repositories").
+			Name("test-repo-readonly").
+			SubResource("test").
+			Body(configBytes).
+			SetHeader("Content-Type", "application/json").
+			Do(ctx)
+
+		require.NoError(t, result.Error(), "test endpoint should work for read-only repository")
+
+		obj, err := result.Get()
+		require.NoError(t, err)
+
+		testResults := parseTestResults(t, obj)
+		require.True(t, testResults.Success, "read-only repository should succeed without write permission check")
+		require.Equal(t, 200, testResults.Code, "should return 200 for successful test")
+	})
+
+	t.Run("repository write workflow validation via dryRun", func(t *testing.T) {
+		// Test creating a repository with write workflow using dryRun
+		// This validates the configuration without creating the actual resource
+		repoConfig := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "provisioning.grafana.app/v0alpha1",
+				"kind":       "Repository",
+				"metadata": map[string]any{
+					"name":      "test-repo-dryrun-write",
+					"namespace": "default",
+					"finalizers": []string{
+						"remove-orphan-resources",
+						"cleanup",
+					},
+				},
+				"spec": map[string]any{
+					"title": "Test Repository DryRun with Write Workflow",
+					"type":  "local",
+					"local": map[string]any{
+						"path": helper.ProvisioningPath,
+					},
+					"workflows": []string{"write"},
+					"sync": map[string]any{
+						"enabled":         false,
+						"target":          "folder",
+						"intervalSeconds": 10,
+					},
+				},
+			},
+		}
+
+		// Create with dryRun - validates without actually creating
+		repo, err := helper.Repositories.Resource.Create(ctx, repoConfig, metav1.CreateOptions{
+			DryRun: []string{"All"},
+		})
+		require.NoError(t, err, "dryRun should succeed for repository with write workflow")
+		require.NotNil(t, repo)
+
+		// Verify the repository was not actually created
+		_, err = helper.Repositories.Resource.Get(ctx, "test-repo-dryrun-write", metav1.GetOptions{})
+		require.True(t, k8serrors.IsNotFound(err), "repository should not be created during dryRun")
+	})
+
+	t.Run("repository without workflows passes validation via dryRun", func(t *testing.T) {
+		// Test creating a read-only repository using dryRun
+		repoConfig := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "provisioning.grafana.app/v0alpha1",
+				"kind":       "Repository",
+				"metadata": map[string]any{
+					"name":      "test-repo-dryrun-readonly",
+					"namespace": "default",
+					"finalizers": []string{
+						"remove-orphan-resources",
+						"cleanup",
+					},
+				},
+				"spec": map[string]any{
+					"title": "Test Repository DryRun Read-Only",
+					"type":  "local",
+					"local": map[string]any{
+						"path": helper.ProvisioningPath,
+					},
+					// No workflows = read-only
+					"sync": map[string]any{
+						"enabled":         false,
+						"target":          "folder",
+						"intervalSeconds": 10,
+					},
+				},
+			},
+		}
+
+		// Create with dryRun
+		repo, err := helper.Repositories.Resource.Create(ctx, repoConfig, metav1.CreateOptions{
+			DryRun: []string{"All"},
+		})
+		require.NoError(t, err, "dryRun should succeed for read-only repository")
+		require.NotNil(t, repo)
+
+		// Verify the repository was not actually created
+		_, err = helper.Repositories.Resource.Get(ctx, "test-repo-dryrun-readonly", metav1.GetOptions{})
+		require.True(t, k8serrors.IsNotFound(err), "repository should not be created during dryRun")
+	})
+
+	t.Run("health check reflects write permission status for repositories with workflows", func(t *testing.T) {
+		// Create an actual repository with write workflow
+		repo := "test-repo-health-write"
+		helper.CreateRepo(t, TestRepo{
+			Name:            repo,
+			Target:          "folder",
+			ExpectedFolders: 1,
+			Values: map[string]any{
+				"Workflows": []string{"write"},
+			},
+		})
+
+		// Get the repository and check health status
+		repoObj, err := helper.Repositories.Resource.Get(ctx, repo, metav1.GetOptions{})
+		require.NoError(t, err)
+		repository := unstructuredToRepository(t, repoObj)
+
+		// Repository should be healthy
+		require.True(t, repository.Status.Health.Healthy, "repository with write workflow should be healthy")
+		require.Empty(t, repository.Status.Health.Error, "should have no health errors")
+		require.Empty(t, repository.Status.FieldErrors, "should have no field errors")
+
+		// Verify Ready condition
+		readyCondition := findCondition(repository.Status.Conditions, provisioning.ConditionTypeReady)
+		require.NotNil(t, readyCondition, "Ready condition should exist")
+		require.Equal(t, metav1.ConditionTrue, readyCondition.Status, "Ready condition should be True")
+	})
+}
