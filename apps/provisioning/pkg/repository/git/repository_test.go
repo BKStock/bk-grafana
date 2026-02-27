@@ -842,6 +842,141 @@ func TestGitRepository_Test(t *testing.T) {
 	}
 }
 
+func TestGitRepository_Test_CanWriteValidation(t *testing.T) {
+	t.Run("verifies CanWrite is called for repositories with write workflows", func(t *testing.T) {
+		mockClient := &mocks.FakeClient{}
+		mockClient.IsAuthorizedReturns(true, nil)
+		mockClient.RepoExistsReturns(true, nil)
+		mockClient.GetRefReturns(nanogit.Ref{
+			Name: "refs/heads/main",
+			Hash: hash.Hash{},
+		}, nil)
+		mockClient.CanWriteReturns(true, nil)
+
+		gitRepo := &gitRepository{
+			client: mockClient,
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			config: &provisioning.Repository{
+				Spec: provisioning.RepositorySpec{
+					Type:      provisioning.GitRepositoryType,
+					Workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+				},
+			},
+		}
+
+		results, err := gitRepo.Test(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, results)
+		require.True(t, results.Success)
+		require.Equal(t, http.StatusOK, results.Code)
+
+		// Verify CanWrite was called exactly once
+		require.Equal(t, 1, mockClient.CanWriteCallCount(), "CanWrite should be called for write workflows")
+	})
+
+	t.Run("verifies CanWrite is NOT called for read-only repositories", func(t *testing.T) {
+		mockClient := &mocks.FakeClient{}
+		mockClient.IsAuthorizedReturns(true, nil)
+		mockClient.RepoExistsReturns(true, nil)
+		mockClient.GetRefReturns(nanogit.Ref{
+			Name: "refs/heads/main",
+			Hash: hash.Hash{},
+		}, nil)
+
+		gitRepo := &gitRepository{
+			client: mockClient,
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			config: &provisioning.Repository{
+				Spec: provisioning.RepositorySpec{
+					Type:      provisioning.GitRepositoryType,
+					Workflows: nil, // No workflows = read-only
+				},
+			},
+		}
+
+		results, err := gitRepo.Test(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, results)
+		require.True(t, results.Success)
+		require.Equal(t, http.StatusOK, results.Code)
+
+		// Verify CanWrite was NOT called for read-only repositories
+		require.Equal(t, 0, mockClient.CanWriteCallCount(), "CanWrite should NOT be called for read-only repositories")
+	})
+
+	t.Run("verifies CanWrite is called for branch workflow", func(t *testing.T) {
+		mockClient := &mocks.FakeClient{}
+		mockClient.IsAuthorizedReturns(true, nil)
+		mockClient.RepoExistsReturns(true, nil)
+		mockClient.GetRefReturns(nanogit.Ref{
+			Name: "refs/heads/main",
+			Hash: hash.Hash{},
+		}, nil)
+		mockClient.CanWriteReturns(true, nil)
+
+		gitRepo := &gitRepository{
+			client: mockClient,
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			config: &provisioning.Repository{
+				Spec: provisioning.RepositorySpec{
+					Type:      provisioning.GitRepositoryType,
+					Workflows: []provisioning.Workflow{provisioning.BranchWorkflow},
+				},
+			},
+		}
+
+		results, err := gitRepo.Test(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, results)
+		require.True(t, results.Success)
+		require.Equal(t, http.StatusOK, results.Code)
+
+		// Verify CanWrite was called for branch workflow
+		require.Equal(t, 1, mockClient.CanWriteCallCount(), "CanWrite should be called for branch workflow")
+	})
+
+	t.Run("verifies Test fails when CanWrite denies access", func(t *testing.T) {
+		mockClient := &mocks.FakeClient{}
+		mockClient.IsAuthorizedReturns(true, nil)
+		mockClient.RepoExistsReturns(true, nil)
+		mockClient.GetRefReturns(nanogit.Ref{
+			Name: "refs/heads/main",
+			Hash: hash.Hash{},
+		}, nil)
+		mockClient.CanWriteReturns(false, nil) // Write access denied
+
+		gitRepo := &gitRepository{
+			client: mockClient,
+			gitConfig: RepositoryConfig{
+				Branch: "main",
+			},
+			config: &provisioning.Repository{
+				Spec: provisioning.RepositorySpec{
+					Type:      provisioning.GitRepositoryType,
+					Workflows: []provisioning.Workflow{provisioning.WriteWorkflow},
+				},
+			},
+		}
+
+		results, err := gitRepo.Test(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, results)
+		require.False(t, results.Success)
+		require.Equal(t, http.StatusForbidden, results.Code)
+		require.Len(t, results.Errors, 1)
+		require.Equal(t, "write permission denied", results.Errors[0].Detail)
+
+		// Verify CanWrite was called
+		require.Equal(t, 1, mockClient.CanWriteCallCount(), "CanWrite should be called")
+	})
+}
+
 func TestGitRepository_Read(t *testing.T) {
 	tests := []struct {
 		name      string
