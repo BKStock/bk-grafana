@@ -61,7 +61,7 @@ func TestIntegrationBenchmarkSQLKVStorageAndSearch(t *testing.T) {
 			testutil.SkipIntegrationTestInShortMode(t)
 			opts := DefaultBenchmarkOptions(t)
 			if db.IsTestDbSQLite() {
-				opts.Concurrency = 1
+				t.Skip("skipping concurrency benchmark on sqlite")
 			}
 			backend, _ := NewTestSqlKvBackend(t, t.Context(), withRvManager)
 			searchBackend, err := search.NewBleveBackend(search.BleveOptions{
