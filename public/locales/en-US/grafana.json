@@ -11930,8 +11930,7 @@
       "tooltip-delete": "Delete"
     },
     "presets": {
-      "back-button": "Back",
-      "back-button-tooltip": "Go back",
+      "back-button-text": "Go back",
       "skip-button": "Skip",
       "title": "Select style"
     },
