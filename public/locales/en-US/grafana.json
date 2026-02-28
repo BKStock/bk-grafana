@@ -6603,6 +6603,12 @@
         }
       }
     },
+    "default-value-editor": {
+      "aria-label": "Default value",
+      "description": "Values that are pre-selected by default.",
+      "label": "Default value",
+      "placeholder": "Choose default values"
+    },
     "delete-provisioned-dashboard-form": {
       "api-error": "Failed to delete dashboard",
       "cancel-action": "Cancel",
@@ -13314,6 +13320,7 @@
     "action": {
       "add-transformation-filter": "Add filter",
       "duplicate": "Duplicate {{type}}",
+      "error": "Error",
       "hide": "Hide {{type}}",
       "hide-help": "Hide data source help",
       "hide-transformation-help": "Hide transformation help",
