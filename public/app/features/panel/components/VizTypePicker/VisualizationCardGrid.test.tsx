@@ -9,17 +9,8 @@ import {
   getDefaultTimeRange,
   toDataFrame,
 } from '@grafana/data';
-import { config } from '@grafana/runtime';
 
 import { VisualizationCardGrid, VisualizationCardGridGroup } from './VisualizationCardGrid';
-
-jest.mock('@grafana/runtime', () => ({
-  ...jest.requireActual('@grafana/runtime'),
-  config: {
-    ...jest.requireActual('@grafana/runtime').config,
-    featureToggles: { newVizSuggestions: true },
-  },
-}));
 
 jest.mock('./VisualizationSuggestionCard', () => ({
   VisualizationSuggestionCard: ({
@@ -218,24 +209,6 @@ describe('VisualizationCardGrid', () => {
       );
 
       expect(document.querySelector('img[src="https://test.com/logo-small.png"]')).toBeInTheDocument();
-    });
-
-    it('should not render group headers when newVizSuggestions feature toggle is disabled', () => {
-      config.featureToggles.newVizSuggestions = false;
-
-      render(
-        <VisualizationCardGrid
-          groups={groups}
-          data={mockData}
-          onItemClick={onItemClick}
-          getItemKey={(item) => item.hash}
-        />
-      );
-
-      expect(screen.queryByText('Time series')).not.toBeInTheDocument();
-      expect(screen.queryByText('Table')).not.toBeInTheDocument();
-
-      config.featureToggles.newVizSuggestions = true;
     });
   });
 });
