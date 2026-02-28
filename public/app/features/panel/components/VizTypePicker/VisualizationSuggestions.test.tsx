@@ -5,14 +5,14 @@ import { LoadingState, PanelData, PanelModel, toDataFrame, FieldType, getDefault
 import { config } from '@grafana/runtime';
 import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene/UnconfiguredPanel';
 
+import * as getPresetsModule from '../../presets/getPresets';
 import * as getAllSuggestionsModule from '../../suggestions/getAllSuggestions';
-import * as getPresetsModule from '../../suggestions/getPresets';
 
 import { VisualizationSuggestions } from './VisualizationSuggestions';
 import { PANEL_STATES, VizSuggestionsInteractions } from './interactions';
 
 jest.mock('../../suggestions/getAllSuggestions');
-jest.mock('../../suggestions/getPresets');
+jest.mock('../../presets/getPresets');
 jest.mock('./interactions', () => ({
   ...jest.requireActual('./interactions'),
   VizSuggestionsInteractions: {

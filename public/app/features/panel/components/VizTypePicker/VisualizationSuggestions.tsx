@@ -17,10 +17,10 @@ import { Alert, Button, Icon, Spinner, Text, useStyles2 } from '@grafana/ui';
 import { UNCONFIGURED_PANEL_PLUGIN_ID } from 'app/features/dashboard-scene/scene/UnconfiguredPanel';
 
 import { useStructureRev } from '../../../explore/Graph/useStructureRev';
+import { getPresets } from '../../presets/getPresets';
 import { filterPluginList } from '../../state/util';
 import { panelsWithoutData } from '../../suggestions/consts';
 import { getAllSuggestions } from '../../suggestions/getAllSuggestions';
-import { getPresets } from '../../suggestions/getPresets';
 import { hasData } from '../../suggestions/utils';
 
 import { VisualizationCardGrid, VisualizationCardGridGroup } from './VisualizationCardGrid';
