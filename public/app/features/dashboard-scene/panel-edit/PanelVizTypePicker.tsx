@@ -218,7 +218,11 @@ export function PanelVizTypePicker({
                 {listMode === VisualizationSelectPaneTab.Suggestions && (
                   <VisualizationSuggestions
                     onChange={onChange}
-                    onShowPresets={config.featureToggles.vizPresets ? handleShowPresets : undefined}
+                    onShowPresets={
+                      config.featureToggles.vizPresets && config.featureToggles.newVizSuggestions
+                        ? handleShowPresets
+                        : undefined
+                    }
                     panel={panelModel}
                     data={data}
                     searchQuery={searchQuery}
